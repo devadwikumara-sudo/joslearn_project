@@ -1,8 +1,10 @@
 <?php
 
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/user', function (Request $request) {
-    return $request->user();
-})->middleware('auth:sanctum');
+// Endpoint pemeriksaan awal; tambahkan autentikasi sebelum API dipakai.
+Route::prefix('v1')->group(function () {
+    Route::get('/status', fn () => response()->json([
+        'app' => 'JosBook', 'status' => 'starter',
+    ]));
+});

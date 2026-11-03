@@ -19,6 +19,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Izinkan file view berekstensi .php diproses dengan compiler Blade
+        app('view')->addExtension('php', 'blade');
     }
 }
