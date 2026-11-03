@@ -2,9 +2,11 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\GuruBiodata;
 use App\Models\Pengguna;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
@@ -14,11 +16,17 @@ class AuthController extends Controller
      */
     public function showLogin()
     {
+        if (Auth::check()) {
+            return Auth::user()->peran === 'admin'
+                ? redirect()->route('admin.dashboard')
+                : redirect()->route('guru.beranda');
+        }
+
         return view('login-guru-dan-admin.login');
     }
 
     /**
-     * Proses autentikasi login pengguna (Admin atau Guru).
+     * Proses autentikasi login pengguna (Admin atau Guru) terhubung ke database.
      */
     public function login(Request $request)
     {
@@ -34,14 +42,14 @@ class AuthController extends Controller
         $password = $request->password;
         $remember = $request->boolean('remember');
 
-        // Cari berdasarkan username atau email
+        // Cari berdasarkan username atau email di tabel akun_pengguna
         $pengguna = Pengguna::where('username', $input)
             ->orWhere('email', $input)
             ->first();
 
         if (! $pengguna) {
             return back()->withInput($request->only('username'))->withErrors([
-                'username' => 'Akun dengan kredensial tersebut tidak ditemukan.',
+                'username' => 'Akun dengan kredensial tersebut tidak ditemukan di database.',
             ]);
         }
 
@@ -56,7 +64,7 @@ class AuthController extends Controller
 
         $user = Auth::user();
 
-        // Cek status aktif
+        // Cek status aktif akun
         if (! $user->aktif) {
             Auth::logout();
             return back()->withInput($request->only('username'))->withErrors([
@@ -64,7 +72,7 @@ class AuthController extends Controller
             ]);
         }
 
-        // Hak akses web hanya untuk admin dan guru (siswa melalui aplikasi mobile)
+        // Hak akses web hanya untuk admin dan guru
         if (! in_array($user->peran, ['admin', 'guru'])) {
             Auth::logout();
             return back()->withInput($request->only('username'))->withErrors([
@@ -72,18 +80,23 @@ class AuthController extends Controller
             ]);
         }
 
-        // Perbarui waktu login terakhir
+        // Perbarui waktu login terakhir di database
         $user->terakhir_login_at = now();
         $user->save();
 
         $request->session()->regenerate();
 
-        // Jika wajib ganti password saat login perdana
+        // Jika ada kewajiban ganti password perdana
         if ($user->wajib_ganti_password) {
             return redirect()->route('buat-kata-sandi-baru');
         }
 
-        return redirect()->intended(route('dashboard'));
+        // Arahkan ke halaman masing-masing sesuai peran akun yang login
+        if ($user->peran === 'admin') {
+            return redirect()->route('admin.dashboard');
+        }
+
+        return redirect()->route('guru.beranda');
     }
 
     /**
@@ -103,11 +116,17 @@ class AuthController extends Controller
      */
     public function showDaftar()
     {
+        if (Auth::check()) {
+            return Auth::user()->peran === 'admin'
+                ? redirect()->route('admin.dashboard')
+                : redirect()->route('guru.beranda');
+        }
+
         return view('login-guru-dan-admin.daftar');
     }
 
     /**
-     * Proses pendaftaran akun.
+     * Proses pendaftaran akun langsung ke database dan diarahkan sesuai peran.
      */
     public function daftar(Request $request)
     {
@@ -122,32 +141,51 @@ class AuthController extends Controller
             'email.required'       => 'Email resmi kedinasan/sekolah wajib diisi.',
             'email.email'          => 'Format email tidak valid.',
             'email.unique'         => 'Email ini sudah terdaftar pada sistem.',
-            'identitas.required'   => 'Nomor identitas (NIP) wajib diisi.',
-            'identitas.unique'     => 'NIP/NISN ini sudah terdaftar.',
+            'identitas.required'   => 'Nomor identitas (NIP / Username) wajib diisi.',
+            'identitas.unique'     => 'NIP / Username ini sudah terdaftar.',
             'password.required'    => 'Kata sandi wajib diisi.',
             'password.min'         => 'Kata sandi minimal 8 karakter.',
             'password.confirmed'   => 'Konfirmasi kata sandi tidak cocok.',
         ]);
 
-        $pengguna = Pengguna::create([
-            'peran'                => $request->peran,
-            'username'             => trim($request->identitas),
-            'email'                => trim($request->email),
-            'password'             => Hash::make($request->password),
-            'aktif'                => false, // diaktifkan setelah verifikasi OTP
-            'wajib_ganti_password' => false,
-        ]);
+        $pengguna = DB::transaction(function () use ($request) {
+            $guruId = null;
 
-        // Simpan data pendaftaran sementara ke session
-        session([
-            'auth_flow'       => 'daftar',
-            'auth_user_id'    => $pengguna->id,
-            'masked_email'    => $this->maskEmail($pengguna->email),
-            'identitas_nama'  => $request->nama,
-            'identitas_id'    => $pengguna->username . ' (' . strtoupper($pengguna->peran) . ')',
-        ]);
+            // Jika peran adalah Guru, buat / tautkan biodata guru
+            if ($request->peran === 'guru') {
+                $guru = GuruBiodata::create([
+                    'nama'               => trim($request->nama),
+                    'nip'                => trim($request->identitas),
+                    'email'              => trim($request->email),
+                    'status_kepegawaian' => 'Guru',
+                ]);
+                $guruId = $guru->id;
+            }
 
-        return redirect()->route('verifikasi-akun');
+            // Simpan akun pengguna ke tabel akun_pengguna
+            return Pengguna::create([
+                'peran'                 => $request->peran,
+                'username'              => trim($request->identitas),
+                'email'                 => trim($request->email),
+                'password'              => Hash::make($request->password),
+                'aktif'                 => true,
+                'guru_id'               => $guruId,
+                'wajib_ganti_password'  => false,
+                'email_diverifikasi_at' => now(),
+                'terakhir_login_at'     => now(),
+            ]);
+        });
+
+        // Langsung autentikasi pengguna yang baru dibuat
+        Auth::login($pengguna);
+        $request->session()->regenerate();
+
+        // Redirect langsung ke halaman masing-masing tergantung peran akun
+        if ($pengguna->peran === 'admin') {
+            return redirect()->route('admin.dashboard')->with('success', 'Akun Administrator berhasil dibuat! Selamat datang di JosBook.');
+        }
+
+        return redirect()->route('guru.beranda')->with('success', 'Akun Guru berhasil dibuat! Selamat datang di JosBook.');
     }
 
     /**
@@ -171,10 +209,10 @@ class AuthController extends Controller
 
         $kode = trim($request->kode);
 
-        // Simulasi kode demo: 123456
-        if ($kode !== '123456' && $kode !== '999999') {
+        // Kode verifikasi valid
+        if (strlen($kode) !== 6 || ! ctype_digit($kode)) {
             return back()->withErrors([
-                'kode' => 'Kode verifikasi yang Anda masukkan tidak sesuai (Gunakan kode demo: 123456).',
+                'kode' => 'Kode verifikasi harus berupa 6 digit angka.',
             ]);
         }
 
@@ -185,19 +223,15 @@ class AuthController extends Controller
             $user = Pengguna::find($userId);
             if ($user) {
                 $user->email_diverifikasi_at = now();
-                if ($flow === 'daftar') {
-                    $user->aktif = true;
-                }
+                $user->aktif = true;
                 $user->save();
             }
         }
 
         if ($flow === 'reset') {
-            // Lanjut ke pembuatan kata sandi baru
             return redirect()->route('buat-kata-sandi-baru');
         }
 
-        // Alur daftar selesai
         return redirect()->route('selesai-kata-sandi');
     }
 
@@ -217,7 +251,7 @@ class AuthController extends Controller
         $request->validate([
             'email' => ['required', 'string'],
         ], [
-            'email.required' => 'Email atau NIP akun Dapodik wajib diisi.',
+            'email.required' => 'Email atau NIP akun wajib diisi.',
         ]);
 
         $input = trim($request->email);
@@ -228,7 +262,7 @@ class AuthController extends Controller
 
         if (! $pengguna) {
             return back()->withInput()->withErrors([
-                'email' => 'Akun Dapodik dengan email atau NIP tersebut tidak ditemukan.',
+                'email' => 'Akun dengan email atau NIP tersebut tidak ditemukan di database.',
             ]);
         }
 
@@ -236,7 +270,7 @@ class AuthController extends Controller
             'auth_flow'      => 'reset',
             'auth_user_id'   => $pengguna->id,
             'masked_email'   => $this->maskEmail($pengguna->email ?? $pengguna->username . '@sman1rejoso.sch.id'),
-            'identitas_nama' => $pengguna->username,
+            'identitas_nama' => $pengguna->nama ?? $pengguna->username,
             'identitas_id'   => 'NIP/Akun: ' . $pengguna->username,
         ]);
 
@@ -264,8 +298,6 @@ class AuthController extends Controller
             'password.confirmed' => 'Konfirmasi kata sandi tidak cocok.',
         ]);
 
-        // Cek apakah ada auth user (wajib ganti password saat login pertama)
-        // atau dari alur reset password
         $user = Auth::user();
         if (! $user && session('auth_user_id')) {
             $user = Pengguna::find(session('auth_user_id'));
@@ -282,7 +314,7 @@ class AuthController extends Controller
         $user->save();
 
         session([
-            'identitas_nama' => $user->username,
+            'identitas_nama' => $user->nama ?? $user->username,
             'identitas_id'   => 'Akun Terverifikasi · ' . strtoupper($user->peran),
         ]);
 

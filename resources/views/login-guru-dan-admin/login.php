@@ -95,11 +95,7 @@
 
                 <p class="jfoot">Belum punya akun? <a href="{{ route('daftar') }}">Daftar akun</a></p>
 
-                <div class="lgh" style="margin-top:16px">
-                    <b>Masuk cepat (demo)</b><br>
-                    Admin: <code>admin</code> / <code>admin123</code><br>
-                    Guru: <code>198501152010011002</code> / <code>guru123</code>
-                </div>
+
             </div>
 
             <small class="jbt">Memerlukan bantuan akses? Hubungi administrator sekolah</small>

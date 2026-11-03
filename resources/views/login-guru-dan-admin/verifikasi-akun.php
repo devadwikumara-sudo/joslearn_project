@@ -64,7 +64,6 @@
             <p class="wfo">
                 Belum menerima kode verifikasi?<br>
                 Kirim ulang kode: <em class="tm" id="timer_text">⏱ Kirim ulang dalam 00:45</em><br>
-                <small style="color:#1967d2;font-weight:600">Kode simulasi demo: 123456</small>
             </p>
 
             <div class="wlk">
