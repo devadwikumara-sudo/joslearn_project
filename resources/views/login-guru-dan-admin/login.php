@@ -12,13 +12,19 @@
 </head>
 <body style="margin:0;padding:0;background:#fff;font-family:'Plus Jakarta Sans',Inter,sans-serif">
     <div class="jl">
+        <!-- Panel Kiri Sesuai Desain Login.png -->
         <div class="jlf">
             <div class="jb">
-                <img src="{{ asset('images/josbook-logo.png') }}" alt="JosBook Logo">
+                <div class="jb-logo">
+                    <img src="{{ asset('images/josbook-logo.png') }}" alt="JosBook Logo">
+                </div>
                 <b>JOSBOOK</b>
             </div>
+
             <div class="jlc">
-                <img class="big" src="{{ asset('images/josbook-logo.png') }}" alt="JosBook Logo">
+                <div class="jlc-logo">
+                    <img src="{{ asset('images/josbook-logo.png') }}" alt="JosBook Logo">
+                </div>
                 <h1>JosBook</h1>
                 <p>Absensi &amp; Nilai Raport Real Time</p>
                 <ul>
@@ -26,10 +32,16 @@
                     <li>Pengolahan nilai raport terpadu &amp; transparan</li>
                 </ul>
             </div>
+
             <small>© 2026 JosLearn. Hak Cipta Dilindungi.</small>
         </div>
+
+        <!-- Panel Kanan Form Login Sesuai Desain Login.png -->
         <div class="jr">
-            <div class="jm"><img src="{{ asset('images/josbook-logo.png') }}" alt="JosBook Logo"></div>
+            <div class="jm">
+                <img src="{{ asset('images/josbook-logo.png') }}" alt="JosBook Logo" style="width:90px;height:90px;object-fit:contain">
+            </div>
+
             <div class="jfm">
                 <h1>Selamat Datang</h1>
                 <h4>Masuk ke JosBook</h4>
@@ -59,19 +71,21 @@
                 <form method="POST" action="{{ route('login.post') }}">
                     @csrf
                     <label for="l_u">NIS/NIP, Email</label>
-                    <div class="jf">
+                    <div class="wf">
+                        <i>👤</i>
                         <input id="l_u" name="username" type="text" placeholder="Masukkan Nama Pengguna atau NIS/NIP" value="{{ old('username') }}" autocomplete="username" required autofocus>
                     </div>
 
                     <label for="l_p">Kata Sandi</label>
-                    <div class="jf">
+                    <div class="wf">
+                        <i>🔒</i>
                         <input id="l_p" name="password" type="password" placeholder="Masukkan kata sandi Anda" autocomplete="current-password" required>
                         <span class="eye" onclick="togglePassword('l_p')">👁</span>
                     </div>
 
                     <div class="jrow">
                         <label style="display:flex;gap:6px;margin:0;align-items:center;cursor:pointer">
-                            <input type="checkbox" name="remember" {{ old('remember') ? 'checked' : '' }}> ingat saya
+                            <input type="checkbox" name="remember" {{ old('remember') ? 'checked' : '' }}> Ingat saya
                         </label>
                         <a href="{{ route('reset-sandi') }}">Lupa Kata Sandi?</a>
                     </div>
@@ -87,6 +101,7 @@
                     Guru: <code>198501152010011002</code> / <code>guru123</code>
                 </div>
             </div>
+
             <small class="jbt">Memerlukan bantuan akses? Hubungi administrator sekolah</small>
         </div>
     </div>

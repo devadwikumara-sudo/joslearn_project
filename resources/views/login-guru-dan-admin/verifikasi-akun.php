@@ -13,19 +13,26 @@
 <body style="margin:0;padding:0;background:#f6f9fe;font-family:'Plus Jakarta Sans',Inter,sans-serif">
     <div class="jc">
         <div class="wbg"></div>
+
+        <!-- Header Logo sesuai desain -->
         <div class="wh">
-            <img src="{{ asset('images/josbook-logo.png') }}" alt="JosBook Logo">
-            <div>
-                <b>JosBook <u>PORTAL</u></b>
+            <div class="wh-logo">
+                <img src="{{ asset('images/josbook-logo.png') }}" alt="JosBook Logo">
+            </div>
+            <div class="wh-text">
+                <div class="wh-title">
+                    <b>JosBook</b>
+                    <span class="wh-badge">PORTAL</span>
+                </div>
                 <small>SMA NEGERI 1 REJOSO NGANJUK</small>
             </div>
         </div>
 
         <div class="wcard">
             <span class="wic">✉</span>
-            <span class="pl">Langkah 2 dari 3: Verifikasi Kode Keamanan</span>
+            <div class="pl">⟳ Langkah 2 dari 3: Verifikasi Kode Keamanan</div>
             <h2>Verifikasi Akun</h2>
-            <p class="ws">Kami telah mengirimkan 6 digit kode keamanan ke email kedinasan Anda.</p>
+            <p class="ws">Kami telah mengirimkan 6 digit kode keamanan ke email kedinasan Anda:</p>
 
             @if(isset($errors) && $errors->any())
             <div class="mban">
@@ -35,7 +42,7 @@
             @endif
 
             <div class="mp">
-                ✔ <b>{{ session('masked_email', 'guru@sman1rejoso.sch.id') }}</b> <em>TERVALIDASI</em>
+                ✔ <b>{{ session('masked_email', 'bu***@sman1rejoso.sch.id') }}</b> <em>TERVALIDASI</em>
             </div>
 
             <form method="POST" action="{{ route('verifikasi-akun.post') }}" id="otpForm">
@@ -57,7 +64,7 @@
             <p class="wfo">
                 Belum menerima kode verifikasi?<br>
                 Kirim ulang kode: <em class="tm" id="timer_text">⏱ Kirim ulang dalam 00:45</em><br>
-                <small style="color:#0256cf;font-weight:600">Kode simulasi demo: 123456</small>
+                <small style="color:#1967d2;font-weight:600">Kode simulasi demo: 123456</small>
             </p>
 
             <div class="wlk">
@@ -118,7 +125,7 @@
             seconds--;
             if (seconds <= 0) {
                 clearInterval(interval);
-                timerEl.innerHTML = '<a href="#" onclick="location.reload();return false;" style="color:#0256cf;font-weight:700">Kirim Ulang Sekarang</a>';
+                timerEl.innerHTML = '<a href="#" onclick="location.reload();return false;" style="color:#1967d2;font-weight:700">Kirim Ulang Sekarang</a>';
             } else {
                 timerEl.textContent = `⏱ Kirim ulang dalam 00:${seconds < 10 ? '0' : ''}${seconds}`;
             }

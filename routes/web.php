@@ -3,9 +3,27 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\GantiPasswordController;
-use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\Admin\DashboardAdminController;
+use App\Http\Controllers\Admin\DataSiswaController;
+use App\Http\Controllers\Admin\DataGuruController;
+use App\Http\Controllers\Admin\ImportNilaiAdminController;
+use App\Http\Controllers\Admin\ImportEkskulAdminController;
+use App\Http\Controllers\Admin\ImportKehadiranAdminController;
+use App\Http\Controllers\Admin\KenaikanKelasController;
+use App\Http\Controllers\Admin\MutasiSiswaController;
+use App\Http\Controllers\Admin\AlumniController;
+use App\Http\Controllers\Admin\LaporanController;
+use App\Http\Controllers\Admin\CekKualitasDataController;
+use App\Http\Controllers\Admin\LogAktivitasController;
+use App\Http\Controllers\Admin\SettingController;
+use App\Http\Controllers\Guru\BerandaGuruController;
+use App\Http\Controllers\Guru\DataSiswaGuruController;
+use App\Http\Controllers\Guru\ImportNilaiGuruController;
+use App\Http\Controllers\Guru\ImportEkskulGuruController;
+use App\Http\Controllers\Guru\ImportKetidakhadiranController;
+use App\Http\Controllers\Guru\InputNilaiMapelController;
 
-// ─── ALUR LOGIN & AUTENTIKASI GURU & ADMIN (project/web/login guru dan admin) ───
+// ─── ALUR LOGIN & AUTENTIKASI GURU & ADMIN ───────────────────────────────────
 
 // 1. Halaman Login (Login.png)
 Route::get('/login', [AuthController::class, 'showLogin'])->name('login')->middleware('guest');
@@ -31,14 +49,115 @@ Route::post('/buat-kata-sandi-baru', [AuthController::class, 'simpanKataSandiBar
 // 6. Halaman Selesai Kata Sandi (selesai kata sandi.png)
 Route::get('/selesai-kata-sandi', [AuthController::class, 'showSelesaiKataSandi'])->name('selesai-kata-sandi');
 
-// Kompatibilitas alur ganti password lama
+// Ganti password (wajib ganti pertama login)
 Route::middleware(['auth'])->group(function () {
     Route::get('/ganti-password', [GantiPasswordController::class, 'show'])->name('ganti-password');
     Route::post('/ganti-password', [GantiPasswordController::class, 'update'])->name('ganti-password.update');
 });
 
-// ─── DASHBOARD & AREA TERPROTEKSI ──────────────────────────────────────────
+// ─── ROOT REDIRECT ────────────────────────────────────────────────────────────
+Route::get('/', function () {
+    if (auth()->check()) {
+        $peran = auth()->user()->peran;
+        return $peran === 'admin'
+            ? redirect()->route('admin.dashboard')
+            : redirect()->route('guru.beranda');
+    }
+    return redirect()->route('login');
+});
+
+// ─── AREA ADMIN (hanya admin) ─────────────────────────────────────────────────
+Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin.only'])->group(function () {
+
+    // Dashboard Admin (dashboard admin.png)
+    Route::get('/dashboard', [DashboardAdminController::class, 'index'])->name('dashboard');
+
+    // Data Siswa (data siswa.png)
+    Route::get('/data-siswa', [DataSiswaController::class, 'index'])->name('data-siswa');
+    Route::get('/data-siswa/{id}', [DataSiswaController::class, 'show'])->name('data-siswa.show');
+    Route::post('/data-siswa', [DataSiswaController::class, 'store'])->name('data-siswa.store');
+    Route::put('/data-siswa/{id}', [DataSiswaController::class, 'update'])->name('data-siswa.update');
+
+    // Data Guru (data guru.png)
+    Route::get('/data-guru', [DataGuruController::class, 'index'])->name('data-guru');
+    Route::post('/data-guru', [DataGuruController::class, 'store'])->name('data-guru.store');
+    Route::get('/data-guru/{id}/edit', [DataGuruController::class, 'edit'])->name('data-guru.edit');
+    Route::put('/data-guru/{id}', [DataGuruController::class, 'update'])->name('data-guru.update');
+
+    // Import Nilai (import nilai.png)
+    Route::get('/import/nilai', [ImportNilaiAdminController::class, 'index'])->name('import.nilai');
+    Route::post('/import/nilai', [ImportNilaiAdminController::class, 'store'])->name('import.nilai.store');
+    Route::post('/import/nilai/confirm', [ImportNilaiAdminController::class, 'confirm'])->name('import.nilai.confirm');
+
+    // Import Ekskul (import ekskul.png)
+    Route::get('/import/ekskul', [ImportEkskulAdminController::class, 'index'])->name('import.ekskul');
+    Route::post('/import/ekskul', [ImportEkskulAdminController::class, 'store'])->name('import.ekskul.store');
+
+    // Import Kehadiran (import kehadiran.png)
+    Route::get('/import/kehadiran', [ImportKehadiranAdminController::class, 'index'])->name('import.kehadiran');
+    Route::post('/import/kehadiran', [ImportKehadiranAdminController::class, 'store'])->name('import.kehadiran.store');
+
+    // Kenaikan Kelas (kenaikan kelas.png)
+    Route::get('/kenaikan-kelas', [KenaikanKelasController::class, 'index'])->name('kenaikan-kelas');
+    Route::post('/kenaikan-kelas/proses', [KenaikanKelasController::class, 'proses'])->name('kenaikan-kelas.proses');
+
+    // Mutasi Siswa (mutasi siswa.png)
+    Route::get('/mutasi-siswa', [MutasiSiswaController::class, 'index'])->name('mutasi-siswa');
+    Route::post('/mutasi-siswa', [MutasiSiswaController::class, 'store'])->name('mutasi-siswa.store');
+
+    // Alumni & Kontrol (alumni dan kontrol.png)
+    Route::get('/alumni', [AlumniController::class, 'index'])->name('alumni');
+    Route::get('/alumni/{id}', [AlumniController::class, 'show'])->name('alumni.show');
+
+    // Laporan (laporan.png)
+    Route::get('/laporan', [LaporanController::class, 'index'])->name('laporan');
+    Route::post('/laporan/cetak', [LaporanController::class, 'cetak'])->name('laporan.cetak');
+
+    // Cek Kualitas Data (cek kualitas data.png)
+    Route::get('/cek-kualitas-data', [CekKualitasDataController::class, 'index'])->name('cek-kualitas-data');
+
+    // Log Aktivitas (log aktivitas.png)
+    Route::get('/log-aktivitas', [LogAktivitasController::class, 'index'])->name('log-aktivitas');
+
+    // Setting (setting.png)
+    Route::get('/setting', [SettingController::class, 'index'])->name('setting');
+    Route::put('/setting', [SettingController::class, 'update'])->name('setting.update');
+    Route::delete('/setting/akun/{id}', [SettingController::class, 'hapusAkun'])->name('setting.akun.hapus');
+});
+
+// ─── AREA GURU (hanya guru) ───────────────────────────────────────────────────
+Route::prefix('guru')->name('guru.')->middleware(['auth', 'role.web'])->group(function () {
+
+    // Beranda Guru (beranda guru.png)
+    Route::get('/beranda', [BerandaGuruController::class, 'index'])->name('beranda');
+
+    // Data Siswa (data siswa.png - guru)
+    Route::get('/data-siswa', [DataSiswaGuruController::class, 'index'])->name('data-siswa');
+    Route::get('/data-siswa/{id}', [DataSiswaGuruController::class, 'show'])->name('data-siswa.show');
+
+    // Import Nilai (import nilai.png - guru)
+    Route::get('/import-nilai', [ImportNilaiGuruController::class, 'index'])->name('import-nilai');
+    Route::post('/import-nilai', [ImportNilaiGuruController::class, 'store'])->name('import-nilai.store');
+
+    // Import Ekskul (import ekskul.png - guru)
+    Route::get('/import-ekskul', [ImportEkskulGuruController::class, 'index'])->name('import-ekskul');
+    Route::post('/import-ekskul', [ImportEkskulGuruController::class, 'store'])->name('import-ekskul.store');
+
+    // Import Ketidakhadiran (import ketidakhadiraan.png - guru)
+    Route::get('/import-ketidakhadiran', [ImportKetidakhadiranController::class, 'index'])->name('import-ketidakhadiran');
+    Route::post('/import-ketidakhadiran', [ImportKetidakhadiranController::class, 'store'])->name('import-ketidakhadiran.store');
+
+    // Input Nilai Mapel (input nilai mapel.png - guru)
+    Route::get('/input-nilai-mapel', [InputNilaiMapelController::class, 'index'])->name('input-nilai-mapel');
+    Route::post('/input-nilai-mapel', [InputNilaiMapelController::class, 'store'])->name('input-nilai-mapel.store');
+});
+
+// ─── DASHBOARD LAMA (backward compat redirect) ───────────────────────────────
 Route::middleware(['auth', 'role.web'])->group(function () {
-    Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard.index');
+    Route::get('/dashboard', function () {
+        $peran = auth()->user()->peran;
+        return $peran === 'admin'
+            ? redirect()->route('admin.dashboard')
+            : redirect()->route('guru.beranda');
+    })->name('dashboard');
 });

@@ -1,9 +1,0 @@
-<?php
-namespace App\Http\Controllers;
-
-use Illuminate\View\View;
-
-class SiswaController extends Controller
-{
-    public function index(): View { return view('siswa.index'); }
-}

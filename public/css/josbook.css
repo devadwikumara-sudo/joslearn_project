@@ -98,3 +98,385 @@ select,input{border-radius:10px;border-color:#dfe5ee}
 .jmb.c .ok{box-shadow:0 0 0 8px #1f8a5b26}.jmb.c .mw1{background:#0256cf;color:#fff}.jmb.c .mw1.rd{background:#ef4b5f}.jmb.c .mw2{border:1px solid #cfd9e6;background:#fff}
 .mic{background:#ffffff1f;border-radius:12px;padding:12px 14px;display:grid;grid-template-columns:1fr auto;gap:6px;font-size:11.5px;text-align:left;margin-bottom:16px}.mic.w{display:block;background:#0b377a66}.rs{display:block;font-size:10px;opacity:.8;margin-top:12px}.mft{position:absolute;bottom:18px;font-size:9.5px;opacity:.8}
 .spl{display:grid;place-items:center;position:fixed;inset:0;z-index:60;background:linear-gradient(180deg,#fff 55%,#2f8cf5,#0b377a);animation:spl 0s 1.6s forwards}.spl img{width:240px}
+
+
+/* ==========================================================================
+   JOSBOOK PIXEL-PERFECT AUTH STYLES MATCHING DESIGN
+   ========================================================================== */
+
+/* Top Branding Header (.wh) */
+.wh {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 24px;
+    text-decoration: none;
+}
+.wh-logo {
+    width: 48px;
+    height: 48px;
+    background: #ffffff;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 14px rgba(11, 34, 64, 0.08);
+    border: 1px solid #eef2f7;
+    flex-shrink: 0;
+}
+.wh-logo img {
+    width: 38px;
+    height: 38px;
+    object-fit: contain;
+}
+.wh-text {
+    display: flex;
+    flex-direction: column;
+    text-align: left;
+}
+.wh-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    line-height: 1.2;
+}
+.wh-title b {
+    font-size: 19px;
+    font-weight: 800;
+    color: #0b2240;
+    letter-spacing: -0.2px;
+}
+.wh-badge {
+    background: #e1ebfa;
+    color: #1967d2;
+    font-size: 10px;
+    font-weight: 800;
+    padding: 2px 7px;
+    border-radius: 6px;
+    letter-spacing: 0.5px;
+}
+.wh-text small {
+    font-size: 10px;
+    font-weight: 700;
+    color: #68778d;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-top: 3px;
+}
+
+/* Card Container (.wcard) */
+.wcard {
+    position: relative;
+    background: #ffffff;
+    border-radius: 20px;
+    box-shadow: 0 12px 40px rgba(11, 34, 64, 0.08);
+    border: 1px solid #e8eef6;
+    width: 440px;
+    max-width: 94vw;
+    padding: 32px 36px;
+    text-align: center;
+    box-sizing: border-box;
+}
+.wcard h2 {
+    font-size: 24px;
+    font-weight: 800;
+    color: #0b1b2d;
+    margin: 8px 0 4px;
+    letter-spacing: -0.3px;
+}
+.ws {
+    font-size: 13px;
+    color: #68778d;
+    line-height: 1.5;
+    margin-bottom: 20px;
+}
+
+/* Role Selector Tabs (.jt) */
+.jt {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 18px;
+}
+.jt span {
+    border: 1.5px solid #dfe5ee;
+    border-radius: 12px;
+    padding: 12px;
+    cursor: pointer;
+    background: #f8fafc;
+    transition: all 0.2s ease;
+    text-align: center;
+}
+.jt span:hover {
+    background: #f1f5fb;
+}
+.jt span.on {
+    border-color: #1967d2;
+    background: #f0f6ff;
+    box-shadow: 0 0 0 3px rgba(25, 103, 210, 0.12);
+}
+.jt b {
+    display: block;
+    font-size: 13px;
+    font-weight: 800;
+    color: #68778d;
+    margin-bottom: 2px;
+}
+.jt span.on b {
+    color: #1967d2;
+}
+.jt small {
+    font-size: 11px;
+    color: #8795a6;
+    font-weight: 500;
+}
+.jt span.on small {
+    color: #1967d2;
+    opacity: 0.85;
+}
+
+/* Form Inputs with Icons */
+.wcard label, .jfm label {
+    display: block;
+    text-align: left;
+    font-size: 12px;
+    font-weight: 700;
+    color: #1b2430;
+    margin: 14px 0 6px;
+}
+.wf {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+.wf i, .jf-with-icon .input-icon {
+    position: absolute;
+    left: 14px;
+    font-style: normal;
+    font-size: 14px;
+    color: #8795a6;
+    pointer-events: none;
+    opacity: 0.8;
+}
+.wf input {
+    width: 100%;
+    padding: 12px 14px 12px 42px;
+    border-radius: 10px;
+    border: 1px solid #dfe5ee;
+    background: #fbfcfe;
+    font: inherit;
+    font-size: 13px;
+    color: #1b2430;
+    box-sizing: border-box;
+    transition: border-color 0.2s;
+}
+.wf input:focus, .jf input:focus {
+    outline: none;
+    border-color: #1967d2;
+    box-shadow: 0 0 0 3px rgba(25, 103, 210, 0.12);
+}
+.wf input.no-icon {
+    padding-left: 14px !important;
+}
+.wf .eye, .jf .eye {
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    font-size: 16px;
+    opacity: 0.6;
+    user-select: none;
+}
+.wf .eye:hover, .jf .eye:hover {
+    opacity: 1;
+}
+
+/* Primary Button (.wb, .jbtn) */
+.wb, .jbtn {
+    display: block;
+    width: 100%;
+    margin-top: 22px;
+    padding: 14px;
+    border: 0;
+    border-radius: 10px;
+    background: #1967d2;
+    color: #ffffff;
+    font: 700 13.5px 'Plus Jakarta Sans', Inter, sans-serif;
+    letter-spacing: 0.3px;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+    box-shadow: 0 4px 14px rgba(25, 103, 210, 0.25);
+}
+.wb:hover, .jbtn:hover {
+    background: #1557b0;
+}
+.wb:active, .jbtn:active {
+    transform: scale(0.99);
+}
+
+/* Login Split Branding */
+.jb {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: 800;
+    font-size: 16px;
+    color: #ffffff;
+    letter-spacing: 0.5px;
+}
+.jb-logo {
+    width: 44px;
+    height: 44px;
+    background: #ffffff;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+}
+.jb-logo img {
+    width: 34px;
+    height: 34px;
+    object-fit: contain;
+}
+.jlc-logo {
+    width: 120px;
+    height: 120px;
+    background: #ffffff;
+    border-radius: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 16px 36px rgba(11, 34, 64, 0.28);
+    margin-bottom: 24px;
+}
+.jlc-logo img {
+    width: 96px;
+    height: 96px;
+    object-fit: contain;
+}
+
+/* Step Pills (.pl) */
+.pl {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #e1ebfa;
+    color: #1967d2;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: 99px;
+    margin: 0 0 10px;
+}
+
+/* Icon Badges (.wic) */
+.wic {
+    display: inline-grid;
+    place-items: center;
+    width: 58px;
+    height: 58px;
+    border-radius: 16px;
+    background: #e1ebfa;
+    color: #1967d2;
+    font-size: 24px;
+    margin-bottom: 12px;
+}
+.wic.ok {
+    background: #1967d2;
+    color: #ffffff;
+    border-radius: 50%;
+    box-shadow: 0 0 0 8px #e1ebfa, 0 0 0 16px #f0f6ff;
+}
+
+/* OTP Boxes (.otps, .otp) */
+.otps {
+    display: flex;
+    gap: 10px;
+    margin: 18px 0;
+    justify-content: center;
+}
+.otp {
+    width: 52px;
+    height: 58px;
+    text-align: center;
+    font-size: 26px;
+    font-weight: 800;
+    color: #0b1b2d;
+    border-radius: 12px;
+    border: 1.5px solid #dce5f0;
+    background: #f8fafc;
+    transition: all 0.2s ease;
+}
+.otp:focus {
+    outline: none;
+    background: #ffffff;
+    border-color: #1967d2;
+    box-shadow: 0 0 0 3px rgba(25, 103, 210, 0.15);
+}
+
+/* Information / Notice Box (.wi) */
+.wi {
+    background: #f0f6ff;
+    border-radius: 10px;
+    padding: 11px 14px;
+    font-size: 11.5px;
+    color: #3b5168;
+    text-align: left;
+    margin-top: 14px;
+    line-height: 1.6;
+    border: 1px solid #dce8f8;
+}
+
+/* Summary Card (.wsm) */
+.wsm {
+    background: #f8fafc;
+    border: 1px solid #eef2f7;
+    border-radius: 14px;
+    padding: 16px 18px;
+    text-align: left;
+    display: grid;
+    gap: 12px;
+    margin: 14px 0;
+}
+.wsm small {
+    display: block;
+    font-size: 10px;
+    color: #8795a6;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.wsm b {
+    font-size: 14px;
+    color: #0b1b2d;
+    display: block;
+    margin-top: 2px;
+}
+.wsm .g {
+    color: #1967d2;
+    font-size: 12px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* Footer Bottom (.wft) */
+.wft {
+    position: relative;
+    margin-top: 24px;
+    font-size: 11px;
+    color: #68778d;
+    text-align: center;
+    line-height: 1.8;
+}
+.wft a {
+    color: #1967d2;
+    font-weight: 700;
+    text-decoration: none;
+}
+.wft a:hover {
+    text-decoration: underline;
+}

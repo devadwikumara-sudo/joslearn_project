@@ -13,17 +13,24 @@
 <body style="margin:0;padding:0;background:#f6f9fe;font-family:'Plus Jakarta Sans',Inter,sans-serif">
     <div class="jc">
         <div class="wbg"></div>
+
+        <!-- Header Logo sesuai desain -->
         <div class="wh">
-            <img src="{{ asset('images/josbook-logo.png') }}" alt="JosBook Logo">
-            <div>
-                <b>JosBook <u>PORTAL</u></b>
+            <div class="wh-logo">
+                <img src="{{ asset('images/josbook-logo.png') }}" alt="JosBook Logo">
+            </div>
+            <div class="wh-text">
+                <div class="wh-title">
+                    <b>JosBook</b>
+                    <span class="wh-badge">PORTAL</span>
+                </div>
                 <small>SMA NEGERI 1 REJOSO NGANJUK</small>
             </div>
         </div>
 
         <div class="wcard">
             <span class="wic">⟲</span>
-            <span class="pl">Langkah 1 dari 3: Identifikasi Akun Guru</span>
+            <div class="pl">● Langkah 1 dari 3: Identifikasi Akun Guru</div>
             <h2>Reset Kata Sandi</h2>
             <p class="ws">Masukkan NIP atau email resmi yang terdaftar pada akun Dapodik Anda.</p>
 
@@ -38,18 +45,18 @@
                 @csrf
                 <label for="r_e">Email *</label>
                 <div class="wf">
-                    <i>▣</i>
-                    <input id="r_e" name="email" type="text" placeholder="nama@sekolah.sch.id" value="{{ old('email') }}" required autofocus>
+                    <i>📇</i>
+                    <input id="r_e" name="email" type="text" placeholder="198204152008011007@sman1rejoso.sch.id" value="{{ old('email') }}" required autofocus>
                 </div>
 
                 <div class="wi">
-                    ⓘ Petunjuk: Kode verifikasi 6 digit akan dikirimkan ke email guru yang terdaftar di Dapodik.
+                    ⓘ Petunjuk: Kode verifikasi 6 digit akan dikirimkan ke email guru yang tertaut di Dapodik.
                 </div>
 
                 <button type="submit" class="wb">KIRIM KODE VERIFIKASI →</button>
             </form>
 
-            <p class="wfo"><a href="{{ route('login') }}">← Kembali ke Login</a></p>
+            <p class="wfo" style="margin-top:20px"><a href="{{ route('login') }}">← Kembali ke Login</a></p>
         </div>
 
         <div class="wft">

@@ -13,10 +13,17 @@
 <body style="margin:0;padding:0;background:#f6f9fe;font-family:'Plus Jakarta Sans',Inter,sans-serif">
     <div class="jc">
         <div class="wbg"></div>
+
+        <!-- Header Logo sesuai desain -->
         <div class="wh">
-            <img src="{{ asset('images/josbook-logo.png') }}" alt="JosBook Logo">
-            <div>
-                <b>JosBook <u>PORTAL</u></b>
+            <div class="wh-logo">
+                <img src="{{ asset('images/josbook-logo.png') }}" alt="JosBook Logo">
+            </div>
+            <div class="wh-text">
+                <div class="wh-title">
+                    <b>JosBook</b>
+                    <span class="wh-badge">PORTAL</span>
+                </div>
                 <small>SMA NEGERI 1 REJOSO NGANJUK</small>
             </div>
         </div>
@@ -34,14 +41,15 @@
 
             <form method="POST" action="{{ route('daftar.post') }}">
                 @csrf
-                <input type="hidden" name="peran" id="role_input" value="{{ old('peran', 'guru') }}">
+                <input type="hidden" name="peran" id="role_input" value="{{ old('peran', 'admin') }}">
 
+                <!-- Tab Pemilihan Peran: ADMIN dan GURU sesuai Desain -->
                 <div class="jt">
-                    <span id="tab_siswa" class="{{ old('peran') === 'siswa' ? 'on' : '' }}" onclick="selectRole('siswa')">
-                        <b>SISWA</b>
-                        <small>Peserta Didik</small>
+                    <span id="tab_admin" class="{{ old('peran', 'admin') === 'admin' ? 'on' : '' }}" onclick="selectRole('admin')">
+                        <b>ADMIN</b>
+                        <small>Pengelola sistem</small>
                     </span>
-                    <span id="tab_guru" class="{{ old('peran', 'guru') === 'guru' ? 'on' : '' }}" onclick="selectRole('guru')">
+                    <span id="tab_guru" class="{{ old('peran') === 'guru' ? 'on' : '' }}" onclick="selectRole('guru')">
                         <b>GURU</b>
                         <small>Tenaga Pendidik</small>
                     </span>
@@ -49,28 +57,28 @@
 
                 <label for="d_n">Nama Lengkap</label>
                 <div class="wf">
-                    <input id="d_n" name="nama" type="text" placeholder="Masukkan nama lengkap" value="{{ old('nama') }}" required>
+                    <input id="d_n" class="no-icon" name="nama" type="text" placeholder="Joko Susanto" value="{{ old('nama') }}" required>
                 </div>
 
                 <label for="d_e">Email</label>
                 <div class="wf">
-                    <input id="d_e" name="email" type="email" placeholder="nama@email.com" value="{{ old('email') }}" required>
+                    <input id="d_e" class="no-icon" name="email" type="email" placeholder="198204152008011007@sman1rejoso.sch.id" value="{{ old('email') }}" required>
                 </div>
 
                 <label for="d_i" id="label_identitas">Nomor Identitas / NIP</label>
                 <div class="wf">
-                    <input id="d_i" name="identitas" type="text" placeholder="{{ old('peran') === 'siswa' ? 'Masukkan NISN' : 'Masukkan NIP' }}" value="{{ old('identitas') }}" required>
+                    <input id="d_i" class="no-icon" name="identitas" type="text" placeholder="19820415" value="{{ old('identitas') }}" required>
                 </div>
 
                 <label for="d_p">Password</label>
                 <div class="wf">
-                    <input id="d_p" name="password" type="password" placeholder="Minimal 8 karakter" required>
+                    <input id="d_p" class="no-icon" name="password" type="password" placeholder="••••••••••••" required>
                     <span class="eye" onclick="togglePassword('d_p')">👁</span>
                 </div>
 
                 <label for="d_p2">Konfirmasi Password</label>
                 <div class="wf">
-                    <input id="d_p2" name="password_confirmation" type="password" placeholder="Ulangi password" required>
+                    <input id="d_p2" class="no-icon" name="password_confirmation" type="password" placeholder="••••••••••••" required>
                     <span class="eye" onclick="togglePassword('d_p2')">👁</span>
                 </div>
 
@@ -89,21 +97,21 @@
     <script>
         function selectRole(role) {
             document.getElementById('role_input').value = role;
-            const tabSiswa = document.getElementById('tab_siswa');
+            const tabAdmin = document.getElementById('tab_admin');
             const tabGuru = document.getElementById('tab_guru');
             const labelIdentitas = document.getElementById('label_identitas');
             const inputIdentitas = document.getElementById('d_i');
 
-            if (role === 'siswa') {
-                tabSiswa.classList.add('on');
+            if (role === 'admin') {
+                tabAdmin.classList.add('on');
                 tabGuru.classList.remove('on');
-                labelIdentitas.innerText = 'Nomor Identitas / NISN';
-                inputIdentitas.placeholder = 'Masukkan NISN';
+                labelIdentitas.innerText = 'Nomor Identitas / NIP';
+                inputIdentitas.placeholder = '19820415';
             } else {
                 tabGuru.classList.add('on');
-                tabSiswa.classList.remove('on');
-                labelIdentitas.innerText = 'Nomor Identitas / NIP';
-                inputIdentitas.placeholder = 'Masukkan NIP';
+                tabAdmin.classList.remove('on');
+                labelIdentitas.innerText = 'Nomor Identitas / NIP Guru';
+                inputIdentitas.placeholder = 'Masukkan NIP Guru';
             }
         }
 
