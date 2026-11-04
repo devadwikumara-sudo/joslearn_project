@@ -9,8 +9,10 @@ use App\Models\SiswaBiodata;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use RuntimeException;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -18,35 +20,18 @@ class DataSiswaController extends Controller
 {
     public function index(Request $request): View
     {
-        // 1. Tahun Ajaran Berjalan
-        $taAktifObj = SekolahTahunAjaran::where('sedang_berjalan', 1)->first()
-            ?? SekolahTahunAjaran::latest('id')->first();
-        $taAktif = $taAktifObj ? $taAktifObj->nama : '2024/2025';
+        $taAktifObj = SekolahTahunAjaran::where('sedang_berjalan', 1)->first();
+        $taAktif = $taAktifObj?->nama ?? 'Belum diatur';
         $taAktifId = $taAktifObj?->id ?? 0;
 
         $kelasSelected = $request->input('kelas', '');
         $search = trim($request->input('q', ''));
         $statusFilter = trim($request->input('st', ''));
 
-        // 2. Daftar Semua Kelas dari Master Kelas / Riwayat
         $kelasList = SekolahKelas::orderBy('nama')->pluck('nama')->toArray();
-        if (empty($kelasList)) {
-            $kelasList = DB::table('siswa_riwayat_kelas as riwayat')
-                ->join('sekolah_kelas as kelas', 'kelas.id', '=', 'riwayat.kelas_id')
-                ->where('riwayat.tahun_ajaran_id', $taAktifId)
-                ->whereNull('riwayat.deleted_at')
-                ->distinct()
-                ->orderBy('kelas.nama')
-                ->pluck('kelas.nama')
-                ->toArray();
-        }
-        if (empty($kelasList)) {
-            $kelasList = ['X-1', 'X-2', 'XI-1', 'XI-2', 'XII-1', 'XII-2'];
-        }
         sort($kelasList);
         $kelasIds = SekolahKelas::pluck('id', 'nama')->toArray();
 
-        // 3. Hitung jumlah siswa per kelas untuk tampilan grid
         $kelasCounts = array_fill_keys($kelasList, 0);
         $countsByClass = DB::table('siswa_riwayat_kelas as riwayat')
             ->join('sekolah_kelas as kelas', 'kelas.id', '=', 'riwayat.kelas_id')
@@ -61,25 +46,26 @@ class DataSiswaController extends Controller
             $kelasCounts[$className] = $count;
         }
 
-        // 4. Jika ada kelas yang dipilih atau ada pencarian, ambil data tabel siswa
         $siswaList = null;
-        if ($kelasSelected !== '' || $search !== '' || $statusFilter !== '') {
-            $query = SiswaBiodata::whereNull('deleted_at');
+        if ($kelasSelected !== '' || $search !== '' || $statusFilter !== '' || $kelasList === []) {
+            $query = SiswaBiodata::query();
 
-            $query->whereHas('riwayatKelas', function ($q) use ($kelasSelected, $statusFilter, $taAktifId, $kelasIds) {
-                $q->where('tahun_ajaran_id', $taAktifId)
-                    ->whereNull('deleted_at');
+            if ($kelasSelected !== '' && $kelasSelected !== '*') {
+                $query->whereHas('riwayatKelas', function ($q) use ($kelasSelected, $taAktifId, $kelasIds) {
+                    $q->where('tahun_ajaran_id', $taAktifId)
+                        ->whereNull('deleted_at')
+                        ->where('kelas_id', $kelasIds[$kelasSelected] ?? 0);
+                });
+            }
 
-                if ($kelasSelected !== '' && $kelasSelected !== '*') {
-                    $q->where('kelas_id', $kelasIds[$kelasSelected] ?? 0);
-                }
+            if ($statusFilter !== '') {
+                $query->whereHas('riwayatKelas', function ($q) use ($statusFilter, $taAktifId) {
+                    $q->where('tahun_ajaran_id', $taAktifId)
+                        ->whereNull('deleted_at')
+                        ->where('status', $statusFilter);
+                });
+            }
 
-                if ($statusFilter !== '') {
-                    $q->where('status', $statusFilter);
-                }
-            });
-
-            // Pencarian Nama / NISN / NIS
             if ($search !== '') {
                 $query->where(function ($q) use ($search) {
                     $q->where('nama_lengkap', 'like', "%{$search}%")
@@ -113,18 +99,10 @@ class DataSiswaController extends Controller
     {
         $taAktifObj = SekolahTahunAjaran::where('sedang_berjalan', 1)->first()
             ?? SekolahTahunAjaran::latest('id')->first();
-        $taAktif = $taAktifObj ? $taAktifObj->nama : '2024/2025';
+        $taAktif = $taAktifObj?->nama;
 
         $taAktifId = $taAktifObj?->id ?? 0;
         $kelasList = SekolahKelas::orderBy('nama')->pluck('nama')->toArray();
-        if (empty($kelasList)) {
-            $kelasList = ['X-1', 'X-2', 'XI-1', 'XI-2', 'XII-1', 'XII-2'];
-        }
-
-        $taList = SekolahTahunAjaran::pluck('nama')->toArray();
-        if (empty($taList)) {
-            $taList = ['2024/2025', '2023/2024', '2022/2023'];
-        }
 
         // Ambil riwayat batch import siswa pada tahun ini
         $riwayatImport = DB::table('siswa_riwayat_kelas as riwayat')
@@ -140,7 +118,6 @@ class DataSiswaController extends Controller
         return view('admin.import.siswa', compact(
             'taAktif',
             'kelasList',
-            'taList',
             'riwayatImport'
         ));
     }
@@ -200,28 +177,57 @@ class DataSiswaController extends Controller
             ->stream('biodata-siswa-'.$siswa->nisn.'.pdf');
     }
 
-    public function show(int $id): View
+    public function foto(int $id): BinaryFileResponse
     {
-        $taAktifObj = SekolahTahunAjaran::where('sedang_berjalan', 1)->first()
-            ?? SekolahTahunAjaran::latest('id')->first();
-        $siswa = SiswaBiodata::with([
-            'riwayatKelas.kelas',
-            'riwayatKelas.tahunAjaran',
-            'nilai.mapel',
-            'kehadiran',
-            'ekskul',
-        ])->findOrFail($id);
+        $siswa = SiswaBiodata::findOrFail($id);
+        $path = $siswa->foto;
+        abort_if(! $path, 404);
 
-        $kelasList = SekolahKelas::orderBy('nama')->pluck('nama')->toArray();
-        if (empty($kelasList)) {
-            $kelasList = ['X-1', 'X-2', 'XI-1', 'XI-2', 'XII-1', 'XII-2'];
+        $headers = [
+            'Cache-Control' => 'private, no-store',
+            'X-Content-Type-Options' => 'nosniff',
+        ];
+
+        if (str_starts_with($path, 'siswa/foto/')) {
+            $filename = substr($path, strlen('siswa/foto/'));
+            abort_if(
+                $filename === ''
+                    || basename($filename) !== $filename
+                    || ! in_array(strtolower(pathinfo($filename, PATHINFO_EXTENSION)), ['jpg', 'jpeg', 'png', 'webp'], true),
+                404
+            );
+
+            $disk = Storage::disk('local');
+            abort_unless($disk->exists($path), 404);
+
+            return response()->file($disk->path($path), $headers);
         }
 
-        return view('admin.form-pendataan', [
-            'edit' => $siswa,
-            'taAktif' => $taAktifObj?->nama ?? '2024/2025',
-            'kelasList' => $kelasList,
-        ]);
+        if (str_starts_with($path, 'uploads/foto/')) {
+            $filename = substr($path, strlen('uploads/foto/'));
+            abort_if(
+                $filename === ''
+                    || basename($filename) !== $filename
+                    || ! in_array(strtolower(pathinfo($filename, PATHINFO_EXTENSION)), ['jpg', 'jpeg', 'png', 'webp'], true),
+                404
+            );
+
+            $legacyPath = public_path('uploads/foto/'.$filename);
+            abort_unless(is_file($legacyPath), 404);
+
+            return response()->file($legacyPath, $headers);
+        }
+
+        abort(404);
+    }
+
+    public function show(int $id): View
+    {
+        $siswa = SiswaBiodata::with(['riwayatKelas' => function ($query) {
+            $query->with(['kelas', 'tahunAjaran'])->orderBy('tahun_ajaran_id');
+        }])->findOrFail($id);
+
+        return view('admin.siswa-detail', compact('siswa'));
     }
 
     public function destroy(int $id)

@@ -4,6 +4,14 @@
 
 @section('content')
 <h2>Form Pendataan · Siswa {{ $edit ? 'Edit' : 'Baru' }}</h2>
+@if($errors->any())
+    <div class="note err" role="alert" style="margin-bottom:14px">{{ $errors->first() }}</div>
+@endif
+@if(!$taAktif)
+    <div class="note err" role="alert" style="margin-bottom:14px">
+        Tahun ajaran aktif belum diatur. Data belum dapat disimpan sampai tahun ajaran aktif tersedia.
+    </div>
+@endif
 <p class="sub">
     @if($edit)
         Mengubah data siswa <b>{{ $edit->nama_lengkap }}</b> · NISN {{ $edit->nisn }}. Data pribadi berlaku untuk seluruh tahun ajaran.
@@ -40,7 +48,7 @@
             <div class="note" style="margin-top:0;margin-bottom:14px;display:flex;gap:14px;align-items:center;flex-wrap:wrap">
                 <div style="width:72px;height:96px;background:#e2e8f0;border-radius:6px;border:1px dashed #94a3b8;display:flex;align-items:center;justify-content:center;overflow:hidden">
                     @if($edit && $edit->foto)
-                        <img id="preview-foto" src="{{ asset($edit->foto) }}" style="width:100%;height:100%;object-fit:cover">
+                        <img id="preview-foto" src="{{ route('admin.data-siswa.foto', $edit->id) }}" style="width:100%;height:100%;object-fit:cover">
                     @else
                         <img id="preview-foto" style="width:100%;height:100%;object-fit:cover;display:none">
                         <span id="label-foto" style="font-size:11px;color:#64748b;text-align:center">Pas foto<br>3×4</span>
@@ -48,10 +56,10 @@
                 </div>
                 <div>
                     <label style="font-weight:600">Pas foto 3×4</label>
-                    <input type="file" name="foto_file" id="foto-input" accept="image/*" style="max-width:240px;font-size:12px">
+                    <input type="file" name="foto_file" id="foto-input" accept=".jpg,.jpeg,.png,.webp" style="max-width:240px;font-size:12px">
                 </div>
                 <span class="sub" style="margin:0;flex:1;min-width:180px;font-size:12px">
-                    Cukup satu pas foto 3x4. Otomatis tampil di halaman pertama register Buku Induk (PDF).
+                    Cukup satu pas foto 3x4 (JPG, PNG, atau WEBP, maksimal 2 MB).
                 </span>
             </div>
 

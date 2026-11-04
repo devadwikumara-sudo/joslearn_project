@@ -25,11 +25,11 @@ class ImportBatchController extends Controller
     public function saveBatch(Request $request)
     {
         $type       = $request->input('type', 'siswa'); // siswa, nilai, hadir, ekskul, guru
-        $taName     = $request->input('tahun_ajaran', '2024/2025');
+        $taName     = trim((string) $request->input('tahun_ajaran', ''));
         $semester   = $request->input('semester', 'Genap');
         $mode       = $request->input('mode', 'semua');
         $kelasInput = $request->input('kelas', '');
-        $dup        = $request->input('dup', 'timpa');
+        $dup        = $request->input('dup', 'skip');
         $rows       = $request->input('rows', []);
         $newClasses = $request->input('new_classes', []);
         $newMapel   = $request->input('new_mapel', []);
@@ -52,18 +52,22 @@ class ImportBatchController extends Controller
 
         DB::beginTransaction();
         try {
-            // 1. Tahun Ajaran
-            $ta = SekolahTahunAjaran::firstOrCreate(
-                ['nama' => $taName],
-                ['sedang_berjalan' => 0]
-            );
+            // 1. Do not invent an academic year for a student biodata import.
+            $ta = $type === 'siswa'
+                ? ($taName !== '' ? SekolahTahunAjaran::where('nama', $taName)->first() : null)
+                : SekolahTahunAjaran::firstOrCreate(
+                    ['nama' => $taName !== '' ? $taName : '2024/2025'],
+                    ['sedang_berjalan' => 0]
+                );
 
-            // 2. Buat kelas baru jika ada
-            $allClassNames = collect($rows)->pluck('kelas')->merge($newClasses)->unique()->filter()->values();
-            foreach ($allClassNames as $cName) {
-                $cName = $this->normK($cName);
-                if ($cName) {
-                    $this->ensureKelas($cName);
+            // 2. Buat kelas baru untuk tipe impor selain biodata siswa.
+            if ($type !== 'siswa') {
+                $allClassNames = collect($rows)->pluck('kelas')->merge($newClasses)->unique()->filter()->values();
+                foreach ($allClassNames as $cName) {
+                    $cName = $this->normK($cName);
+                    if ($cName) {
+                        $this->ensureKelas($cName);
+                    }
                 }
             }
 
@@ -81,10 +85,12 @@ class ImportBatchController extends Controller
 
             $savedCount = 0;
             $skippedCount = 0;
+            $rowErrors = [];
+            $unlinkedCount = 0;
 
             // 4. Proses berdasarkan jenis data
             if ($type === 'siswa') {
-                list($savedCount, $skippedCount) = $this->saveSiswa($rows, $ta, $mode, $kelasInput, $dup);
+                list($savedCount, $skippedCount, $rowErrors, $unlinkedCount) = $this->saveSiswa($rows, $ta, $mode, $kelasInput);
             } elseif ($type === 'nilai') {
                 list($savedCount, $skippedCount) = $this->saveNilai($rows, $ta, $semester, $mode, $kelasInput);
             } elseif ($type === 'hadir') {
@@ -111,7 +117,13 @@ class ImportBatchController extends Controller
                 'success' => true,
                 'count'   => $savedCount,
                 'skipped' => $skippedCount,
-                'message' => "Berhasil mengimpor {$savedCount} data {$type}" . ($skippedCount > 0 ? " ({$skippedCount} baris dilewati)" : "") . "."
+                'message' => "Berhasil mengimpor {$savedCount} data {$type}" . ($skippedCount > 0 ? " ({$skippedCount} baris gagal/dilewati)" : "") . ".",
+                'errors' => $rowErrors,
+                'class_warning' => $type === 'siswa' && $unlinkedCount > 0
+                    ? (!$ta
+                        ? 'Biodata tersimpan, tetapi riwayat kelas tidak dibuat karena tahun ajaran yang dipilih belum terdaftar.'
+                        : "{$unlinkedCount} biodata tersimpan tanpa riwayat kelas karena kelas tidak tersedia.")
+                    : null,
             ]);
 
         } catch (\Throwable $e) {
@@ -216,45 +228,99 @@ class ImportBatchController extends Controller
         return is_string($v) ? trim($v) : $v;
     }
 
-    private function saveSiswa($rows, $ta, $mode, $kelasInput, $dup)
+    private function saveSiswa($rows, $ta, $mode, $kelasInput)
     {
         $saved = 0;
         $skipped = 0;
+        $errors = [];
+        $seenNisn = [];
+        $seenNis = [];
+        $unlinked = 0;
 
-        foreach ($rows as $r) {
+        foreach ($rows as $rowIndex => $r) {
+            if (!is_array($r)) {
+                $skipped++;
+                $errors[] = ['row' => $rowIndex + 1, 'reason' => 'Format baris tidak valid.'];
+                continue;
+            }
+            $rowNumber = max(1, (int) ($r['__excel_row'] ?? $rowIndex + 1));
             $nisn = $this->normN($r['nisn'] ?? '');
             $nama = $this->cleanVal($r['nama'] ?? $r['nama_lengkap'] ?? '');
-            if (!$nisn && !$nama) {
+            $nis = $this->cleanVal($r['nis'] ?? $r['nomor_induk'] ?? null);
+            if (!$nisn && !$nama && !$nis) {
                 $skipped++;
+                $errors[] = ['row' => $rowNumber, 'reason' => 'Baris kosong atau tidak memiliki identitas siswa.'];
                 continue;
             }
 
-            // Tentukan kelas
+            if (!$nama) {
+                $skipped++;
+                $errors[] = ['row' => $rowNumber, 'reason' => 'Nama lengkap wajib diisi.'];
+                continue;
+            }
+
+            if (!preg_match('/^\d{10}$/', (string) $nisn)) {
+                $skipped++;
+                $errors[] = ['row' => $rowNumber, 'reason' => 'NISN wajib terdiri dari tepat 10 digit.'];
+                continue;
+            }
+
+            $nik = $this->cleanVal($r['nik'] ?? null);
+            if (!empty($r['__numeric_nik'])) {
+                $skipped++;
+                $errors[] = ['row' => $rowNumber, 'reason' => 'NIK tersimpan sebagai angka di Excel dan berisiko kehilangan digit. Ubah kolom NIK menjadi teks lalu impor ulang.'];
+                continue;
+            }
+            if ($nik !== null && !preg_match('/^\d{16}$/', (string) $nik)) {
+                $skipped++;
+                $errors[] = ['row' => $rowNumber, 'reason' => 'NIK harus terdiri dari tepat 16 digit.'];
+                continue;
+            }
+
+            if (isset($seenNisn[$nisn]) || ($nis !== null && isset($seenNis[$nis]))) {
+                $skipped++;
+                $errors[] = ['row' => $rowNumber, 'reason' => 'NISN atau NIS duplikat pada file yang diunggah.'];
+                continue;
+            }
+
+            $siswaByNisn = SiswaBiodata::where('nisn', $nisn)->first();
+            $siswaByNis = $nis !== null
+                ? SiswaBiodata::where('nomor_induk', $nis)->first()
+                : null;
+
+            if (($siswaByNisn && $siswaByNis && $siswaByNisn->id !== $siswaByNis->id)
+                || $siswaByNisn || $siswaByNis) {
+                $skipped++;
+                $errors[] = ['row' => $rowNumber, 'reason' => 'Siswa dengan NISN atau NIS tersebut sudah terdaftar; data lama tidak ditimpa.'];
+                continue;
+            }
+
+            $jk = strtoupper(trim((string) ($r['jk'] ?? $r['jenis_kelamin'] ?? '')));
+            if ($jk !== '' && !in_array($jk, ['L', 'LAKI-LAKI', 'P', 'PEREMPUAN'], true)) {
+                $skipped++;
+                $errors[] = ['row' => $rowNumber, 'reason' => 'Jenis kelamin harus L atau P.'];
+                continue;
+            }
+
             $kStr = $mode === 'semua' ? ($r['kelas'] ?? '') : $kelasInput;
             $kStr = $this->normK($kStr);
-            $kelas = $kStr ? $this->ensureKelas($kStr) : null;
-
-            // NISN wajib tepat 10 digit — baris tidak valid dilewati
-            if (!preg_match('/^\d{10}$/', (string)$nisn)) {
+            if ($kStr !== null && mb_strlen($kStr) > 30) {
                 $skipped++;
+                $errors[] = ['row' => $rowNumber, 'reason' => 'Nama kelas melebihi batas 30 karakter.'];
                 continue;
             }
 
-            $siswa = SiswaBiodata::where('nisn', $nisn)->first();
-            if ($siswa && $dup === 'skip') {
-                // Jangan timpa biodata, cukup update riwayat kelas jika ada
-            } else {
-                $data = [
+            $data = [
                     'nama_lengkap'       => $nama ?: 'Siswa ' . $nisn,
                     'nama_panggilan'     => $this->cleanVal($r['panggilan'] ?? null),
                     'nisn'               => $nisn,
                     'nomor_induk'        => $this->cleanVal($r['nis'] ?? $r['nomor_induk'] ?? null),
-                    'jenis_kelamin'      => in_array(strtoupper($r['jk'] ?? ''), ['P', 'PEREMPUAN']) ? 'P' : 'L',
+                    'jenis_kelamin'      => in_array($jk, ['P', 'PEREMPUAN'], true) ? 'P' : (in_array($jk, ['L', 'LAKI-LAKI'], true) ? 'L' : null),
                     'tempat_lahir'       => $this->cleanVal($r['tmp'] ?? $r['tempat_lahir'] ?? null),
                     'tanggal_lahir'      => $this->normDate($r['tgl'] ?? $r['tanggal_lahir'] ?? null),
                     'agama'              => $this->cleanVal($r['agama'] ?? null),
-                    'kewarganegaraan'    => $this->cleanVal($r['kewarganegaraan'] ?? 'Warga Negara Indonesia'),
-                    'nik'                => preg_match('/^\d{16}$/', (string)($r['nik'] ?? '')) ? $r['nik'] : null,
+                    'kewarganegaraan'    => $this->cleanVal($r['kewarganegaraan'] ?? null),
+                    'nik'                => $nik,
                     'anak_ke'            => is_numeric($r['anak_ke'] ?? null) ? (int)$r['anak_ke'] : null,
                     'jumlah_saudara'     => $this->cleanVal($r['jml_saudara'] ?? $r['jumlah_saudara'] ?? null),
                     'status_yatim'       => $this->cleanVal($r['yatim'] ?? $r['status_yatim'] ?? null),
@@ -277,8 +343,8 @@ class ImportBatchController extends Controller
                     'sekolah_asal'       => $this->cleanVal($r['asal'] ?? $r['sekolah_asal'] ?? null),
                     'tanggal_ijazah_smp' => $this->cleanVal($r['tgl_ijazah_smp'] ?? null),
                     'nomor_ijazah_smp'   => $this->cleanVal($r['no_ijazah_smp'] ?? $r['nomor_ijazah_smp'] ?? null),
-                    'lama_belajar_tahun' => is_numeric($r['lama'] ?? null) ? (int)$r['lama'] : 3,
-                    'jenis_registrasi'   => $this->cleanVal($r['masuk'] ?? $r['jenis_registrasi'] ?? 'Siswa Baru'),
+                    'lama_belajar_tahun' => is_numeric($r['lama'] ?? null) ? (int)$r['lama'] : null,
+                    'jenis_registrasi'   => $this->cleanVal($r['masuk'] ?? $r['jenis_registrasi'] ?? null),
                     'pindahan_dari_sekolah' => $this->cleanVal($r['sekolah_pindah'] ?? $r['pindahan_dari_sekolah'] ?? null),
                     'alasan_pindah'      => $this->cleanVal($r['alasan_pindah'] ?? null),
                     'kelas_diterima'     => $this->cleanVal($r['kelas_masuk'] ?? $r['kelas_diterima'] ?? null),
@@ -320,6 +386,13 @@ class ImportBatchController extends Controller
                     'pekerjaan_wali'     => $this->cleanVal($r['kerja_wali'] ?? $r['pekerjaan_wali'] ?? null),
                     'penghasilan_wali'   => $this->cleanVal($r['gaji_wali'] ?? $r['penghasilan_wali'] ?? null),
                     'nomor_hp_wali'      => $this->cleanVal($r['hp_wali'] ?? $r['nomor_hp_wali'] ?? null),
+                    'wali_alamat_jalan'  => $this->cleanVal($r['wali_jalan'] ?? $r['wali_alamat_jalan'] ?? null),
+                    'wali_alamat_rt_rw'  => $this->cleanVal($r['wali_rt'] ?? $r['wali_alamat_rt_rw'] ?? null),
+                    'wali_alamat_desa'   => $this->cleanVal($r['wali_desa'] ?? $r['wali_alamat_desa'] ?? null),
+                    'wali_alamat_kecamatan' => $this->cleanVal($r['wali_kec'] ?? $r['wali_alamat_kecamatan'] ?? null),
+                    'wali_alamat_kabupaten' => $this->cleanVal($r['wali_kab'] ?? $r['wali_alamat_kabupaten'] ?? null),
+                    'wali_alamat_provinsi'  => $this->cleanVal($r['wali_prov'] ?? $r['wali_alamat_provinsi'] ?? null),
+                    'wali_alamat_kode_pos'  => $this->cleanVal($r['wali_pos'] ?? $r['wali_alamat_kode_pos'] ?? null),
 
                     // Keluar / Lulus
                     'tanggal_keluar'     => $this->normDate($r['tgl_keluar'] ?? $r['tanggal_keluar'] ?? null),
@@ -336,38 +409,143 @@ class ImportBatchController extends Controller
                     'catatan'            => $this->cleanVal($r['catatan'] ?? null),
                 ];
 
-                if ($siswa) {
-                    $siswa->update($data);
-                } else {
+            $validationError = $this->validateImportedStudent($data, $r);
+            if ($validationError !== null) {
+                $skipped++;
+                $errors[] = ['row' => $rowNumber, 'reason' => $validationError];
+                continue;
+            }
+
+            try {
+                DB::transaction(function () use ($data, $kStr, $ta, $r): void {
                     $siswa = SiswaBiodata::create($data);
-                }
+                    $kelas = $ta && $kStr ? $this->ensureKelas($kStr) : null;
+
+                    if ($kelas && $ta) {
+                        $statusSiswa = 'Aktif';
+                        if (!empty($r['alasan_keluar']) && stripos($r['alasan_keluar'], 'Lulus') !== false) {
+                            $statusSiswa = 'Lulus';
+                        } elseif (!empty($r['status']) && in_array($r['status'], ['Aktif', 'Pindah keluar', 'Keluar', 'Lulus'], true)) {
+                            $statusSiswa = $r['status'];
+                        }
+
+                        SiswaRiwayatKelas::updateOrCreate(
+                            [
+                                'siswa_id'        => $siswa->id,
+                                'tahun_ajaran_id' => $ta->id,
+                            ],
+                            [
+                                'kelas_id'        => $kelas->id,
+                                'status'          => $statusSiswa,
+                            ]
+                        );
+                    }
+                });
+            } catch (\Illuminate\Database\QueryException $exception) {
+                $skipped++;
+                $errors[] = ['row' => $rowNumber, 'reason' => 'Database menolak data baris ini karena duplikasi atau batasan kolom/relasi.'];
+                Log::warning('Student import row rejected by database.', [
+                    'row' => $rowNumber,
+                    'nisn' => $nisn,
+                    'exception' => $exception->getMessage(),
+                ]);
+                continue;
             }
 
-            // Simpan / update riwayat kelas
-            if ($siswa && $kelas) {
-                $statusSiswa = 'Aktif';
-                if (!empty($r['alasan_keluar']) && stripos($r['alasan_keluar'], 'Lulus') !== false) {
-                    $statusSiswa = 'Lulus';
-                } elseif (!empty($r['status']) && in_array($r['status'], ['Aktif', 'Pindah keluar', 'Keluar', 'Lulus'])) {
-                    $statusSiswa = $r['status'];
-                }
-
-                SiswaRiwayatKelas::updateOrCreate(
-                    [
-                        'siswa_id'        => $siswa->id,
-                        'tahun_ajaran_id' => $ta->id,
-                    ],
-                    [
-                        'kelas_id'        => $kelas->id,
-                        'status'          => $statusSiswa,
-                    ]
-                );
+            $seenNisn[$nisn] = true;
+            if ($nis !== null) {
+                $seenNis[$nis] = true;
             }
-
+            if (!$ta || !$kStr) {
+                $unlinked++;
+            }
             $saved++;
         }
 
-        return [$saved, $skipped];
+        return [$saved, $skipped, $errors, $unlinked];
+    }
+
+    private function validateImportedStudent(array $data, array $row): ?string
+    {
+        $maxLengths = [
+            'nama_lengkap' => 150, 'nama_panggilan' => 64, 'nomor_induk' => 64,
+            'tempat_lahir' => 100, 'agama' => 64, 'kewarganegaraan' => 64,
+            'jumlah_saudara' => 64, 'status_yatim' => 64, 'bahasa_sehari_hari' => 64,
+            'alamat_jalan' => 255, 'alamat_rt_rw' => 64, 'alamat_desa' => 100,
+            'alamat_kecamatan' => 100, 'alamat_kabupaten' => 100, 'alamat_provinsi' => 100,
+            'alamat_kode_pos' => 10, 'nomor_hp' => 64, 'tempat_tinggal' => 64,
+            'golongan_darah' => 5, 'penyakit' => 255, 'kelainan_fisik' => 255,
+            'sekolah_asal' => 150, 'tanggal_ijazah_smp' => 64, 'nomor_ijazah_smp' => 64,
+            'jenis_registrasi' => 64, 'pindahan_dari_sekolah' => 150, 'alasan_pindah' => 255,
+            'kelas_diterima' => 10, 'rombel_diterima' => 10,
+            'nama_ayah' => 150, 'agama_ayah' => 64, 'kewarganegaraan_ayah' => 64,
+            'pendidikan_ayah' => 64, 'pekerjaan_ayah' => 100, 'penghasilan_ayah' => 64,
+            'nomor_hp_ayah' => 64, 'keadaan_ayah' => 64,
+            'nama_ibu' => 150, 'agama_ibu' => 64, 'kewarganegaraan_ibu' => 64,
+            'pendidikan_ibu' => 64, 'pekerjaan_ibu' => 100, 'penghasilan_ibu' => 64,
+            'nomor_hp_ibu' => 64, 'keadaan_ibu' => 64,
+            'ortu_alamat_jalan' => 255, 'ortu_alamat_rt_rw' => 64, 'ortu_alamat_desa' => 100,
+            'ortu_alamat_kecamatan' => 100, 'ortu_alamat_kabupaten' => 100,
+            'ortu_alamat_provinsi' => 100, 'ortu_alamat_kode_pos' => 10,
+            'nama_wali' => 150, 'agama_wali' => 64, 'kewarganegaraan_wali' => 64,
+            'pendidikan_wali' => 64, 'pekerjaan_wali' => 100, 'penghasilan_wali' => 64,
+            'nomor_hp_wali' => 64, 'wali_alamat_jalan' => 255, 'wali_alamat_rt_rw' => 64,
+            'wali_alamat_desa' => 100, 'wali_alamat_kecamatan' => 100,
+            'wali_alamat_kabupaten' => 100, 'wali_alamat_provinsi' => 100,
+            'wali_alamat_kode_pos' => 10, 'kelas_keluar' => 64, 'alasan_keluar' => 255,
+            'sekolah_tujuan' => 150, 'nomor_peserta_psaj' => 64, 'nomor_skl' => 64,
+            'nomor_ijazah_sma' => 64, 'nomor_transkrip' => 64,
+            'kegiatan_setelah_lulus' => 255,
+        ];
+
+        foreach ($maxLengths as $field => $maxLength) {
+            if ($data[$field] !== null && mb_strlen((string) $data[$field]) > $maxLength) {
+                return "Kolom {$field} melebihi batas {$maxLength} karakter.";
+            }
+        }
+
+        foreach ([
+            'tanggal_lahir' => ['tgl', 'tanggal_lahir'],
+            'tanggal_diterima' => ['tgl_masuk', 'tanggal_diterima'],
+            'tanggal_keluar' => ['tgl_keluar', 'tanggal_keluar'],
+            'tanggal_ijazah_sma' => ['tgl_ijazah_sma', 'tanggal_ijazah_sma'],
+        ] as $field => $sourceFields) {
+            $sourceValue = null;
+            foreach ($sourceFields as $sourceField) {
+                if (!empty($row[$sourceField])) {
+                    $sourceValue = $row[$sourceField];
+                    break;
+                }
+            }
+            if ($sourceValue !== null && $sourceValue !== '' && $sourceValue !== '-' && $data[$field] === null) {
+                return "Format tanggal pada kolom {$field} tidak valid.";
+            }
+        }
+
+        $numericRules = [
+            'anak_ke' => ['anak_ke', 255, true],
+            'jarak_ke_sekolah_km' => ['jarak', 9999.99, false],
+            'tinggi_badan_cm' => ['tinggi', 65535, true],
+            'berat_badan_kg' => ['berat', 65535, true],
+            'lama_belajar_tahun' => ['lama', 255, true],
+        ];
+        foreach ($numericRules as $field => [$sourceField, $maximum, $integerOnly]) {
+            $value = $row[$sourceField] ?? null;
+            if ($value === null || $value === '' || $value === '-') {
+                continue;
+            }
+            if (!is_numeric($value) || (float) $value < 0 || (float) $value > $maximum
+                || ($integerOnly && (float) $value !== (float) (int) $value)) {
+                return "Nilai pada kolom {$sourceField} tidak valid.";
+            }
+        }
+
+        $tahunLulus = $data['tahun_lulus'];
+        if ($tahunLulus !== null && !preg_match('/^\d{4}$/', $tahunLulus)) {
+            return 'Tahun lulus harus terdiri dari 4 digit.';
+        }
+
+        return null;
     }
 
     private function saveNilai($rows, $ta, $semester, $mode, $kelasInput)
@@ -599,4 +777,3 @@ class ImportBatchController extends Controller
         return [$saved, $skipped];
     }
 }
-

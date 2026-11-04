@@ -89,6 +89,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin.only'])->grou
     Route::get('/data-siswa', [DataSiswaController::class, 'index'])->name('data-siswa');
     Route::get('/data-siswa/export', [DataSiswaController::class, 'export'])->name('data-siswa.export');
     Route::get('/data-siswa/create', [FormPendataanController::class, 'index'])->name('data-siswa.create');
+    Route::get('/data-siswa/{id}/foto', [DataSiswaController::class, 'foto'])->name('data-siswa.foto');
     Route::get('/data-siswa/{id}', [DataSiswaController::class, 'show'])->name('data-siswa.show');
     Route::get('/data-siswa/{id}/edit', [FormPendataanController::class, 'edit'])->name('data-siswa.edit');
     Route::get('/data-siswa/{id}/pdf', [DataSiswaController::class, 'pdf'])->name('data-siswa.pdf');

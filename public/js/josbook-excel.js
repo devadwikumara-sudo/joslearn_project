@@ -3,7 +3,7 @@
  * 100% Mengikuti Spesifikasi & Prototipe JosBook
  * Fitur:
  * - Pembaca file fleksibel (.xlsx, .xls, .csv via SheetJS)
- * - Dukungan penuh sheet PesertaDidik + Kontrol Induk (DATABASE_SISWA.xlsx)
+ * - Pemetaan biodata dari sheet PesertaDidik (DATABASE_SISWA.xlsx)
  * - Deteksi otomatis baris judul (header), kelas, semester, dan jenis data
  * - Tidak pernah beralih jenis data sembarangan (tipe terkunci per halaman)
  * - Panel interaktif "Lihat / ubah pemetaan kolom" (cmap)
@@ -31,14 +31,8 @@
         BD:'hp_ibu', BE:'ket_ibu', BF:'al_jalan', BG:'al_rt', BH:'al_desa', BI:'al_kec',
         BJ:'al_kab', BK:'al_prov', BL:'al_pos', BM:'wali', BN:'agama_wali', BO:'wn_wali',
         BP:'pend_wali', BQ:'kerja_wali', BR:'gaji_wali', BS:'hp_wali',
-        BU:'alw_jalan', BV:'alw_rt', BW:'alw_desa', BX:'alw_kec', BY:'alw_kab',
-        BZ:'alw_prov', CA:'alw_pos', CD:'nopes'
-    };
-
-    // ─── Pemetaan Kolom DATABASE_SISWA.xlsx (Kontrol Induk) ────────────────────
-    const KMAP = {
-        I:'alasan_keluar', J:'tgl_keluar', K:'kelas_keluar', L:'tujuan', M:'nopes',
-        N:'no_skl', O:'no_ijazah_sma', P:'tgl_ijazah_sma', Q:'no_transkrip'
+        BU:'wali_jalan', BV:'wali_rt', BW:'wali_desa', BX:'wali_kec', BY:'wali_kab',
+        BZ:'wali_prov', CA:'wali_pos', CD:'nopes'
     };
 
     const BLN = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
@@ -141,6 +135,13 @@
         kerja_wali: 'pekerjaan wali',
         gaji_wali: 'penghasilan wali|gaji wali',
         hp_wali: 'hp wali|no hp wali',
+        wali_jalan: 'alamat jalan wali|jalan wali|alamat wali',
+        wali_rt: 'rt rw wali|rt wali',
+        wali_desa: 'desa wali|kelurahan wali',
+        wali_kec: 'kecamatan wali',
+        wali_kab: 'kabupaten wali',
+        wali_prov: 'provinsi wali',
+        wali_pos: 'kode pos wali',
         sakit: 'sakit',
         izin: 'izin|ijin',
         alpa: 'alpa|alpha|alfa|tanpa keterangan',
@@ -194,8 +195,8 @@
         ['E_ayah',['ayah','agama_ayah','wn_ayah','pend_ayah','kerja_ayah','gaji_ayah','hp_ayah','ket_ayah']],
         ['E_ibu',['ibu','agama_ibu','wn_ibu','pend_ibu','kerja_ibu','gaji_ibu','hp_ibu','ket_ibu']],
         ['E_al',['al_jalan','al_rt','al_desa','al_kec','al_kab','al_prov','al_pos']],
-        ['F',['wali','agama_wali','wn_wali','pend_wali','kerja_wali','gaji_wali','hp_wali']],
-        ['G',['status','tgl_keluar','kelas_keluar','alasan_keluar','tujuan','nopes','no_skl','no_ijazah_sma','tgl_ijazah_sma','no_transkrip','lanjut','catatan']]
+        ['F',['wali','agama_wali','wn_wali','pend_wali','kerja_wali','gaji_wali','hp_wali','wali_jalan','wali_rt','wali_desa','wali_kec','wali_kab','wali_prov','wali_pos']],
+        ['G',['status','tgl_keluar','kelas_keluar','alasan_keluar','tujuan','nopes','no_skl','no_ijazah_sma','tgl_ijazah_sma','no_transkrip','tahun_lulus','lanjut','catatan']]
     ];
     const FK = FD.flatMap(x=>x[1]);
 
@@ -229,37 +230,57 @@
         return '';
     };
 
-    // ─── Pembaca DATABASE_SISWA.xlsx (PesertaDidik + Kontrol Induk) ─────────────
+    // ─── Pembaca biodata dari sheet PesertaDidik ────────────────────────────────
     function realRows(w) {
-        const rd = n => w.Sheets[n] ? XLSX.utils.sheet_to_json(w.Sheets[n], {header:1, defval:''}) : [];
-        const km = {};
-        rd('Kontrol Induk').slice(5).forEach(r => {
-            if (r[2] !== '' && r[2] != null) km[String(r[2]).trim()] = r;
-        });
+        const rows = XLSX.utils.sheet_to_json(w.Sheets.PesertaDidik, {header:1, defval:''});
+        const headers = rows[4] || [];
+        const headerFields = headers.map(fieldOf);
+        const headerCounts = headerFields.reduce((counts, field) => {
+            if (field) counts[field] = (counts[field] || 0) + 1;
+            return counts;
+        }, {});
+        const headerIndex = (field, fallback) => headerCounts[field] === 1
+            ? headerFields.indexOf(field)
+            : fallback;
+        const nisIndex = headerIndex('nis', CI('C'));
+        const nisnIndex = headerIndex('nisn', CI('F'));
+        const nameIndex = headerIndex('nama', CI('D'));
+        const groupedFields = new Set([
+            'agama_ayah','agama_ibu','agama_wali',
+            'hp_ayah','hp_ibu','hp_wali',
+            'kerja_ayah','kerja_ibu','kerja_wali'
+        ]);
         const out = [];
-        rd('PesertaDidik').slice(5).forEach(r => {
-            if (!cl(r[CI('D')]) || r[CI('C')] === '') return;
+        rows.slice(5).forEach((r, offset) => {
+            if (!cl(r[nameIndex]) || (r[nisIndex] === '' && r[nisnIndex] === '')) return;
             const o = {};
+            let numericNik = false;
             for (const [c,k] of Object.entries(RMAP)) {
-                let v = cl(r[CI(c)]);
+                let columnIndex = CI(c);
+                const positionalHeaderField = headerFields[columnIndex];
+                if (positionalHeaderField !== k && positionalHeaderField && !groupedFields.has(k)) {
+                    if (headerCounts[k] === 1) {
+                        columnIndex = headerFields.indexOf(k);
+                    } else {
+                        continue;
+                    }
+                }
+                let v = cl(r[columnIndex]);
                 if ((k==='tgl'||k==='tgl_masuk'||k==='tgl_ijazah_smp') && typeof v==='number') v = iso(v);
+                if (k === 'nik' && typeof v === 'number' && String(v).replace(/\D/g, '').length === 16) {
+                    numericNik = true;
+                }
+                if (['nis','nisn','nik'].includes(k) && typeof v === 'number') v = numStr(v);
                 o[k] = (v===''||v==null)?'-':v;
             }
-            o.nis = String(o.nis);
-            o.nisn = normN(String(r[CI('F')]??'').trim());
-            o.jk = /^p/i.test(o.jk)?'P':'L';
-            o.kelas = normK((o.kelas_masuk||'')+'-'+(o.rombel_masuk||''));
-            const q = km[o.nis];
-            if (q) {
-                for (const [c,k] of Object.entries(KMAP)) {
-                    let v = cl(q[CI(c)]);
-                    if (typeof v==='number'&&k.startsWith('tgl')) v = iso(v);
-                    o[k] = (v===''||v==null)?'-':v;
-                }
-                if (q[CI('K')]) o.kelas = normK(q[CI('K')]);
+            o.nis = String(o.nis ?? '');
+            o.nisn = normN(String(o.nisn ?? '').trim());
+            if (numericNik) {
+                o.__numeric_nik = true;
             }
-            o.status = (o.alasan_keluar==='Lulus'||/lulus/i.test(o.alasan_keluar||''))?'Lulus':'Aktif';
-            if (o.tgl_keluar&&o.tgl_keluar!=='-') o.thn_lulus = +String(o.tgl_keluar).slice(0,4);
+            o.jk = /^p/i.test(String(o.jk)) ? 'P' : (/^l/i.test(String(o.jk)) ? 'L' : '');
+            o.kelas = normK((o.kelas_masuk||'')+'-'+(o.rombel_masuk||''));
+            o.__excel_row = offset + 6;
             out.push(o);
         });
         return out;
@@ -483,8 +504,10 @@
 
                 if (t === 'siswa') {
                     const o = {...o0, ...(bk['']||{})};
-                    if (!o.nisn && o.nis) o.nisn = normN(o.nis);
-                    out.push(o);
+                    if (typeof o.nik === 'number' && String(o.nik).replace(/\D/g, '').length === 16) {
+                        o.__numeric_nik = true;
+                    }
+                    out.push({...o, __excel_row: r + 1});
                     continue;
                 }
                 const sms = Object.keys(bk).filter(x=>x);
@@ -500,7 +523,7 @@
                     }
                     if (t === 'hadir' && !['sakit','izin','alpa','kokur'].some(k=>o[k]!=null)) return;
                     if (t === 'nilai' && !Object.keys(o).some(k=>!com.includes(k))) return;
-                    out.push(o);
+                    out.push({...o, __excel_row: r + 1});
                 });
             }
         });
@@ -557,7 +580,7 @@
             mode: 'semua',
             kelas: 'X-1',
             sem: 'Genap',
-            dup: 'timpa',
+            dup: 'skip',
             ta: '2024/2025',
             raws: null,
             rows: null,
@@ -570,7 +593,7 @@
     function readFormOptions() {
         const I = S.imp;
         const taEl = document.querySelector('input[name="tahun_ajaran"]') || document.getElementById('tahun_ajaran');
-        if (taEl && taEl.value) I.ta = taEl.value;
+        I.ta = taEl ? taEl.value.trim() : '';
 
         const semEl = document.querySelector('select[name="semester"]') || document.getElementById('semester');
         if (semEl && semEl.value) I.sem = semEl.value;
@@ -748,7 +771,7 @@
                     <span class="sp"></span>
                     ${(totalRows - errors.length) <= 0 ?
                         `<span class="bd e">Tidak ada baris valid untuk diimpor</span>` :
-                        `<button type="button" id="btn-do-import" class="btn a" style="font-size:13px;padding:9px 18px" onclick="executeBatchImport()">
+                        `<button type="button" id="btn-do-import" class="btn a" style="font-size:12px;padding:6px 12px" onclick="executeBatchImport()">
                             ⬇ Impor ${totalRows - errors.length} Baris ${tLabel[t] || t} ke Database
                         </button>`
                     }
@@ -810,8 +833,15 @@
             // KUNCI TIPE: Tipe selalu sesuai dengan halaman import yang sedang dibuka
             I.t = expectedType || 'siswa';
 
-            // 1. Cek DATABASE_SISWA.xlsx (PesertaDidik + Kontrol Induk)
-            if (w.Sheets.PesertaDidik && I.t === 'siswa') {
+            // 1. Import biodata dari format database sekolah dengan header di baris kelima.
+            const pesertaDidikRows = w.Sheets.PesertaDidik
+                ? XLSX.utils.sheet_to_json(w.Sheets.PesertaDidik, {header:1, defval:''})
+                : [];
+            const pesertaDidikHeader = pesertaDidikRows[4] || [];
+            const isSchoolDatabaseSheet = fieldOf(pesertaDidikHeader[CI('C')]) === 'nis'
+                && fieldOf(pesertaDidikHeader[CI('D')]) === 'nama'
+                && fieldOf(pesertaDidikHeader[CI('F')]) === 'nisn';
+            if (isSchoolDatabaseSheet && I.t === 'siswa') {
                 I.raws = [{
                     name: 'PesertaDidik',
                     hr: 4,
@@ -822,29 +852,25 @@
                     aoa: [],
                     kelas: ''
                 }];
-                if (w.Sheets['Kontrol Induk']) {
-                    I.raws.push({
-                        name: 'Kontrol Induk',
-                        hr: 4,
-                        heads: Object.keys(KMAP),
-                        map: KMAP,
-                        semOf: {},
-                        base: KMAP,
-                        aoa: [],
-                        kelas: ''
-                    });
-                }
                 I.rows = realRows(w);
                 I.mode = 'semua';
                 I.newM = [];
                 renderPreviewUI();
-                if (window.toast) toast(I.rows.length + ' siswa terbaca dari PesertaDidik + Kontrol Induk');
+                if (window.toast) toast(I.rows.length + ' baris biodata terbaca dari PesertaDidik');
+                return;
+            }
+
+            if (I.t === 'siswa' && w.Sheets['Kontrol Induk']) {
+                alert('Sheet PesertaDidik tidak ditemukan. Sheet Kontrol Induk tidak dapat diimpor sebagai biodata siswa.');
                 return;
             }
 
             // 2. Analisis Lembar Kerja Umum
             const rd = n => XLSX.utils.sheet_to_json(w.Sheets[n], {header: 1, defval: ''});
-            const allAnalyzed = w.SheetNames.map(n => analyze(n, rd(n), I.t)).filter(Boolean);
+            const sheetNames = I.t === 'siswa'
+                ? w.SheetNames.filter(name => name !== 'Kontrol Induk')
+                : w.SheetNames;
+            const allAnalyzed = sheetNames.map(n => analyze(n, rd(n), I.t)).filter(Boolean);
 
             let use = allAnalyzed;
             if (!use.length) {
@@ -892,13 +918,6 @@
         readFormOptions();
 
         let rowsToSend = I.rows || [];
-        if (I.t === 'siswa') {
-            rowsToSend = rowsToSend.filter(r => r.nisn && /^\d{10}$/.test(r.nisn));
-            if (rowsToSend.length === 0) {
-                alert('Tidak ada baris dengan NISN valid (tepat 10 digit angka). Silakan periksa kolom NISN di file Excel Anda.');
-                return;
-            }
-        }
 
         const btn = document.getElementById('btn-do-import');
         if (btn) {
@@ -913,11 +932,11 @@
 
         const payload = {
             type: I.t,
-            tahun_ajaran: I.ta || '2024/2025',
+            tahun_ajaran: I.ta || '',
             semester: I.sem || 'Genap',
             mode: I.mode || 'semua',
             kelas: I.kelas || '',
-            dup: I.dup || 'timpa',
+            dup: I.dup || 'skip',
             rows: rowsToSend,
             new_classes: [...new Set(rowsToSend.map(r => normK(r.kelas || '')).filter(Boolean))],
             new_mapel: I.newM || []
@@ -939,20 +958,34 @@
             if (data.success) {
                 const container = document.getElementById('josbook-import-preview-area');
                 if (container) {
+                    const rowErrors = Array.isArray(data.errors) ? data.errors : [];
+                    const escapedErrors = rowErrors.map(function(error) {
+                        const reason = String(error.reason || 'Baris dilewati')
+                            .replace(/&/g, '&amp;')
+                            .replace(/</g, '&lt;')
+                            .replace(/>/g, '&gt;')
+                            .replace(/"/g, '&quot;')
+                            .replace(/'/g, '&#039;');
+                        return `<li>Baris ${Number(error.row) || '-'}: ${reason}</li>`;
+                    }).join('');
+                    const errorSummary = rowErrors.length
+                        ? `<details style="margin:0 0 14px"><summary style="cursor:pointer">Lihat ${rowErrors.length} baris gagal/dilewati</summary><ul>${escapedErrors}</ul></details>`
+                        : '';
                     container.innerHTML = `
                         <div class="card" style="margin-top:14px;border-left:4px solid #27ae60;background:#f6fbf8;padding:20px">
                             <h3 style="color:#27ae60;margin:0 0 8px;font-size:16px">✅ ${data.message}</h3>
-                            ${data.skipped > 0 ? `<p class="sub" style="margin:0 0 14px;color:#e67e22">⚠️ ${data.skipped} baris dilewati (NISN sudah ada atau data tidak valid).</p>` : '<p class="sub" style="margin:0 0 14px;color:#2e7d32">Semua data berhasil disimpan ke database tanpa kendala.</p>'}
+                            ${data.class_warning ? `<p class="sub" style="margin:0 0 14px;color:#e67e22">${String(data.class_warning).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>` : ''}
+                            ${errorSummary}
                             <div class="bar" style="margin-top:14px;gap:10px;flex-wrap:wrap">
                                 ${I.t === 'siswa' ? `
-                                    <a href="/admin/data-siswa" class="btn a" style="padding:9px 18px;text-decoration:none;font-weight:600">👉 Buka Halaman Data Siswa</a>
-                                    ${targetKelas ? `<a href="/admin/data-siswa?kelas=${encodeURIComponent(targetKelas)}" class="btn" style="padding:9px 16px;text-decoration:none">Lihat Kelas ${targetKelas}</a>` : ''}
+                                    <a href="/admin/data-siswa" class="btn a" style="padding:6px 12px;font-size:12px;text-decoration:none;font-weight:600">👉 Buka Halaman Data Siswa</a>
+                                    ${targetKelas ? `<a href="/admin/data-siswa?kelas=${encodeURIComponent(targetKelas)}" class="btn" style="padding:6px 10px;font-size:12px;text-decoration:none">Lihat Kelas ${targetKelas}</a>` : ''}
                                 ` : I.t === 'nilai' ? `
-                                    <a href="/admin/import/nilai" class="btn a" style="padding:9px 18px;text-decoration:none;font-weight:600">🔄 Selesai &amp; Muat Ulang Data Nilai</a>
+                                    <a href="/admin/import/nilai" class="btn a" style="padding:6px 12px;font-size:12px;text-decoration:none;font-weight:600">🔄 Selesai &amp; Muat Ulang Data Nilai</a>
                                 ` : I.t === 'hadir' ? `
-                                    <a href="/admin/import/kehadiran" class="btn a" style="padding:9px 18px;text-decoration:none;font-weight:600">🔄 Selesai &amp; Muat Ulang Data Kehadiran</a>
+                                    <a href="/admin/import/kehadiran" class="btn a" style="padding:6px 12px;font-size:12px;text-decoration:none;font-weight:600">🔄 Selesai &amp; Muat Ulang Data Kehadiran</a>
                                 ` : `
-                                    <a href="/admin/import/ekskul" class="btn a" style="padding:9px 18px;text-decoration:none;font-weight:600">🔄 Selesai &amp; Muat Ulang Data Ekskul</a>
+                                    <a href="/admin/import/ekskul" class="btn a" style="padding:6px 12px;font-size:12px;text-decoration:none;font-weight:600">🔄 Selesai &amp; Muat Ulang Data Ekskul</a>
                                 `}
                                 <button type="button" class="btn o" onclick="resetImportPreview()">⬆ Import File Lain</button>
                             </div>

@@ -611,6 +611,11 @@ select,input{border-radius:10px;border-color:#dfe5ee}
     opacity: 1;
 }
 
+svg {
+    max-width: 20px !important;
+    max-height: 20px !important;
+}
+
 .josbook-sidebar-footer {
     padding: 12px 14px;
     border-top: 1px solid rgba(255, 255, 255, 0.08);

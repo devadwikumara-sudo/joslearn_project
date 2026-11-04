@@ -239,7 +239,18 @@ document.addEventListener('click', function(e){
 
 <script src="{{ asset('js/xlsx.full.min.js') }}"></script>
 <script src="{{ asset('js/josbook-excel.js') }}"></script>
-<script src="{{ asset('js/josbook.js') }}"></script>
 @stack('scripts')
+<script>
+function toast(message, duration) {
+    const container = document.getElementById('ts');
+    if (!container) return;
+
+    container.textContent = message;
+    container.style.display = 'block';
+    window.setTimeout(function() {
+        container.style.display = 'none';
+    }, duration || 2500);
+}
+</script>
 </body>
 </html>

@@ -4,7 +4,13 @@
 
 @section('content')
 <h2>Data Siswa</h2>
-<p class="sub">Pilih kelas dulu agar data tidak tampil sekaligus.</p>
+<p class="sub">
+    @if(count($kelasList) === 0)
+        Belum ada kelas master; biodata tanpa riwayat kelas ditampilkan sebagai belum ditetapkan.
+    @else
+        Pilih kelas dulu agar data tidak tampil sekaligus.
+    @endif
+</p>
 
 {{-- Toolbar Sesuai Prototype (siswaPg) --}}
 <div class="bar">
@@ -17,7 +23,7 @@
             @endforeach
         </select>
 
-        <input type="text" name="q" placeholder="Cari nama / NISN" value="{{ $search }}" style="width:200px">
+        <input type="text" name="q" placeholder="Cari nama / NISN / NIS" value="{{ $search }}" style="width:200px">
 
         <select name="st" onchange="this.form.submit()">
             <option value="">Semua status</option>
@@ -37,7 +43,7 @@
 </div>
 
 {{-- JIKA BELUM PILIH KELAS & TIDAK SEDANG SEARCH: Tampilkan Grid Card Kelas (Prototype baris 330) --}}
-@if(!$kelasSelected && !$search && !$statusFilter)
+@if(!$kelasSelected && !$search && !$statusFilter && count($kelasList) > 0)
 <div class="g g4" style="margin-top:14px">
     @forelse($kelasList as $k)
         @php
@@ -92,9 +98,11 @@
                 @forelse($siswaList as $s)
                 @php
                     $rk = $s->riwayatKelas->first();
-                    $kelasNama = $rk?->kelas?->nama ?? '-';
-                    $statusNama = $rk ? $rk->status : 'Aktif';
-                    $badgeClass = $statusNama === 'Aktif' ? 'ok' : ($statusNama === 'Lulus' ? 'ok' : ($statusNama === 'Pindah keluar' ? 'w' : 'e'));
+                    $kelasNama = $rk?->kelas?->nama ?? 'Belum ditetapkan';
+                    $statusNama = $rk?->status ?? 'Belum diatur';
+                    $badgeClass = in_array($statusNama, ['Aktif', 'Lulus'], true)
+                        ? 'ok'
+                        : (in_array($statusNama, ['Pindah keluar', 'Belum diatur'], true) ? 'w' : 'e');
                 @endphp
                 <tr>
                     <td><input type="checkbox" class="check-item" value="{{ $s->id }}"></td>
