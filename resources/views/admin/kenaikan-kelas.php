@@ -1,91 +1,129 @@
 @extends('layouts.app')
 
-@section('title', 'Kenaikan Kelas - JosBook Admin')
+@section('title', 'Kenaikan Kelas — JosBook Admin')
 
 @section('content')
 <h2>Kenaikan Kelas</h2>
-<p class="sub">Proses kenaikan kelas siswa berdasarkan nilai dan kehadiran</p>
+<p class="sub">Proses dari {{ $taAktif ?? '2024/2025' }} ke {{ $taBerikutnya ?? '2025/2026' }}. Naikkan semua sekaligus atau atur satu per satu. Riwayat tahun lama tetap tersimpan.</p>
 
-<div class="note">
-    ⚠️ Proses kenaikan kelas bersifat <b>permanen</b>. Pastikan semua data nilai dan kehadiran sudah lengkap sebelum melanjutkan.
-</div>
-
-<div class="g g2">
-    <div class="card">
-        <h3>⚙️ Konfigurasi Kenaikan Kelas</h3>
-        <form method="POST" action="{{ route('admin.kenaikan-kelas.proses') }}">
-            @csrf
-            <div style="display:grid;gap:12px;margin-bottom:14px">
-                <div>
-                    <label>Dari Tahun Ajaran</label>
-                    <select name="dari_tahun_ajaran" style="width:100%">
-                        <option>2023/2024</option><option>2024/2025</option>
-                    </select>
-                </div>
-                <div>
-                    <label>Ke Tahun Ajaran</label>
-                    <select name="ke_tahun_ajaran" style="width:100%">
-                        <option>2024/2025</option><option>2025/2026</option>
-                    </select>
-                </div>
-                <div>
-                    <label>Kelas yang Diproses</label>
-                    <select name="kelas" style="width:100%">
-                        <option value="">Semua Kelas</option>
-                        @foreach($kelasList ?? [] as $k)
-                            <option>{{ $k }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label>Nilai Minimum Kelulusan</label>
-                    <input type="number" name="nilai_minimum" value="75" min="0" max="100" style="width:100%">
-                </div>
-            </div>
-            <button type="submit" class="btn" style="width:100%" onclick="return confirm('Yakin proses kenaikan kelas? Tindakan ini tidak bisa dibatalkan.')">
-                🎓 Proses Kenaikan Kelas
-            </button>
-        </form>
-    </div>
+<form action="{{ route('admin.kenaikan-kelas.proses') }}" method="POST">
+    @csrf
+    <input type="hidden" name="ta_aktif" value="{{ $taAktif }}">
+    <input type="hidden" name="ta_berikutnya" value="{{ $taBerikutnya }}">
+    <input type="hidden" name="kelas_asal" value="{{ $kelasAsal }}">
 
     <div class="card">
-        <h3>📊 Status Kenaikan</h3>
-        @forelse($statusKelas ?? [] as $kelas => $data)
-        <div style="padding:10px;border:1px solid var(--ln);border-radius:10px;margin-bottom:10px">
-            <b>{{ $kelas }}</b>
-            <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">
-                <span class="bd ok">Naik: {{ $data['naik'] ?? 0 }}</span>
-                <span class="bd e">Tidak Naik: {{ $data['tidak_naik'] ?? 0 }}</span>
-                <span class="bd w">Belum Diproses: {{ $data['pending'] ?? 0 }}</span>
+        <div class="bar">
+            <div>
+                <label>Kelas asal</label>
+                <select onchange="location.href='{{ route('admin.kenaikan-kelas') }}?kelas='+this.value">
+                    @foreach($kelasList as $k)
+                        <option value="{{ $k }}" {{ $kelasAsal === $k ? 'selected' : '' }}>{{ $k }}</option>
+                    @endforeach
+                </select>
             </div>
+            <span class="sp"></span>
+            <button type="button" class="btn o" onclick="setSemuaHasil('Naik')">Naikkan semua</button>
+            <button type="button" class="btn o" onclick="setSemuaHasil('Tinggal')">Tinggal semua</button>
+            <button type="button" class="btn o" onclick="setSemuaHasil('Lulus')">Luluskan semua</button>
+            <button type="submit" class="btn a">Proses {{ count($siswaList) }} siswa</button>
         </div>
-        @empty
-        <p style="color:var(--mu);font-size:12px;text-align:center;padding:20px">Belum ada data kenaikan kelas.</p>
-        @endforelse
+
+        <div class="tw" style="margin-top:12px">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Nama</th>
+                        <th>NISN</th>
+                        <th>Hasil</th>
+                        <th>Kelas tujuan ({{ $taBerikutnya }})</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @php
+                        $isKelas12 = str_starts_with(strtoupper($kelasAsal), 'XII');
+                    @endphp
+                    @forelse($siswaList as $s)
+                    @php
+                        $defaultHasil = $isKelas12 ? 'Lulus' : 'Naik';
+                        $defaultTujuan = $nextKelasMap[$kelasAsal] ?? $kelasAsal;
+                    @endphp
+                    <tr>
+                        <td><b>{{ $s->nama_lengkap }}</b></td>
+                        <td><code>{{ $s->nisn }}</code></td>
+                        <td>
+                            <select name="keputusan[{{ $s->id }}]" class="sel-keputusan" data-id="{{ $s->id }}" onchange="updateTargetKelas(this, '{{ $s->id }}')">
+                                @if($isKelas12)
+                                    <option value="Lulus" selected>Lulus</option>
+                                    <option value="Tinggal">Tinggal</option>
+                                    <option value="Keluar">Keluar</option>
+                                @else
+                                    <option value="Naik" selected>Naik</option>
+                                    <option value="Tinggal">Tinggal</option>
+                                    <option value="Keluar">Keluar</option>
+                                @endif
+                            </select>
+                        </td>
+                        <td>
+                            <div id="target-wrap-{{ $s->id }}">
+                                @if($isKelas12)
+                                    <span style="color:var(--mu)">Lulus (Masuk Alumni)</span>
+                                @else
+                                    <select name="kelas_tujuan[{{ $s->id }}]" class="sel-tujuan">
+                                        @foreach($kelasList as $kt)
+                                            <option value="{{ $kt }}" {{ $defaultTujuan === $kt ? 'selected' : '' }}>{{ $kt }}</option>
+                                        @endforeach
+                                    </select>
+                                @endif
+                            </div>
+                        </td>
+                    </tr>
+                    @empty
+                    <tr>
+                        <td colspan="4" style="text-align:center;padding:26px;color:var(--mu)">
+                            Tidak ada siswa aktif di kelas {{ $kelasAsal }} pada tahun ajaran {{ $taAktif }}.
+                        </td>
+                    </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
     </div>
+</form>
+
+<div class="note" style="margin-top:14px">
+    Wali kelas hanya dapat memproses kelasnya sendiri. Siswa kelas XII otomatis berstatus <b>Lulus</b> dan masuk ke Data Alumni. Untuk memindahkan siswa ke kelas lain di tahun yang sama, pakai tombol ⇄ di Data Siswa.
 </div>
 
-{{-- Tabel siswa tidak naik kelas --}}
-@if(isset($siswaTidakNaik) && count($siswaTidakNaik) > 0)
-<div class="card">
-    <h3>❌ Siswa Tidak Naik Kelas ({{ count($siswaTidakNaik) }})</h3>
-    <div class="tw">
-        <table>
-            <thead><tr><th>Nama</th><th>NISN</th><th>Kelas</th><th>Alasan</th><th>Aksi</th></tr></thead>
-            <tbody>
-                @foreach($siswaTidakNaik as $s)
-                <tr>
-                    <td><b>{{ $s->nama_lengkap }}</b></td>
-                    <td>{{ $s->nisn }}</td>
-                    <td>{{ $s->kelas }}</td>
-                    <td style="color:var(--er)">{{ $s->alasan_tidak_naik }}</td>
-                    <td><a href="/admin/data-siswa/{{ $s->id }}" class="btn o" style="padding:4px 10px;font-size:11px">Lihat Detail</a></td>
-                </tr>
-                @endforeach
-            </tbody>
-        </table>
-    </div>
-</div>
-@endif
+@push('scripts')
+<script>
+function setSemuaHasil(aksi) {
+    document.querySelectorAll('.sel-keputusan').forEach(function(sel) {
+        var id = sel.getAttribute('data-id');
+        // Pastikan opsi ada
+        for (var i = 0; i < sel.options.length; i++) {
+            if (sel.options[i].value === aksi) {
+                sel.selectedIndex = i;
+                updateTargetKelas(sel, id);
+                break;
+            }
+        }
+    });
+}
+
+function updateTargetKelas(sel, id) {
+    var val = sel.value;
+    var wrap = document.getElementById('target-wrap-' + id);
+    if (!wrap) return;
+
+    if (val === 'Lulus') {
+        wrap.innerHTML = '<span style="color:var(--mu)">Lulus (Masuk Alumni)</span>';
+    } else if (val === 'Tinggal') {
+        wrap.innerHTML = '<span>{{ $kelasAsal }} (Tinggal)</span>';
+    } else if (val === 'Keluar') {
+        wrap.innerHTML = '<span style="color:var(--mu)">— (Keluar)</span>';
+    }
+}
+</script>
+@endpush
 @endsection
-

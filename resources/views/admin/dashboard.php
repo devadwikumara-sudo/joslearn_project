@@ -1,119 +1,162 @@
 @extends('layouts.app')
 
-@section('title', 'Dashboard Admin — JosBook')
+@section('title', 'Dashboard — JosBook')
 
 @section('content')
-{{-- Hero Banner --}}
-<div class="hero2">
-    <div>
-        <span class="pl2">📊 BUKU INDUK DIGITAL</span>
-        <h1>Dashboard Admin</h1>
-        <p>Tahun Ajaran 2024/2025 · SMA Negeri 1 Rejoso Nganjuk</p>
-        <div class="chs">
-            <span>Semester Genap</span>
-            <span>{{ now()->format('d M Y') }}</span>
-        </div>
+<h2>Dashboard</h2>
+<p class="sub">Tahun ajaran {{ $taAktif ?? '2024/2025' }}</p>
+
+{{-- 4 Stat Cards Utama (Prototype Row 1) --}}
+<div class="g g4">
+    <div class="card st">
+        <span>Siswa aktif</span>
+        <b>{{ number_format($totalSiswaAktif ?? 0) }}</b>
     </div>
-    <div class="dt">
-        <small>Total Siswa Aktif</small>
-        <b style="font-size:28px">0</b>
-        <small style="margin-top:4px">tahun ini</small>
+    <div class="card st">
+        <span>Guru</span>
+        <b>{{ number_format($totalGuru ?? 0) }}</b>
+    </div>
+    <div class="card st">
+        <span>Alumni</span>
+        <b>{{ number_format($totalAlumni ?? 0) }}</b>
+    </div>
+    <div class="card st">
+        <span>Data di sampah</span>
+        <b>{{ number_format($totalSampah ?? 0) }}</b>
     </div>
 </div>
 
-{{-- 4 Stat Cards --}}
-<div class="g g4" style="margin-bottom:14px">
+{{-- 4 Stat Cards Rincian (Prototype Row 2) --}}
+<div class="g g4" style="margin-top:12px">
     <div class="card st">
-        <span>Total Siswa</span>
-        <b>0</b>
+        <span>Laki-laki</span>
+        <b>{{ number_format($totalLaki ?? 0) }}</b>
     </div>
     <div class="card st">
-        <span>Total Guru</span>
-        <b>0</b>
+        <span>Perempuan</span>
+        <b>{{ number_format($totalPerempuan ?? 0) }}</b>
     </div>
     <div class="card st">
-        <span>Kelas Aktif</span>
-        <b>0</b>
+        <span>Pindah / keluar {{ $taAktif ?? '' }}</span>
+        <b>{{ number_format($totalMutasi ?? 0) }}</b>
     </div>
     <div class="card st">
-        <span>Import Bulan Ini</span>
-        <b>0</b>
+        <span>Kelengkapan data</span>
+        <b>{{ $persenLengkap ?? 100 }}%</b>
     </div>
 </div>
 
-{{-- Row 2: Angkatan + Alumni --}}
-<div class="g g2" style="margin-bottom:14px">
+{{-- Row 3: Komposisi per Kelas & Perlu Dilengkapi (Prototype Row 3) --}}
+<div class="g g2" style="margin-top:12px">
     <div class="card">
-        <h3>Siswa per Angkatan</h3>
-        <div class="angs">
-            <div class="ang">
-                <i>X</i>
-                <small>Kelas X</small>
-                <b>0 Siswa</b>
-            </div>
-            <div class="ang">
-                <i>XI</i>
-                <small>Kelas XI</small>
-                <b>0 Siswa</b>
-            </div>
-            <div class="ang">
-                <i>XII</i>
-                <small>Kelas XII</small>
-                <b>0 Siswa</b>
-            </div>
-        </div>
-    </div>
-    <div class="card">
-        <h3>Alumni per Tahun Lulus</h3>
-        <p class="sub" style="color:var(--mu)">Belum ada data alumni.</p>
-        <h3 style="margin-top:14px">Aktivitas Terbaru</h3>
-        <p class="sub" style="color:var(--mu)">Belum ada aktivitas.</p>
-    </div>
-</div>
-
-{{-- Row 3: Komposisi Kelas + Kelengkapan Data --}}
-<div class="g g2" style="margin-bottom:14px">
-    <div class="card">
-        <h3>Komposisi per Kelas</h3>
+        <h3>Komposisi per kelas</h3>
         <div class="tw">
             <table>
-                <tr>
-                    <th>Kelas</th>
-                    <th>L</th>
-                    <th>P</th>
-                    <th>Total</th>
-                    <th>Kelengkapan</th>
-                </tr>
-                <tr>
-                    <td colspan="5" style="text-align:center;color:var(--mu);padding:26px">
-                        Belum ada data siswa
-                    </td>
-                </tr>
+                <thead>
+                    <tr>
+                        <th>Kelas</th>
+                        <th>L</th>
+                        <th>P</th>
+                        <th>Total</th>
+                        <th>Kelengkapan</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($komposisiKelas ?? [] as $k)
+                    <tr>
+                        <td><strong>{{ $k['kelas'] }}</strong></td>
+                        <td>{{ $k['l'] }}</td>
+                        <td>{{ $k['p'] }}</td>
+                        <td><b>{{ $k['total'] }}</b></td>
+                        <td>
+                            @if($k['total'] > 0)
+                                <span class="bd {{ $k['persen'] >= 90 ? 'ok' : 'w' }}">{{ $k['persen'] }}%</span>
+                            @else
+                                -
+                            @endif
+                        </td>
+                    </tr>
+                    @empty
+                    <tr>
+                        <td colspan="5" style="text-align:center;color:var(--mu);padding:20px">
+                            Belum ada data kelas aktif pada tahun ajaran ini.
+                        </td>
+                    </tr>
+                    @endforelse
+                </tbody>
             </table>
         </div>
     </div>
+
     <div class="card">
-        <h3>Perlu Dilengkapi</h3>
-        <p class="sub" style="color:var(--mu)">Semua data siswa aktif sudah lengkap 🎉</p>
+        <h3>Perlu dilengkapi</h3>
+        @if(!empty($perluDilengkapi))
+            @foreach($perluDilengkapi as $item)
+            <div class="row" style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--bd, #eef2f6)">
+                <span>
+                    <b>{{ $item['nama'] }}</b> · {{ $item['kelas'] }}<br>
+                    <small style="color:var(--mu, #64748b)">
+                        Kurang: {{ implode(', ', array_slice($item['missing'], 0, 3)) }}
+                        @if(count($item['missing']) > 3)
+                            +{{ count($item['missing']) - 3 }} lainnya
+                        @endif
+                    </small>
+                </span>
+                <a href="{{ route('admin.data-siswa.edit', $item['id']) }}" class="btn a" style="padding:4px 10px;font-size:12px">Edit</a>
+            </div>
+            @endforeach
+        @else
+            <span class="sub" style="display:block;padding:12px 0">Semua data siswa aktif sudah lengkap 🎉</span>
+        @endif
     </div>
 </div>
 
-{{-- Row 4: Distribusi Siswa (bar chart) --}}
-<div class="card" style="margin-bottom:0">
-    <h3>Distribusi Siswa per Kelas</h3>
-    <div class="bars" style="margin-top:14px">
-        <div style="display:flex;flex-direction:column;align-items:center;flex:1">
-            <div style="flex:1;width:100%;background:var(--a);border-radius:4px 4px 0 0;min-height:4px"></div>
-            <small style="margin-top:4px;color:var(--mu)">X-1</small>
+{{-- Row 4: Siswa per Angkatan & Alumni per Tahun Lulus + Log Aktivitas (Prototype Row 4) --}}
+<div class="g g2" style="margin-top:12px">
+    <div class="card">
+        <h3>Siswa per angkatan</h3>
+        <div class="angs" style="display:grid;grid-template-columns:repeat(3, 1fr);gap:10px;margin-top:10px">
+            <div class="ang" style="background:#f8fafc;padding:12px;border-radius:8px;border:1px solid #e2e8f0;text-align:center">
+                <small style="display:block;color:#64748b;font-size:12px">Kelas X</small>
+                <b style="font-size:18px;color:#1e293b">{{ number_format($angkatanX ?? 0) }} Siswa</b>
+                <i style="display:block;font-size:11px;color:#94a3b8;margin-top:4px">◔ Aktif</i>
+            </div>
+            <div class="ang" style="background:#f8fafc;padding:12px;border-radius:8px;border:1px solid #e2e8f0;text-align:center">
+                <small style="display:block;color:#64748b;font-size:12px">Kelas XI</small>
+                <b style="font-size:18px;color:#1e293b">{{ number_format($angkatanXI ?? 0) }} Siswa</b>
+                <i style="display:block;font-size:11px;color:#94a3b8;margin-top:4px">◔ Aktif</i>
+            </div>
+            <div class="ang" style="background:#f8fafc;padding:12px;border-radius:8px;border:1px solid #e2e8f0;text-align:center">
+                <small style="display:block;color:#64748b;font-size:12px">Kelas XII</small>
+                <b style="font-size:18px;color:#1e293b">{{ number_format($angkatanXII ?? 0) }} Siswa</b>
+                <i style="display:block;font-size:11px;color:#94a3b8;margin-top:4px">◔ Aktif</i>
+            </div>
         </div>
-        <div style="display:flex;flex-direction:column;align-items:center;flex:1">
-            <div style="flex:1;width:100%;background:var(--a);border-radius:4px 4px 0 0;min-height:4px"></div>
-            <small style="margin-top:4px;color:var(--mu)">XI-1</small>
+    </div>
+
+    <div class="card">
+        <h3>Alumni per tahun lulus</h3>
+        <div class="bar" style="flex-wrap:wrap;gap:6px;margin:8px 0">
+            @if(!empty($alumniPerTahun))
+                @foreach($alumniPerTahun as $thn => $jml)
+                    <span class="bd ok">{{ $thn }}: {{ $jml }}</span>
+                @endforeach
+            @else
+                <span class="sub">Belum ada alumni</span>
+            @endif
         </div>
-        <div style="display:flex;flex-direction:column;align-items:center;flex:1">
-            <div style="flex:1;width:100%;background:var(--a);border-radius:4px 4px 0 0;min-height:4px"></div>
-            <small style="margin-top:4px;color:var(--mu)">XII-1</small>
-        </div>
+
+        <h3 style="margin-top:16px">Aktivitas terbaru</h3>
+        @if(!empty($aktivitasTerbaru) && count($aktivitasTerbaru) > 0)
+            @foreach($aktivitasTerbaru as $log)
+            <div class="row" style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f1f5f9;font-size:13px">
+                <b>{{ $log->keterangan ?? $log->aksi }}</b>
+                <span style="color:#64748b">{{ $log->created_at ? $log->created_at->diffForHumans() : '-' }}</span>
+            </div>
+            @endforeach
+        @else
+            <span class="sub">Belum ada aktivitas tercatat.</span>
+        @endif
     </div>
 </div>
 @endsection

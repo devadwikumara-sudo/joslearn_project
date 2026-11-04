@@ -1,119 +1,92 @@
 @extends('layouts.app')
 
+@section('title', 'Mutasi Siswa — JosBook Admin')
+
 @section('content')
-<div class="hero2">
-    <div>
-        <h2>Mutasi Siswa</h2>
-        <p class="sub">Proses perpindahan atau pengeluaran siswa dari sekolah</p>
-    </div>
-</div>
+<h2>Mutasi Siswa</h2>
+<p class="sub">Catat siswa pindah / keluar.</p>
 
-@if(session('success'))
-<div class="note ok">{{ session('success') }}</div>
-@endif
-@if(session('error'))
-<div class="note er">{{ session('error') }}</div>
-@endif
-
-{{-- Form Mutasi --}}
+{{-- Card 1: Form Catat Mutasi (Sesuai Prototype mutasiPg) --}}
 <div class="card">
-    <h3 style="margin:0 0 1rem;font-size:1rem;color:var(--p)">Proses Mutasi Siswa</h3>
-    <form method="POST" action="{{ route('admin.mutasi-siswa.store') }}">
+    <form action="{{ route('admin.mutasi-siswa.store') }}" method="POST">
         @csrf
         <div class="fl">
-            <div class="sp">
+            <div>
                 <label>Siswa</label>
                 <select name="siswa_id" required>
-                    <option value="">-- Pilih Siswa --</option>
+                    <option value="">— Pilih siswa aktif —</option>
                     @foreach($siswaAktif as $s)
-                    <option value="{{ $s->id }}" {{ old('siswa_id') == $s->id ? 'selected' : '' }}>
-                        {{ $s->nama }} — {{ $s->kelas }} ({{ $s->nis }})
-                    </option>
+                        @php
+                            $kName = $s->riwayatKelas->first() ? $s->riwayatKelas->first()->kelas : '-';
+                        @endphp
+                        <option value="{{ $s->id }}">{{ $s->nama_lengkap }} · {{ $kName }}</option>
                     @endforeach
                 </select>
-                @error('siswa_id')<small class="er">{{ $message }}</small>@enderror
             </div>
-            <div class="sp">
-                <label>Jenis Mutasi</label>
-                <select name="jenis_mutasi" id="jenisMutasi" required onchange="toggleSekolah()">
-                    <option value="">-- Pilih Jenis --</option>
-                    <option value="Pindah keluar" {{ old('jenis_mutasi')=='Pindah keluar' ? 'selected' : '' }}>Pindah Keluar</option>
-                    <option value="Keluar" {{ old('jenis_mutasi')=='Keluar' ? 'selected' : '' }}>Keluar</option>
+            <div>
+                <label>Jenis</label>
+                <select name="jenis">
+                    <option value="Pindah keluar">Pindah keluar</option>
+                    <option value="Keluar">Keluar</option>
                 </select>
-                @error('jenis_mutasi')<small class="er">{{ $message }}</small>@enderror
             </div>
-            <div class="sp" id="sekolahField">
-                <label>Sekolah Tujuan</label>
-                <input type="text" name="sekolah_tujuan" placeholder="Nama sekolah tujuan (jika pindah)" value="{{ old('sekolah_tujuan') }}">
-                @error('sekolah_tujuan')<small class="er">{{ $message }}</small>@enderror
+            <div>
+                <label>Sekolah tujuan</label>
+                <input type="text" name="sekolah_tujuan" placeholder="Nama sekolah tujuan">
             </div>
-            <div class="sp">
-                <label>Tanggal Mutasi</label>
-                <input type="date" name="tanggal_mutasi" value="{{ old('tanggal_mutasi', date('Y-m-d')) }}" required>
-                @error('tanggal_mutasi')<small class="er">{{ $message }}</small>@enderror
-            </div>
-            <div class="sp" style="grid-column:1/-1">
-                <label>Keterangan / Alasan</label>
-                <input type="text" name="keterangan" placeholder="Alasan mutasi (opsional)" value="{{ old('keterangan') }}">
+            <div>
+                <label>Tanggal</label>
+                <input type="date" name="tanggal" value="{{ date('Y-m-d') }}" required>
             </div>
         </div>
-        <div class="bar" style="margin-top:1rem">
-            <button type="submit" class="btn a">⇄ Proses Mutasi</button>
-            <button type="reset" class="btn">Reset</button>
+
+        <div class="bar" style="margin-top:14px">
+            <button type="submit" class="btn a">Catat mutasi</button>
         </div>
     </form>
 </div>
 
-{{-- Riwayat Mutasi --}}
-<div class="card wide">
-    <h3 style="margin:0 0 1rem;font-size:1rem;color:var(--p)">Riwayat Mutasi</h3>
-    <table class="tw">
-        <thead>
-            <tr>
-                <th>No</th>
-                <th>Nama Siswa</th>
-                <th>Jenis</th>
-                <th>Sekolah Tujuan</th>
-                <th>Tanggal</th>
-                <th>Kelas Keluar</th>
-            </tr>
-        </thead>
-        <tbody>
-            @forelse($riwayatMutasi as $index => $m)
-            <tr>
-                <td>{{ $loop->iteration }}</td>
-                <td>
-                    <strong>{{ $m->siswa->nama ?? '-' }}</strong><br>
-                    <small style="color:var(--mu)">{{ $m->siswa->nis ?? '' }}</small>
-                </td>
-                <td>
-                    @if($m->jenis_mutasi === 'Pindah keluar')
-                        <span class="bd w">Pindah Keluar</span>
-                    @else
-                        <span class="bd e">Keluar</span>
-                    @endif
-                </td>
-                <td>{{ $m->sekolah_tujuan ?: '-' }}</td>
-                <td>{{ \Carbon\Carbon::parse($m->tanggal_mutasi)->format('d M Y') }}</td>
-                <td>{{ $m->siswa->kelas ?? '-' }}</td>
-            </tr>
-            @empty
-            <tr>
-                <td colspan="6" style="text-align:center;padding:2rem;color:var(--mu)">
-                    Belum ada riwayat mutasi
-                </td>
-            </tr>
-            @endforelse
-        </tbody>
-    </table>
+{{-- Card 2: Riwayat Mutasi & Pindahan Masuk --}}
+<div class="card" style="margin-top:14px">
+    <h3>Riwayat mutasi &amp; pindahan masuk</h3>
+    <div class="tw">
+        <table>
+            <thead>
+                <tr>
+                    <th>Nama</th>
+                    <th>Kelas</th>
+                    <th>Jenis</th>
+                    <th>Tujuan / asal</th>
+                    <th>Aksi</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse($riwayatMutasi as $m)
+                @php
+                    $rk = $m->riwayatKelas->first();
+                    $kName = $rk ? $rk->kelas : ($m->kelas_keluar ?? '-');
+                    $isMasuk = ($rk && $rk->status === 'Aktif') && ($m->jenis_registrasi === 'Pindahan');
+                    $labelJenis = $isMasuk ? 'Pindahan masuk' : ($rk ? $rk->status : 'Pindah keluar');
+                    $tujuanAsal = $isMasuk ? ($m->pindahan_dari_sekolah ?? $m->sekolah_asal ?? '-') : ($m->sekolah_tujuan ?? '-');
+                @endphp
+                <tr>
+                    <td><b>{{ $m->nama_lengkap }}</b></td>
+                    <td>{{ $kName }}</td>
+                    <td><span class="bd w">{{ $labelJenis }}</span></td>
+                    <td>{{ $tujuanAsal }}</td>
+                    <td>
+                        <a href="{{ route('admin.data-siswa.pdf', $m->id) }}" class="btn o" style="padding:3px 8px;font-size:12px">⬇ PDF</a>
+                    </td>
+                </tr>
+                @empty
+                <tr>
+                    <td colspan="5" style="text-align:center;padding:24px;color:var(--mu)">
+                        Belum ada riwayat siswa pindah atau keluar pada tahun ajaran ini.
+                    </td>
+                </tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
 </div>
-
-<script>
-function toggleSekolah() {
-    const jenis = document.getElementById('jenisMutasi').value;
-    const field = document.getElementById('sekolahField');
-    field.style.opacity = jenis === 'Keluar' ? '0.4' : '1';
-}
-toggleSekolah();
-</script>
 @endsection

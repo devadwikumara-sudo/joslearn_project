@@ -3,99 +3,148 @@
 @section('title', 'Data Siswa — JosBook Admin')
 
 @section('content')
-<div class="hero2">
-    <div>
-        <h2>Data Siswa</h2>
-        <p class="sub">Total {{ count($siswa) }} siswa terdaftar dalam sistem</p>
-    </div>
-</div>
+<h2>Data Siswa</h2>
+<p class="sub">Pilih kelas dulu agar data tidak tampil sekaligus.</p>
 
-@if(session('success'))
-<div class="note ok">{{ session('success') }}</div>
-@endif
-@if(session('error'))
-<div class="note er">{{ session('error') }}</div>
-@endif
-
+{{-- Toolbar Sesuai Prototype (siswaPg) --}}
 <div class="bar">
-    <form method="GET" action="{{ route('admin.data-siswa') }}" style="display:contents">
-        <input type="text" name="search" placeholder="Cari NISN, NIS, atau nama..." value="{{ request('search') }}">
+    <form method="GET" action="{{ route('admin.data-siswa') }}" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <select name="kelas" onchange="this.form.submit()">
-            <option value="">Semua Kelas</option>
-            <option value="X-1" {{ request('kelas')=='X-1' ? 'selected' : '' }}>X-1</option>
-            <option value="XI-1" {{ request('kelas')=='XI-1' ? 'selected' : '' }}>XI-1</option>
-            <option value="XII-1" {{ request('kelas')=='XII-1' ? 'selected' : '' }}>XII-1</option>
+            <option value="">— Pilih kelas —</option>
+            <option value="*" {{ $kelasSelected === '*' ? 'selected' : '' }}>Semua kelas (gabungan)</option>
+            @foreach($kelasList as $k)
+                <option value="{{ $k }}" {{ $kelasSelected === $k ? 'selected' : '' }}>{{ $k }}</option>
+            @endforeach
         </select>
-        <select name="status" onchange="this.form.submit()">
-            <option value="">Semua Status</option>
-            <option value="Aktif" {{ request('status')=='Aktif' ? 'selected' : '' }}>Aktif</option>
-            <option value="Lulus" {{ request('status')=='Lulus' ? 'selected' : '' }}>Lulus</option>
-            <option value="Pindah" {{ request('status')=='Pindah' ? 'selected' : '' }}>Pindah</option>
-            <option value="Keluar" {{ request('status')=='Keluar' ? 'selected' : '' }}>Keluar</option>
+
+        <input type="text" name="q" placeholder="Cari nama / NISN" value="{{ $search }}" style="width:200px">
+
+        <select name="st" onchange="this.form.submit()">
+            <option value="">Semua status</option>
+            @foreach(['Aktif', 'Pindah keluar', 'Keluar', 'Lulus'] as $st)
+                <option value="{{ $st }}" {{ $statusFilter === $st ? 'selected' : '' }}>{{ $st }}</option>
+            @endforeach
         </select>
-        <button type="submit" class="btn">Cari</button>
+
+        <button type="submit" class="btn" style="padding:6px 12px">Cari</button>
     </form>
-    <a href="{{ route('admin.data-siswa.export') }}" class="btn o">⬇ Export Excel</a>
-    <a href="{{ route('admin.import.nilai') }}" class="btn o">⬆ Import Data</a>
-    <a href="{{ route('admin.form-pendataan') }}" class="btn a">+ Tambah Siswa</a>
+
+    <span class="sp"></span>
+
+    <a href="{{ route('admin.data-siswa.export') }}" class="btn o">⬇ Ekspor Excel</a>
+    <a href="{{ route('admin.import.siswa') }}" class="btn a">⬆ Import Excel</a>
+    <a href="{{ route('admin.form-pendataan') }}" class="btn">+ Tambah siswa</a>
 </div>
 
-<div class="card wide">
-    <table class="tw">
-        <thead>
-            <tr>
-                <th>No</th>
-                <th>NISN</th>
-                <th>NIS</th>
-                <th>Nama</th>
-                <th>Kelas</th>
-                <th>JK</th>
-                <th>TTL</th>
-                <th>Agama</th>
-                <th>Status</th>
-                <th>Aksi</th>
-            </tr>
-        </thead>
-        <tbody>
-            @forelse($siswa as $index => $s)
-            <tr>
-                <td>{{ $index + 1 }}</td>
-                <td>{{ $s->nisn ?? '-' }}</td>
-                <td>{{ $s->nis ?? '-' }}</td>
-                <td>
-                    <strong>{{ $s->nama ?? '-' }}</strong>
-                </td>
-                <td>{{ $s->kelas ?? '-' }}</td>
-                <td>{{ $s->jenis_kelamin ?? '-' }}</td>
-                <td>{{ $s->tempat_lahir ?? '-' }}, {{ isset($s->tanggal_lahir) ? \Carbon\Carbon::parse($s->tanggal_lahir)->format('d/m/Y') : '-' }}</td>
-                <td>{{ $s->agama ?? '-' }}</td>
-                <td>
-                    @if(($s->status ?? '') === 'Aktif')
-                        <span class="bd ok">Aktif</span>
-                    @elseif(($s->status ?? '') === 'Lulus')
-                        <span class="bd">Lulus</span>
-                    @elseif(($s->status ?? '') === 'Pindah')
-                        <span class="bd w">Pindah</span>
-                    @elseif(($s->status ?? '') === 'Keluar')
-                        <span class="bd e">Keluar</span>
-                    @else
-                        <span class="bd">{{ $s->status ?? 'Aktif' }}</span>
-                    @endif
-                </td>
-                <td>
-                    <a href="{{ route('admin.data-siswa.show', $s->id ?? 1) }}" class="btn o">Lihat</a>
-                    <a href="{{ route('admin.data-siswa.pdf', $s->id ?? 1) }}" class="btn o">PDF</a>
-                    <a href="{{ route('admin.form-pendataan.edit', $s->id ?? 1) }}" class="btn o">Edit</a>
-                </td>
-            </tr>
-            @empty
-            <tr>
-                <td colspan="10" style="text-align:center;padding:2rem;color:var(--mu)">
-                    Belum ada data siswa
-                </td>
-            </tr>
-            @endforelse
-        </tbody>
-    </table>
+{{-- JIKA BELUM PILIH KELAS & TIDAK SEDANG SEARCH: Tampilkan Grid Card Kelas (Prototype baris 330) --}}
+@if(!$kelasSelected && !$search && !$statusFilter)
+<div class="g g4" style="margin-top:14px">
+    @forelse($kelasList as $k)
+        @php
+            $count = $kelasCounts[$k] ?? 0;
+        @endphp
+        <a href="{{ route('admin.data-siswa', ['kelas' => $k]) }}" class="card cc" style="text-decoration:none;color:inherit;cursor:pointer">
+            <h3 style="font-size:16px">{{ $k }}</h3>
+            <div class="st">
+                <b>{{ $count }}</b>
+                <span>siswa</span>
+            </div>
+        </a>
+    @empty
+        <div class="card" style="grid-column:1/-1">
+            <p class="sub">Belum ada kelas di master kelas.</p>
+        </div>
+    @endforelse
 </div>
+
+{{-- JIKA KELAS SUDAH DIPILIH: Tampilkan Tabel Siswa (Prototype baris 331) --}}
+@else
+<div class="card" style="margin-top:14px">
+    <div class="bar">
+        <b>{{ $siswaList ? $siswaList->total() : 0 }} siswa</b>
+        @if($kelasSelected && $kelasSelected !== '*')
+            <span class="bd ok">{{ $kelasSelected }}</span>
+        @endif
+        <span class="sp"></span>
+        <button class="btn o" onclick="window.print()">⬇ PDF terpilih</button>
+        <button class="btn o" onclick="window.print()">⬇ PDF semua tampil</button>
+        <button class="btn o" onclick="toast('Fitur pindah kelas terpilih')">⇄ Pindah kelas</button>
+    </div>
+
+    <div class="tw">
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:36px"><input type="checkbox" id="check-all"></th>
+                    <th>NISN</th>
+                    <th>NIS</th>
+                    <th>Nama</th>
+                    <th>Kelas</th>
+                    <th>JK</th>
+                    <th>TTL</th>
+                    <th>Agama</th>
+                    <th>Orang tua</th>
+                    <th>Status</th>
+                    <th>Aksi</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse($siswaList as $s)
+                @php
+                    $rk = $s->riwayatKelas->first();
+                    $kelasNama = $rk ? $rk->kelas : '-';
+                    $statusNama = $rk ? $rk->status : 'Aktif';
+                    $badgeClass = $statusNama === 'Aktif' ? 'ok' : ($statusNama === 'Lulus' ? 'ok' : ($statusNama === 'Pindah keluar' ? 'w' : 'e'));
+                @endphp
+                <tr>
+                    <td><input type="checkbox" class="check-item" value="{{ $s->id }}"></td>
+                    <td><code>{{ $s->nisn ?? '-' }}</code></td>
+                    <td>{{ $s->nomor_induk ?? '-' }}</td>
+                    <td><b>{{ $s->nama_lengkap ?? '-' }}</b></td>
+                    <td>{{ $kelasNama }}</td>
+                    <td>{{ $s->jenis_kelamin ?? '-' }}</td>
+                    <td>{{ $s->tempat_lahir ?? '-' }}, {{ $s->tanggal_lahir ? \Carbon\Carbon::parse($s->tanggal_lahir)->translatedFormat('d M Y') : '-' }}</td>
+                    <td>{{ $s->agama ?? '-' }}</td>
+                    <td>{{ $s->nama_ayah ?? $s->nama_ibu ?? '-' }}</td>
+                    <td><span class="bd {{ $badgeClass }}">{{ $statusNama }}</span></td>
+                    <td style="white-space:nowrap">
+                        <a href="{{ route('admin.data-siswa.show', $s->id) }}" class="btn o" style="padding:3px 8px;font-size:12px">Lihat</a>
+                        <a href="{{ route('admin.data-siswa.pdf', $s->id) }}" class="btn a" style="padding:3px 8px;font-size:12px">⬇ PDF</a>
+                        <a href="{{ route('admin.form-pendataan.edit', $s->id) }}" class="btn o" style="padding:3px 8px;font-size:12px">Edit</a>
+                        <form action="{{ route('admin.data-siswa.destroy', $s->id) }}" method="POST" style="display:inline" onsubmit="return confirm('Pindahkan data {{ $s->nama_lengkap }} ke tempat sampah?')">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="btn x" style="padding:3px 8px;font-size:12px">🗑</button>
+                        </form>
+                    </td>
+                </tr>
+                @empty
+                <tr>
+                    <td colspan="11" style="text-align:center;padding:28px;color:var(--mu)">
+                        Tidak ada data siswa ditemukan untuk kriteria ini.
+                    </td>
+                </tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
+
+    @if($siswaList && $siswaList->hasPages())
+    <div style="margin-top:14px">
+        {{ $siswaList->links() }}
+    </div>
+    @endif
+</div>
+@endif
+
+@push('scripts')
+<script>
+document.getElementById('check-all')?.addEventListener('change', function() {
+    var checked = this.checked;
+    document.querySelectorAll('.check-item').forEach(function(c) {
+        c.checked = checked;
+    });
+});
+</script>
+@endpush
 @endsection

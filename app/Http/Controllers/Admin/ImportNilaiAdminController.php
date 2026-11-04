@@ -4,20 +4,41 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use Illuminate\Support\Facades\DB;
+use App\Models\SekolahKelas;
+use App\Models\SekolahTahunAjaran;
+use App\Models\SiswaNilai;
 
 class ImportNilaiAdminController extends Controller
 {
     public function index(): View
     {
-        return view('admin.import.nilai', [
-            'kelasList'     => ['X-1', 'X-2', 'XI-1', 'XI-2', 'XII-1'],
-            'riwayatImport' => [],
-        ]);
+        $taAktifObj = SekolahTahunAjaran::where('sedang_berjalan', 1)->first()
+            ?? SekolahTahunAjaran::latest('id')->first();
+        $taAktif = $taAktifObj ? $taAktifObj->nama : '2024/2025';
+
+        $kelasList = SekolahKelas::pluck('nama')->toArray();
+        if (empty($kelasList)) {
+            $kelasList = ['X-1', 'X-2', 'XI-1', 'XI-2', 'XII-1', 'XII-2'];
+        }
+
+        // Ambil riwayat data nilai yang sudah tersimpan pada TA ini
+        $riwayatImport = SiswaNilai::where('tahun_ajaran', $taAktif)
+            ->selectRaw('kelas, semester, count(*) as baris')
+            ->groupBy('kelas', 'semester')
+            ->orderBy('kelas')
+            ->get();
+
+        return view('admin.import.nilai', compact(
+            'taAktif',
+            'kelasList',
+            'riwayatImport'
+        ));
     }
 
     public function store(Request $request)
     {
-        return back()->with('info', 'File berhasil diunggah. Menunggu proses parsing Excel.');
+        return back()->with('info', 'File berhasil diterima.');
     }
 
     public function confirm(Request $request)
@@ -27,6 +48,6 @@ class ImportNilaiAdminController extends Controller
 
     public function template()
     {
-        return back()->with('info', 'Template Excel nilai sedang diunduh.');
+        return back()->with('info', 'Gunakan tombol Download Template di halaman untuk mengunduh template spreadsheet.');
     }
 }

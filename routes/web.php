@@ -19,6 +19,7 @@ use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\FormPendataanController;
 use App\Http\Controllers\Admin\PelacakanAlumniController;
 use App\Http\Controllers\Admin\MasterKelasController;
+use App\Http\Controllers\Admin\ImportBatchController;
 use App\Http\Controllers\Guru\BerandaGuruController;
 use App\Http\Controllers\Guru\DataSiswaGuruController;
 use App\Http\Controllers\Guru\ImportNilaiGuruController;
@@ -90,6 +91,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin.only'])->grou
     Route::get('/data-siswa/{id}/pdf', [DataSiswaController::class, 'pdf'])->name('data-siswa.pdf');
     Route::post('/data-siswa', [DataSiswaController::class, 'store'])->name('data-siswa.store');
     Route::put('/data-siswa/{id}', [DataSiswaController::class, 'update'])->name('data-siswa.update');
+    Route::delete('/data-siswa/{id}', [DataSiswaController::class, 'destroy'])->name('data-siswa.destroy');
 
     // Data Guru (data guru.png)
     Route::get('/data-guru', [DataGuruController::class, 'index'])->name('data-guru');
@@ -97,6 +99,12 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin.only'])->grou
     Route::get('/data-guru/{id}/edit', [DataGuruController::class, 'edit'])->name('data-guru.edit');
     Route::put('/data-guru/{id}', [DataGuruController::class, 'update'])->name('data-guru.update');
     Route::delete('/data-guru/{id}', [DataGuruController::class, 'destroy'])->name('data-guru.destroy');
+
+    // Import Fleksibel API (Universal Batch Save)
+    Route::post('/import/save-batch', [ImportBatchController::class, 'saveBatch'])->name('import.save-batch');
+
+    // Import Siswa
+    Route::get('/import/siswa', [DataSiswaController::class, 'importView'])->name('import.siswa');
 
     // Import Nilai (import nilai.png)
     Route::get('/import/nilai', [ImportNilaiAdminController::class, 'index'])->name('import.nilai');
@@ -145,6 +153,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin.only'])->grou
 
     // Log Aktivitas (log aktivitas.png)
     Route::get('/log-aktivitas', [LogAktivitasController::class, 'index'])->name('log-aktivitas');
+    Route::get('/log-aktivitas/export', [LogAktivitasController::class, 'export'])->name('log-aktivitas.export');
 
     // Master Kelas & Mapel (master class.png)
     Route::get('/master-kelas', [MasterKelasController::class, 'index'])->name('master-kelas');
@@ -169,6 +178,9 @@ Route::prefix('guru')->name('guru.')->middleware(['auth', 'role.web'])->group(fu
     // Data Siswa (data siswa.png - guru)
     Route::get('/data-siswa', [DataSiswaGuruController::class, 'index'])->name('data-siswa');
     Route::get('/data-siswa/{id}', [DataSiswaGuruController::class, 'show'])->name('data-siswa.show');
+
+    // Import Fleksibel API (Universal Batch Save - Guru)
+    Route::post('/import/save-batch', [ImportBatchController::class, 'saveBatch'])->name('import.save-batch');
 
     // Import Nilai (import nilai.png - guru)
     Route::get('/import-nilai', [ImportNilaiGuruController::class, 'index'])->name('import-nilai');

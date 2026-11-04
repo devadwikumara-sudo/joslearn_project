@@ -243,6 +243,8 @@ function toast(t, ms){
 }
 </script>
 
+<script src="{{ asset('js/xlsx.full.min.js') }}"></script>
+<script src="{{ asset('js/josbook-excel.js') }}"></script>
 <script src="{{ asset('js/josbook.js') }}"></script>
 @stack('scripts')
 </body>

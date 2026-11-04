@@ -1,79 +1,64 @@
 @extends('layouts.app')
 
-@section('title', 'Log Aktivitas - JosBook Admin')
+@section('title', 'Log Aktivitas — JosBook Admin')
 
 @section('content')
 <h2>Log Aktivitas</h2>
-<p class="sub">Rekam jejak semua aktivitas pengguna di sistem</p>
+<p class="sub">Jejak siapa mengubah apa. {{ $totalLogs }} catatan pada sistem.</p>
 
-<div class="card">
+<form method="GET" action="{{ route('admin.log-aktivitas') }}">
     <div class="bar">
-        <select style="min-width:140px" id="filterUser">
-            <option value="">Semua Pengguna</option>
-            @foreach($penggunaList ?? [] as $p)
-                <option value="{{ $p->id }}">{{ $p->nama ?? $p->username }}</option>
+        <select name="lf" onchange="this.form.submit()">
+            <option value="">Semua pengguna</option>
+            @foreach($whoList as $u)
+            <option value="{{ $u }}" {{ $lf === $u ? 'selected' : '' }}>{{ $u }}</option>
             @endforeach
         </select>
-        <select style="min-width:140px" id="filterAksi">
-            <option value="">Semua Aksi</option>
-            <option value="login">Login</option>
-            <option value="import">Import</option>
-            <option value="edit">Edit Data</option>
-            <option value="hapus">Hapus</option>
-            <option value="cetak">Cetak Laporan</option>
-        </select>
-        <input type="date" id="filterTanggal">
+        <input type="text" name="lq" placeholder="Cari aktivitas" value="{{ $lq }}">
+        <button type="submit" class="btn" style="display:none"></button>
         <span class="sp"></span>
-        <input type="text" placeholder="🔍 Cari log…" id="qLog" oninput="filterLog(this.value)" style="min-width:180px">
+        <a href="{{ route('admin.log-aktivitas.export', ['lf' => $lf, 'lq' => $lq]) }}" class="btn">⬇ Ekspor CSV</a>
     </div>
+</form>
 
+<div class="card" style="margin-top:14px">
     <div class="tw">
-        <table id="tblLog" class="wide">
+        <table>
             <thead>
                 <tr>
-                    <th>Waktu</th>
-                    <th>Pengguna</th>
-                    <th>Peran</th>
-                    <th>Aksi</th>
-                    <th>Keterangan</th>
-                    <th>IP</th>
+                    <th style="width:160px">Waktu</th>
+                    <th style="width:140px">Pengguna</th>
+                    <th>Aktivitas</th>
                 </tr>
             </thead>
             <tbody>
-                @forelse($logs ?? [] as $log)
+                @forelse($logs as $l)
                 <tr>
-                    <td style="white-space:nowrap;font-size:11px">{{ \Carbon\Carbon::parse($log->created_at)->format('d M Y H:i:s') }}</td>
-                    <td><b>{{ $log->pengguna->nama ?? $log->pengguna->username ?? '-' }}</b></td>
-                    <td><span class="bd">{{ strtoupper($log->pengguna->peran ?? '-') }}</span></td>
-                    <td>
-                        <span class="bd {{ in_array($log->aksi, ['hapus','gagal']) ? 'e' : ($log->aksi === 'import' ? 'w' : 'ok') }}">
-                            {{ $log->aksi }}
-                        </span>
+                    <td style="white-space:nowrap;font-size:12px;color:var(--mu)">
+                        {{ $l->created_at ? $l->created_at->format('Y-m-d H:i:s') : '-' }}
                     </td>
-                    <td>{{ $log->keterangan }}</td>
-                    <td style="font-family:monospace;font-size:11px">{{ $log->ip_address }}</td>
+                    <td>
+                        <b>{{ $l->pengguna->username ?? $l->peran ?? 'Sistem' }}</b>
+                    </td>
+                    <td>
+                        {{ $l->keterangan ?: $l->aksi }}
+                    </td>
                 </tr>
                 @empty
-                <tr><td colspan="6" style="text-align:center;color:var(--mu);padding:24px">Belum ada log aktivitas.</td></tr>
+                <tr>
+                    <td colspan="3" style="text-align:center;padding:24px;color:var(--mu)">
+                        Belum ada catatan aktivitas yang cocok.
+                    </td>
+                </tr>
                 @endforelse
             </tbody>
         </table>
     </div>
 
-    @if(isset($logs) && method_exists($logs, 'links'))
-    <div class="pgn">{{ $logs->links() }}</div>
+    @if($logs->hasPages())
+    <div style="margin-top:14px;display:flex;justify-content:center">
+        {{ $logs->links() }}
+    </div>
     @endif
 </div>
 @endsection
-
-@push('scripts')
-<script>
-function filterLog(q) {
-    q = q.toLowerCase();
-    document.querySelectorAll('#tblLog tbody tr').forEach(function(tr) {
-        tr.style.display = tr.textContent.toLowerCase().includes(q) ? '' : 'none';
-    });
-}
-</script>
-@endpush
-
