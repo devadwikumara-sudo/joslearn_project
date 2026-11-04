@@ -6,6 +6,24 @@
 <h2>Kenaikan Kelas</h2>
 <p class="sub">Proses dari {{ $taAktif ?? '2024/2025' }} ke {{ $taBerikutnya ?? '2025/2026' }}. Naikkan semua sekaligus atau atur satu per satu. Riwayat tahun lama tetap tersimpan.</p>
 
+@if(!empty($riwayatKenaikanTerakhir))
+<div class="card" style="margin-bottom:14px;border-left:4px solid var(--p,#2563eb);background:var(--card,#fff)">
+    <div class="bar">
+        <div>
+            <b>Riwayat Kenaikan Terakhir:</b>
+            Kelas <strong>{{ $riwayatKenaikanTerakhir->kelasAsal?->nama ?? 'Kelas' }}</strong>
+            ({{ $riwayatKenaikanTerakhir->tahunAjaranAsal?->nama ?? $taAktif }} &rarr; {{ $riwayatKenaikanTerakhir->tahunAjaranTujuan?->nama ?? $taBerikutnya }}) &middot;
+            {{ $riwayatKenaikanTerakhir->jumlah_siswa }} siswa diproses pada {{ $riwayatKenaikanTerakhir->created_at }}.
+        </div>
+        <span class="sp"></span>
+        <form action="{{ route('admin.kenaikan-kelas.batalkan', $riwayatKenaikanTerakhir->id) }}" method="POST" onsubmit="return confirm('Apakah Anda yakin ingin membatalkan kenaikan kelas ini? Data riwayat siswa akan dikembalikan ke kondisi sebelum diproses.')">
+            @csrf
+            <button type="submit" class="btn x">Batalkan kenaikan terakhir</button>
+        </form>
+    </div>
+</div>
+@endif
+
 <form action="{{ route('admin.kenaikan-kelas.proses') }}" method="POST">
     @csrf
     <input type="hidden" name="ta_aktif" value="{{ $taAktif }}">

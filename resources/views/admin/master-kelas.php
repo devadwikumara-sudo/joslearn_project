@@ -3,125 +3,112 @@
 @section('title', 'Master Kelas & Mapel — JosBook Admin')
 
 @section('content')
-<div class="hero2">
-    <div>
-        <h2>Master Kelas &amp; Mata Pelajaran</h2>
-        <p class="sub">Kelola daftar rombongan belajar dan kurikulum mata pelajaran sekolah</p>
-    </div>
-</div>
+<h2>Master Kelas &amp; Mapel</h2>
+<p class="sub">Daftar ini menjadi tabel <code>kelas</code> dan <code>mapel</code>. Kelas dan mapel baru langsung dipakai di seluruh aplikasi (filter, editor nilai, import, PDF). Hanya yang ditambahkan di sini yang bisa dihapus, dan hanya bila belum dipakai.</p>
 
 @if(session('success'))
 <div class="note ok">{{ session('success') }}</div>
 @endif
 
-<div class="g g2">
-    {{-- Card Kiri: Master Kelas --}}
-    <div class="card">
-        <h3>Master Kelas / Rombel</h3>
-        <p class="sub">Tambah atau nonaktifkan kelas</p>
+@if(session('error'))
+<div class="note err">{{ session('error') }}</div>
+@endif
 
-        <form method="POST" action="{{ route('admin.master-kelas.store') }}" style="margin-bottom:14px">
+<div class="g g2">
+    {{-- Card Kiri: Master Kelas / Rombel --}}
+    <div class="card">
+        <h3>Kelas / rombel</h3>
+        <div class="bar" style="flex-wrap:wrap;gap:8px">
+            @forelse($kelasList as $k)
+            <span style="display:inline-flex;align-items:center;gap:4px">
+                <span class="bd">{{ $k->nama }}</span>
+                <form method="POST" action="{{ route('admin.master-kelas.destroy', $k->id) }}" style="display:inline" onsubmit="return confirm('Hapus kelas {{ $k->nama }}?')">
+                    @csrf
+                    @method('DELETE')
+                    <input type="hidden" name="type" value="kelas">
+                    <button type="submit" class="btn x" style="padding:2px 6px;font-size:10px" title="Hapus kelas">🗑</button>
+                </form>
+            </span>
+            @empty
+            <span style="color:var(--mu)">Belum ada data kelas.</span>
+            @endforelse
+        </div>
+
+        <form method="POST" action="{{ route('admin.master-kelas.store') }}" style="margin-top:16px">
             @csrf
             <input type="hidden" name="type" value="kelas">
             <div class="bar">
-                <input type="text" name="nama_kelas" placeholder="Format: X-1, XI-2..." required style="flex:1">
-                <button type="submit" class="btn a">+ Tambah Kelas</button>
+                <input type="text" name="nama_kelas" placeholder="mis. X-2, XI-3, XII-2" required style="flex:1">
+                <button type="submit" class="btn a">Tambah kelas</button>
             </div>
-            <small style="color:var(--mu);display:block">Standar penamaan: Tingkat (X / XI / XII) diikuti nomor urut.</small>
+            <small style="color:var(--mu);display:block;margin-top:4px">Format: Tingkat (X, XI, XII) diikuti tanda strip dan angka (misal X-1, XI-2).</small>
         </form>
-
-        <div class="tw">
-            <table>
-                <thead>
-                    <tr>
-                        <th>No</th>
-                        <th>Nama Kelas</th>
-                        <th>Tingkat</th>
-                        <th>Aksi</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach(['X-1', 'XI-1', 'XII-1'] as $idx => $k)
-                    <tr>
-                        <td>{{ $idx + 1 }}</td>
-                        <td><strong>{{ $k }}</strong></td>
-                        <td>{{ explode('-', $k)[0] }}</td>
-                        <td>
-                            <button class="btn x" style="padding:2px 8px;font-size:11px" onclick="return confirm('Hapus kelas?')">Hapus</button>
-                        </td>
-                    </tr>
-                    @endforeach
-                </tbody>
-            </table>
-        </div>
     </div>
 
-    {{-- Card Kanan: Master Mapel --}}
+    {{-- Card Kanan: Mata Pelajaran --}}
     <div class="card">
-        <h3>Master Mata Pelajaran</h3>
-        <p class="sub">Kelola kode dan nama mata pelajaran</p>
-
-        <form method="POST" action="{{ route('admin.master-kelas.store') }}" style="margin-bottom:14px">
-            @csrf
-            <input type="hidden" name="type" value="mapel">
-            <div class="fl" style="margin-bottom:8px">
-                <div>
-                    <label>Kode (3 huruf)</label>
-                    <input type="text" name="kode" placeholder="mtk" maxlength="3" required style="width:100%">
-                </div>
-                <div>
-                    <label>Nama Mata Pelajaran</label>
-                    <input type="text" name="nama" placeholder="Matematika" required style="width:100%">
-                </div>
-                <div>
-                    <label>Tingkat</label>
-                    <select name="tingkat" style="width:100%">
-                        <option value="Semua">Semua Tingkat</option>
-                        <option value="X">Kelas X</option>
-                        <option value="XI">Kelas XI</option>
-                        <option value="XII">Kelas XII</option>
-                    </select>
-                </div>
-            </div>
-            <button type="submit" class="btn a">+ Tambah Mapel</button>
-        </form>
-
-        <div class="tw">
+        <h3>Mata pelajaran</h3>
+        <div class="tw" style="max-height:280px;overflow-y:auto">
             <table>
                 <thead>
                     <tr>
-                        <th>Kode</th>
+                        <th style="width:60px">Kode</th>
                         <th>Nama Mapel</th>
-                        <th>Aksi</th>
+                        <th style="width:90px">Tingkat</th>
+                        <th style="width:50px"></th>
                     </tr>
                 </thead>
                 <tbody>
-                    @php
-                    $sampleMapel = [
-                        ['agm', 'Pendidikan Agama dan Budi Pekerti'],
-                        ['pnc', 'Pendidikan Pancasila'],
-                        ['ind', 'Bahasa Indonesia'],
-                        ['mtk', 'Matematika'],
-                        ['ipa', 'Ilmu Pengetahuan Alam (IPA)'],
-                        ['ips', 'Ilmu Pengetahuan Sosial (IPS)'],
-                        ['big', 'Bahasa Inggris'],
-                        ['pjk', 'PJOK'],
-                        ['inf', 'Informatika'],
-                    ];
-                    @endphp
-                    @foreach($sampleMapel as $m)
+                    @forelse($mapelList as $m)
                     <tr>
-                        <td><code>{{ $m[0] }}</code></td>
-                        <td>{{ $m[1] }}</td>
+                        <td><code>{{ $m->kode ?: strtolower(substr($m->nama, 0, 3)) }}</code></td>
+                        <td>{{ $m->nama }}</td>
+                        <td><small>{{ $m->tingkat ?: 'X,XI,XII' }}</small></td>
                         <td>
-                            <button class="btn x" style="padding:2px 8px;font-size:11px" onclick="return confirm('Hapus mapel?')">Hapus</button>
+                            <form method="POST" action="{{ route('admin.master-mapel.destroy', $m->id) }}" style="display:inline" onsubmit="return confirm('Hapus mapel {{ $m->nama }}?')">
+                                @csrf
+                                @method('DELETE')
+                                <input type="hidden" name="type" value="mapel">
+                                <button type="submit" class="btn x" style="padding:2px 6px;font-size:10px" title="Hapus mapel">🗑</button>
+                            </form>
                         </td>
                     </tr>
-                    @endforeach
+                    @empty
+                    <tr>
+                        <td colspan="4" style="text-align:center;color:var(--mu)">Belum ada data mata pelajaran.</td>
+                    </tr>
+                    @endforelse
                 </tbody>
             </table>
         </div>
+
+        <form method="POST" action="{{ route('admin.master-kelas.store') }}" style="margin-top:12px">
+            @csrf
+            <input type="hidden" name="type" value="mapel">
+            <div class="fl" style="grid-template-columns:1fr 2fr;margin-bottom:8px">
+                <div>
+                    <label>Kode (3 huruf)</label>
+                    <input type="text" name="kode_mapel" maxlength="5" placeholder="mtk" style="width:100%">
+                </div>
+                <div>
+                    <label>Nama mapel</label>
+                    <input type="text" name="nama_mapel" required placeholder="mis. Fisika Terapan" style="width:100%">
+                </div>
+            </div>
+            <div class="bar">
+                <label style="display:flex;align-items:center;gap:4px;margin:0">
+                    <input type="checkbox" name="tingkat_mapel[]" value="X" checked> X
+                </label>
+                <label style="display:flex;align-items:center;gap:4px;margin:0">
+                    <input type="checkbox" name="tingkat_mapel[]" value="XI" checked> XI
+                </label>
+                <label style="display:flex;align-items:center;gap:4px;margin:0">
+                    <input type="checkbox" name="tingkat_mapel[]" value="XII" checked> XII
+                </label>
+                <span class="sp"></span>
+                <button type="submit" class="btn a">Tambah mapel</button>
+            </div>
+        </form>
     </div>
 </div>
 @endsection
-

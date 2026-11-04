@@ -34,6 +34,15 @@ class ImportBatchController extends Controller
         $newClasses = $request->input('new_classes', []);
         $newMapel   = $request->input('new_mapel', []);
 
+        // Pemeriksaan hak peran: Guru tidak boleh import biodata siswa atau guru
+        $user = auth()->user();
+        if ($user && $user->peran === 'guru' && in_array($type, ['siswa', 'guru'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Akses ditolak: Hanya admin yang diizinkan mengimpor data biodata siswa atau guru.'
+            ], 403);
+        }
+
         if (empty($rows) || !is_array($rows)) {
             return response()->json([
                 'success' => false,
@@ -151,6 +160,31 @@ class ImportBatchController extends Controller
         );
     }
 
+    private function getOrCreateRiwayatKelas($siswaId, $taId, $kelas)
+    {
+        $riwayat = SiswaRiwayatKelas::where('siswa_id', $siswaId)
+            ->where('tahun_ajaran_id', $taId)
+            ->first();
+
+        if (!$riwayat) {
+            $kelasId = $kelas ? $kelas->id : null;
+            if (!$kelasId) {
+                $rkLast = SiswaRiwayatKelas::where('siswa_id', $siswaId)->latest('id')->first();
+                $kelasId = $rkLast?->kelas_id ?? (SekolahKelas::first()?->id ?? $this->ensureKelas('X-1')->id);
+            }
+            $riwayat = SiswaRiwayatKelas::create([
+                'siswa_id'        => $siswaId,
+                'tahun_ajaran_id' => $taId,
+                'kelas_id'        => $kelasId,
+                'status'          => 'Aktif',
+            ]);
+        } elseif ($kelas && $riwayat->kelas_id !== $kelas->id) {
+            $riwayat->update(['kelas_id' => $kelas->id]);
+        }
+
+        return $riwayat;
+    }
+
     private function normDate($val)
     {
         if (empty($val) || $val === '-' || $val === '0000-00-00') return null;
@@ -200,12 +234,10 @@ class ImportBatchController extends Controller
             $kStr = $this->normK($kStr);
             $kelas = $kStr ? $this->ensureKelas($kStr) : null;
 
-            // Jika NISN belum 10 digit tetapi ada nomor induk, buat fallback
-            if (!preg_match('/^\d{10}$/', $nisn)) {
-                $nisn = str_pad(preg_replace('/\D/', '', $nisn), 10, '0', STR_PAD_LEFT);
-                if ($nisn === '0000000000') {
-                    $nisn = str_pad(mt_rand(1, 9999999999), 10, '0', STR_PAD_LEFT);
-                }
+            // NISN wajib tepat 10 digit — baris tidak valid dilewati
+            if (!preg_match('/^\d{10}$/', (string)$nisn)) {
+                $skipped++;
+                continue;
             }
 
             $siswa = SiswaBiodata::where('nisn', $nisn)->first();
@@ -362,16 +394,7 @@ class ImportBatchController extends Controller
             $kStr = $this->normK($kStr);
             $kelas = $kStr ? $this->ensureKelas($kStr) : null;
 
-            $riwayat = SiswaRiwayatKelas::firstOrCreate(
-                [
-                    'siswa_id'        => $siswa->id,
-                    'tahun_ajaran_id' => $ta->id,
-                ],
-                [
-                    'kelas_id'        => $kelas ? $kelas->id : ($this->ensureKelas('X-1')->id),
-                    'status'          => 'Aktif',
-                ]
-            );
+            $riwayat = $this->getOrCreateRiwayatKelas($siswa->id, $ta->id, $kelas);
 
             $sem = !empty($r['sem']) ? (stripos($r['sem'], 'genap') !== false ? 'Genap' : 'Ganjil') : $semester;
 
@@ -440,16 +463,7 @@ class ImportBatchController extends Controller
             $kStr = $this->normK($kStr);
             $kelas = $kStr ? $this->ensureKelas($kStr) : null;
 
-            $riwayat = SiswaRiwayatKelas::firstOrCreate(
-                [
-                    'siswa_id'        => $siswa->id,
-                    'tahun_ajaran_id' => $ta->id,
-                ],
-                [
-                    'kelas_id'        => $kelas ? $kelas->id : ($this->ensureKelas('X-1')->id),
-                    'status'          => 'Aktif',
-                ]
-            );
+            $riwayat = $this->getOrCreateRiwayatKelas($siswa->id, $ta->id, $kelas);
 
             $sem = !empty($r['sem']) ? (stripos($r['sem'], 'genap') !== false ? 'Genap' : 'Ganjil') : $semester;
 
@@ -495,16 +509,7 @@ class ImportBatchController extends Controller
             $kStr = $this->normK($kStr);
             $kelas = $kStr ? $this->ensureKelas($kStr) : null;
 
-            $riwayat = SiswaRiwayatKelas::firstOrCreate(
-                [
-                    'siswa_id'        => $siswa->id,
-                    'tahun_ajaran_id' => $ta->id,
-                ],
-                [
-                    'kelas_id'        => $kelas ? $kelas->id : ($this->ensureKelas('X-1')->id),
-                    'status'          => 'Aktif',
-                ]
-            );
+            $riwayat = $this->getOrCreateRiwayatKelas($siswa->id, $ta->id, $kelas);
 
             $sem = !empty($r['sem']) ? (stripos($r['sem'], 'genap') !== false ? 'Genap' : 'Ganjil') : $semester;
             $namaKeg = $this->cleanVal($r['ekskul'] ?? $r['nama_kegiatan'] ?? 'Pramuka');

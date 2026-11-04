@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\DataSiswaController;
 use App\Http\Controllers\Admin\FormPendataanController;
 use App\Http\Controllers\Admin\ImportBatchController;
 use App\Http\Controllers\Admin\ImportEkskulAdminController;
+use App\Http\Controllers\Admin\ImportGuruController;
 use App\Http\Controllers\Admin\ImportKehadiranAdminController;
 use App\Http\Controllers\Admin\ImportNilaiAdminController;
 use App\Http\Controllers\Admin\KenaikanKelasController;
@@ -152,6 +153,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin.only'])->grou
 
     // Cek Kualitas Data (cek kualitas data.png)
     Route::get('/cek-kualitas-data', [CekKualitasDataController::class, 'index'])->name('cek-kualitas-data');
+    Route::get('/cek-kualitas-data/export', [CekKualitasDataController::class, 'index'])->name('cek-kualitas-data.export');
 
     // Log Aktivitas (log aktivitas.png)
     Route::get('/log-aktivitas', [LogAktivitasController::class, 'index'])->name('log-aktivitas');
@@ -161,13 +163,24 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin.only'])->grou
     Route::get('/master-kelas', [MasterKelasController::class, 'index'])->name('master-kelas');
     Route::post('/master-kelas', [MasterKelasController::class, 'store'])->name('master-kelas.store');
     Route::delete('/master-kelas/{id}', [MasterKelasController::class, 'destroy'])->name('master-kelas.destroy');
+    Route::delete('/master-mapel/{id}', [MasterKelasController::class, 'destroy'])->name('master-mapel.destroy');
 
-    // Tempat Sampah (direct link)
-    Route::get('/sampah', [SettingController::class, 'index'])->name('sampah');
+    // Kenaikan Kelas — batalkan
+    Route::post('/kenaikan-kelas/{id}/batalkan', [KenaikanKelasController::class, 'batalkan'])->name('kenaikan-kelas.batalkan');
+
+    // Import Guru (admin)
+    Route::get('/import/guru', [ImportGuruController::class, 'index'])->name('import.guru');
+
+    // Tempat Sampah
+    Route::get('/sampah', [SettingController::class, 'tempahSampah'])->name('sampah');
+    Route::post('/sampah/pulihkan', [SettingController::class, 'pulihkan'])->name('sampah.pulihkan');
+    Route::delete('/sampah/hapus-permanen', [SettingController::class, 'hapusPermanenSampah'])->name('sampah.hapus-permanen');
 
     // Setting (setting.png)
     Route::get('/setting', [SettingController::class, 'index'])->name('setting');
     Route::put('/setting', [SettingController::class, 'update'])->name('setting.update');
+    Route::post('/setting/tahun-ajaran', [SettingController::class, 'tambahTahunAjaran'])->name('setting.tahun-ajaran.tambah');
+    Route::post('/setting/tahun-ajaran/aktif', [SettingController::class, 'setTahunAjaranAktif'])->name('setting.tahun-ajaran.aktif');
     Route::delete('/setting/akun/{id}', [SettingController::class, 'hapusAkun'])->name('setting.akun.hapus');
 });
 

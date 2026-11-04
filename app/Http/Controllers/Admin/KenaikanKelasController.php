@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\CatatanAktivitas;
+use App\Models\CatatanKenaikanKelas;
 use App\Models\SekolahKelas;
 use App\Models\SekolahTahunAjaran;
 use App\Models\SiswaBiodata;
@@ -60,13 +61,20 @@ class KenaikanKelasController extends Controller
             }
         }
 
+        // Catatan kenaikan kelas terakhir yang belum dibatalkan
+        $riwayatKenaikanTerakhir = CatatanKenaikanKelas::with(['kelasAsal', 'tahunAjaranAsal', 'tahunAjaranTujuan'])
+            ->whereNull('dibatalkan_at')
+            ->latest('id')
+            ->first();
+
         return view('admin.kenaikan-kelas', compact(
             'taAktif',
             'taBerikutnya',
             'kelasList',
             'kelasAsal',
             'siswaList',
-            'nextKelasMap'
+            'nextKelasMap',
+            'riwayatKenaikanTerakhir'
         ));
     }
 
@@ -93,6 +101,9 @@ class KenaikanKelasController extends Controller
             $lulusCount = 0;
             $keluarCount = 0;
 
+            $riwayatBaruIds = [];
+            $dataSebelumnya = [];
+
             foreach ($keputusan as $siswaId => $aksi) {
                 $siswa = SiswaBiodata::find($siswaId);
                 if (! $siswa) {
@@ -103,6 +114,24 @@ class KenaikanKelasController extends Controller
                     ->where('tahun_ajaran_id', $taAktifId)
                     ->whereNull('deleted_at')
                     ->first();
+
+                if ($rkLama) {
+                    $dataSebelumnya[] = [
+                        'type'                       => 'riwayat_lama',
+                        'id'                         => $rkLama->id,
+                        'kelas_id'                   => $rkLama->kelas_id,
+                        'tahun_ajaran_id'            => $rkLama->tahun_ajaran_id,
+                        'status'                     => $rkLama->status,
+                        'keputusan_kenaikan'         => $rkLama->keputusan_kenaikan,
+                        'kelas_tujuan_id'            => $rkLama->kelas_tujuan_id,
+                        'tanggal_keputusan_kenaikan' => $rkLama->tanggal_keputusan_kenaikan,
+                        'siswa_id'                   => $siswaId,
+                        'siswa_tahun_lulus'          => $siswa->tahun_lulus,
+                        'siswa_alasan_keluar'        => $siswa->alasan_keluar,
+                        'siswa_kelas_keluar'         => $siswa->kelas_keluar,
+                        'siswa_tanggal_keluar'       => $siswa->tanggal_keluar,
+                    ];
+                }
 
                 if ($aksi === 'Naik') {
                     $targetKelas = $kelasTujuan[$siswaId] ?? $kelasAsal;
@@ -122,10 +151,11 @@ class KenaikanKelasController extends Controller
                     }
 
                     // Buat riwayat kelas di tahun baru
-                    SiswaRiwayatKelas::updateOrCreate(
+                    $rkBaru = SiswaRiwayatKelas::updateOrCreate(
                         ['siswa_id' => $siswaId, 'tahun_ajaran_id' => $taBaru->id],
                         ['kelas_id' => $targetKelasObj->id, 'status' => 'Aktif']
                     );
+                    $riwayatBaruIds[] = $rkBaru->id;
                     $naikCount++;
 
                 } elseif ($aksi === 'Tinggal') {
@@ -135,10 +165,11 @@ class KenaikanKelasController extends Controller
                             'tanggal_keputusan_kenaikan' => now()->toDateString(),
                         ]);
                     }
-                    SiswaRiwayatKelas::updateOrCreate(
+                    $rkBaru = SiswaRiwayatKelas::updateOrCreate(
                         ['siswa_id' => $siswaId, 'tahun_ajaran_id' => $taBaru->id],
                         ['kelas_id' => $rkLama?->kelas_id ?? $kelasAsalId, 'status' => 'Aktif']
                     );
+                    $riwayatBaruIds[] = $rkBaru->id;
                     $naikCount++;
 
                 } elseif ($aksi === 'Lulus') {
@@ -169,13 +200,25 @@ class KenaikanKelasController extends Controller
                 }
             }
 
+            // Catat di tabel catatan_kenaikan_kelas untuk fitur Undo
+            CatatanKenaikanKelas::create([
+                'pengguna_id'            => auth()->id(),
+                'kelas_asal_id'          => $kelasAsalId,
+                'tahun_ajaran_asal_id'   => $taAktifId,
+                'tahun_ajaran_tujuan_id' => $taBaru->id,
+                'jumlah_siswa'           => count($keputusan),
+                'riwayat_baru'           => json_encode($riwayatBaruIds),
+                'data_sebelumnya'        => json_encode($dataSebelumnya),
+                'created_at'             => now(),
+            ]);
+
             CatatanAktivitas::create([
                 'pengguna_id' => auth()->id(),
-                'peran' => auth()->user()->peran ?? 'admin',
-                'aksi' => 'kenaikan_kelas',
-                'keterangan' => "Kenaikan kelas {$kelasAsal} ({$taAktif} -> {$taBerikutnya}): {$naikCount} lanjut, {$lulusCount} lulus, {$keluarCount} keluar.",
-                'objek_tipe' => 'kenaikan_kelas',
-                'alamat_ip' => $request->ip(),
+                'peran'       => auth()->user()->peran ?? 'admin',
+                'aksi'        => 'kenaikan_kelas',
+                'keterangan'  => "Kenaikan kelas {$kelasAsal} ({$taAktif} -> {$taBerikutnya}): {$naikCount} lanjut, {$lulusCount} lulus, {$keluarCount} keluar.",
+                'objek_tipe'  => 'kenaikan_kelas',
+                'alamat_ip'   => $request->ip(),
             ]);
 
             DB::commit();
@@ -186,6 +229,65 @@ class KenaikanKelasController extends Controller
             DB::rollBack();
 
             return back()->with('error', 'Gagal memproses kenaikan kelas: '.$e->getMessage());
+        }
+    }
+
+    public function batalkan(Request $request, $id)
+    {
+        $catatan = CatatanKenaikanKelas::findOrFail($id);
+        if ($catatan->dibatalkan_at) {
+            return back()->with('error', 'Kenaikan kelas ini sudah pernah dibatalkan.');
+        }
+
+        DB::beginTransaction();
+        try {
+            // 1. Kembalikan data lama
+            $dataSebelumnya = json_decode($catatan->data_sebelumnya ?? '[]', true);
+            foreach ($dataSebelumnya as $b) {
+                if (isset($b['id'])) {
+                    SiswaRiwayatKelas::where('id', $b['id'])->update([
+                        'kelas_id'                   => $b['kelas_id'],
+                        'tahun_ajaran_id'            => $b['tahun_ajaran_id'],
+                        'status'                     => $b['status'],
+                        'keputusan_kenaikan'         => $b['keputusan_kenaikan'],
+                        'kelas_tujuan_id'            => $b['kelas_tujuan_id'],
+                        'tanggal_keputusan_kenaikan' => $b['tanggal_keputusan_kenaikan'],
+                    ]);
+                }
+                if (isset($b['siswa_id'])) {
+                    SiswaBiodata::where('id', $b['siswa_id'])->update([
+                        'tahun_lulus'    => $b['siswa_tahun_lulus'],
+                        'alasan_keluar'  => $b['siswa_alasan_keluar'],
+                        'kelas_keluar'   => $b['siswa_kelas_keluar'],
+                        'tanggal_keluar' => $b['siswa_tanggal_keluar'],
+                    ]);
+                }
+            }
+
+            // 2. Hapus baris riwayat kelas baru yang dibuat oleh proses ini
+            $riwayatBaru = json_decode($catatan->riwayat_baru ?? '[]', true);
+            if (!empty($riwayatBaru)) {
+                SiswaRiwayatKelas::whereIn('id', $riwayatBaru)->delete();
+            }
+
+            // 3. Tandai catatan dibatalkan
+            $catatan->update(['dibatalkan_at' => now()]);
+
+            CatatanAktivitas::create([
+                'pengguna_id' => auth()->id(),
+                'peran'       => auth()->user()->peran ?? 'admin',
+                'aksi'        => 'batalkan_kenaikan',
+                'keterangan'  => "Membatalkan kenaikan kelas batch #{$id}.",
+                'objek_tipe'  => 'kenaikan_kelas',
+                'alamat_ip'   => $request->ip(),
+            ]);
+
+            DB::commit();
+
+            return back()->with('success', 'Kenaikan kelas berhasil dibatalkan. Riwayat siswa dikembalikan ke kondisi sebelumnya.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Gagal membatalkan kenaikan: ' . $e->getMessage());
         }
     }
 }
