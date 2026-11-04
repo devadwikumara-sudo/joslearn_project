@@ -24,5 +24,9 @@ class ImportNilaiAdminController extends Controller
     {
         return redirect()->route('admin.import.nilai')->with('success', 'Data nilai berhasil diimpor.');
     }
-}
 
+    public function template()
+    {
+        return back()->with('info', 'Template Excel nilai sedang diunduh.');
+    }
+}

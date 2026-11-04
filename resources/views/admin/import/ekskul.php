@@ -1,61 +1,88 @@
 @extends('layouts.app')
 
-@section('title', 'Import Ekskul - JosBook Admin')
+@section('title', 'Import Ekskul — JosBook Admin')
 
 @section('content')
-<h2>Import Ekskul</h2>
-<p class="sub">Unggah data kegiatan ekstrakurikuler siswa</p>
+<div class="hero2">
+    <div>
+        <h2>Import Ekskul</h2>
+        <p class="sub">Upload file Excel/CSV untuk mengimpor data ekstrakurikuler siswa.</p>
+    </div>
+</div>
 
 <div class="g g2">
+    {{-- Card 1: Upload --}}
     <div class="card">
-        <h3>📤 Unggah File Ekskul</h3>
-        <div class="note">
-            Format file: <b>.xlsx / .xls</b> — Kolom wajib: <b>NISN, Nama Siswa, Nama Ekskul, Nilai, Keterangan</b>
-        </div>
-        <form method="POST" action="{{ route('admin.import.ekskul.store') }}" enctype="multipart/form-data">
+        <h3>1. Upload File</h3>
+
+        <form action="{{ route('admin.import.ekskul.store') }}" method="POST" enctype="multipart/form-data">
             @csrf
-            <div class="fl" style="grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+
+            <div class="fl">
+                <div>
+                    <label>Mode</label>
+                    <select name="mode" id="mode">
+                        <option value="satu_kelas">Satu Kelas</option>
+                        <option value="semua_kelas">Semua Kelas</option>
+                    </select>
+                </div>
                 <div>
                     <label>Tahun Ajaran</label>
-                    <select name="tahun_ajaran" style="width:100%">
-                        <option>2024/2025</option><option>2023/2024</option>
+                    <select name="tahun_ajaran">
+                        <option value="2024/2025" selected>2024/2025</option>
+                        <option value="2023/2024">2023/2024</option>
                     </select>
                 </div>
                 <div>
-                    <label>Semester</label>
-                    <select name="semester" style="width:100%">
-                        <option value="1">Semester 1 (Ganjil)</option>
-                        <option value="2">Semester 2 (Genap)</option>
+                    <label>Kelas</label>
+                    <select name="kelas">
+                        <option value="X-1">X-1</option>
+                        <option value="XI-1">XI-1</option>
+                        <option value="XII-1">XII-1</option>
                     </select>
                 </div>
             </div>
-            <div style="border:2px dashed var(--ln);border-radius:12px;padding:24px;text-align:center;margin-bottom:14px">
-                <div style="font-size:32px;margin-bottom:8px">🏃</div>
-                <p style="color:var(--mu);margin-bottom:12px">File Excel data ekskul</p>
-                <input type="file" name="file" accept=".xlsx,.xls" id="fileEkskul" style="display:none" required onchange="this.nextElementSibling.textContent='📄 '+this.files[0].name">
-                <button type="button" class="btn o" onclick="document.getElementById('fileEkskul').click()">Pilih File</button>
-                <div style="font-size:12px;color:var(--mu);margin-top:6px"></div>
+
+            <div class="fl" style="margin-top:10px">
+                <div>
+                    <label>Semester</label>
+                    <select name="semester">
+                        <option value="Ganjil">Semester 1 (Ganjil)</option>
+                        <option value="Genap" selected>Semester 2 (Genap)</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Jika Duplikat</label>
+                    <select name="duplikat">
+                        <option value="skip">Lewati</option>
+                        <option value="overwrite">Timpa</option>
+                    </select>
+                </div>
             </div>
-            <div style="display:flex;gap:8px;justify-content:flex-end">
-                <button type="submit" class="btn">⬆ Import Ekskul</button>
+
+            <div style="margin: 1rem 0;">
+                <label>File Excel / CSV</label>
+                <input type="file" name="file" accept=".xlsx,.xls,.csv" required>
+            </div>
+
+            <div class="bar">
+                <a href="{{ route('admin.import.ekskul.template') }}" class="btn o">⬇ Download Template</a>
+                <span class="sp"></span>
+                <button type="submit" class="btn a">⬆ Upload &amp; Validasi</button>
             </div>
         </form>
     </div>
 
+    {{-- Card 2: Petunjuk Format --}}
     <div class="card">
-        <h3>🕒 Riwayat Import Ekskul</h3>
-        @forelse($riwayat ?? [] as $r)
-        <div class="row">
-            <div>
-                <b style="font-size:12px">{{ $r->nama_file }}</b>
-                <div style="font-size:11px;color:var(--mu)">{{ $r->tahun_ajaran }} · Sem {{ $r->semester }}</div>
-            </div>
-            <span class="bd {{ $r->status === 'sukses' ? 'ok' : 'w' }}">{{ ucfirst($r->status) }}</span>
+        <h3>2. Format Kolom Excel</h3>
+        <p class="sub">Pastikan file spreadsheet memiliki header kolom berikut:</p>
+        <div style="background:#f4f7fb;padding:12px;border-radius:10px;font-family:monospace;font-size:12px;line-height:1.8">
+            <b>nisn</b>, <b>kelas</b>, <b>ekskul</b>, <b>predikat</b>
         </div>
-        @empty
-        <p style="color:var(--mu);font-size:12px;text-align:center;padding:20px">Belum ada riwayat.</p>
-        @endforelse
+        <div class="note" style="margin-top:12px">
+            ℹ️ Predikat diisi dengan Sangat Baik (A), Baik (B), Cukup (C), atau Kurang (D).
+        </div>
     </div>
 </div>
 @endsection
-

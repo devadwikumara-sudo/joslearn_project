@@ -1,136 +1,129 @@
 @extends('layouts.app')
 
-@section('title', 'Import Nilai - JosBook Admin')
+@section('title', 'Import Nilai — JosBook Admin')
 
 @section('content')
-<h2>Import Nilai</h2>
-<p class="sub">Unggah file Excel untuk import nilai siswa secara massal</p>
+<div class="hero2">
+    <div>
+        <h2>Import Nilai</h2>
+        <p class="sub">Upload file Excel/CSV untuk mengimpor data nilai siswa ke dalam sistem.</p>
+    </div>
+</div>
 
 <div class="g g2">
-    {{-- Upload Form --}}
+    {{-- Card 1: Upload --}}
     <div class="card">
-        <h3>📤 Unggah File Nilai</h3>
-        <div class="note">
-            Format file: <b>.xlsx / .xls</b> — Kolom wajib: <b>NISN, Nama, Semester, Mata Pelajaran, Nilai Harian, Nilai UTS, Nilai UAS</b>
-        </div>
-        <form method="POST" action="{{ route('admin.import.nilai.store') }}" enctype="multipart/form-data">
+        <h3>1. Upload File</h3>
+
+        <form action="{{ route('admin.import.nilai.store') }}" method="POST" enctype="multipart/form-data">
             @csrf
-            <div class="fl" style="grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+
+            <div class="fl">
                 <div>
-                    <label>Tahun Ajaran</label>
-                    <select name="tahun_ajaran" style="width:100%">
-                        <option>2024/2025</option>
-                        <option>2023/2024</option>
-                        <option>2022/2023</option>
+                    <label>Mode</label>
+                    <select name="mode" id="mode">
+                        <option value="satu_kelas">Satu Kelas</option>
+                        <option value="semua_kelas">Semua Kelas</option>
                     </select>
                 </div>
                 <div>
-                    <label>Semester</label>
-                    <select name="semester" style="width:100%">
-                        <option value="1">Semester 1 (Ganjil)</option>
-                        <option value="2">Semester 2 (Genap)</option>
+                    <label>Tahun Ajaran</label>
+                    <select name="tahun_ajaran">
+                        <option value="2024/2025" selected>2024/2025</option>
+                        <option value="2023/2024">2023/2024</option>
                     </select>
                 </div>
                 <div>
                     <label>Kelas</label>
-                    <select name="kelas" style="width:100%">
-                        <option value="">Semua Kelas</option>
-                        @foreach($kelasList ?? ['X IPA 1','X IPA 2','XI IPA 1','XII IPA 1'] as $k)
-                            <option>{{ $k }}</option>
+                    <select name="kelas">
+                        @foreach($kelasList ?? ['X-1', 'XI-1', 'XII-1'] as $k)
+                            <option value="{{ $k }}">{{ $k }}</option>
                         @endforeach
                     </select>
                 </div>
+            </div>
+
+            <div class="fl" style="margin-top:10px">
                 <div>
-                    <label>Mata Pelajaran</label>
-                    <input type="text" name="mata_pelajaran" placeholder="Matematika / kosongkan untuk semua" style="width:100%">
+                    <label>Semester</label>
+                    <select name="semester">
+                        <option value="Ganjil">Semester 1 (Ganjil)</option>
+                        <option value="Genap" selected>Semester 2 (Genap)</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Jika Duplikat</label>
+                    <select name="duplikat">
+                        <option value="skip">Lewati</option>
+                        <option value="overwrite">Timpa</option>
+                    </select>
                 </div>
             </div>
-            <div style="border:2px dashed var(--ln);border-radius:12px;padding:24px;text-align:center;margin-bottom:14px" id="dropZone">
-                <div style="font-size:32px;margin-bottom:8px">📁</div>
-                <p style="color:var(--mu);margin-bottom:12px">Seret file Excel ke sini atau klik untuk pilih</p>
-                <input type="file" name="file" id="fileInput" accept=".xlsx,.xls" style="display:none" required onchange="tampilkanNamaFile(this)">
-                <button type="button" class="btn o" onclick="document.getElementById('fileInput').click()">Pilih File Excel</button>
-                <div id="namaFile" style="margin-top:8px;font-size:12px;color:var(--mu)"></div>
+
+            <div style="margin: 1rem 0;">
+                <label>File Excel / CSV</label>
+                <input type="file" name="file" accept=".xlsx,.xls,.csv" required>
             </div>
-            <div style="display:flex;gap:8px;justify-content:flex-end">
-                <button type="button" class="btn o" onclick="unduhTemplate()">⬇ Unduh Template</button>
-                <button type="submit" class="btn">⬆ Import Sekarang</button>
+
+            <div class="bar">
+                <a href="{{ route('admin.import.nilai.template') }}" class="btn o">⬇ Download Template</a>
+                <span class="sp"></span>
+                <button type="submit" class="btn a">⬆ Upload &amp; Validasi</button>
             </div>
         </form>
     </div>
 
-    {{-- Riwayat Import --}}
+    {{-- Card 2: Petunjuk Format --}}
     <div class="card">
-        <h3>🕒 Riwayat Import</h3>
-        @forelse($riwayatImport ?? [] as $r)
-        <div class="row">
-            <div>
-                <b style="font-size:12px">{{ $r->nama_file }}</b>
-                <div style="font-size:11px;color:var(--mu)">
-                    {{ $r->kelas }} · Sem {{ $r->semester }} · {{ $r->tahun_ajaran }}
-                </div>
-            </div>
-            <div style="text-align:right">
-                <span class="bd {{ $r->status === 'sukses' ? 'ok' : ($r->status === 'sebagian' ? 'w' : 'e') }}">
-                    {{ ucfirst($r->status) }}
-                </span>
-                <div style="font-size:10px;color:var(--mu);margin-top:2px">
-                    {{ \Carbon\Carbon::parse($r->created_at)->format('d M Y H:i') }}
-                </div>
-            </div>
+        <h3>2. Format Kolom Excel</h3>
+        <p class="sub">Pastikan file spreadsheet memiliki header kolom berikut:</p>
+        <div style="background:#f4f7fb;padding:12px;border-radius:10px;font-family:monospace;font-size:12px;line-height:1.8">
+            <b>nisn</b>, <b>kelas</b>, <b>agm</b>, <b>pnc</b>, <b>ind</b>, <b>mtk</b>, <b>ipa</b>, <b>ips</b>, <b>big</b>, <b>pjk</b>, <b>sej</b>, <b>sbd</b>, <b>inf</b>
         </div>
-        @empty
-        <p style="color:var(--mu);font-size:12px;text-align:center;padding:20px">Belum ada riwayat import.</p>
-        @endforelse
+        <div class="note" style="margin-top:12px">
+            ℹ️ Nilai berupa angka 0–100. Kolom yang kosong akan dianggap belum diajarkan (X) dan tidak dihitung ke rata-rata.
+        </div>
     </div>
 </div>
 
-{{-- Pratinjau Hasil --}}
-@if(session('preview'))
-<div class="card">
-    <h3>👁 Pratinjau Data ({{ count(session('preview')) }} baris)</h3>
+{{-- Card 3: Riwayat / Data Tersimpan --}}
+<div class="card" style="margin-top:14px">
+    <h3>Data Nilai Tersimpan</h3>
     <div class="tw">
         <table>
-            <thead><tr>
-                @foreach(array_keys(session('preview')[0] ?? []) as $col)
-                    <th>{{ $col }}</th>
-                @endforeach
-            </tr></thead>
+            <thead>
+                <tr>
+                    <th>Kelas</th>
+                    <th>Semester</th>
+                    <th>Tahun Ajaran</th>
+                    <th>Jumlah Baris</th>
+                    <th>Aksi</th>
+                </tr>
+            </thead>
             <tbody>
-                @foreach(session('preview') as $row)
-                <tr>@foreach($row as $v)<td>{{ $v }}</td>@endforeach</tr>
-                @endforeach
+                <tr>
+                    <td>X-1</td>
+                    <td>Genap</td>
+                    <td>2024/2025</td>
+                    <td>0 baris</td>
+                    <td><button class="btn o" style="padding:3px 8px;font-size:11px">Lihat</button></td>
+                </tr>
+                <tr>
+                    <td>XI-1</td>
+                    <td>Genap</td>
+                    <td>2024/2025</td>
+                    <td>0 baris</td>
+                    <td><button class="btn o" style="padding:3px 8px;font-size:11px">Lihat</button></td>
+                </tr>
+                <tr>
+                    <td>XII-1</td>
+                    <td>Genap</td>
+                    <td>2024/2025</td>
+                    <td>0 baris</td>
+                    <td><button class="btn o" style="padding:3px 8px;font-size:11px">Lihat</button></td>
+                </tr>
             </tbody>
         </table>
     </div>
-    <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end">
-        <form method="POST" action="{{ route('admin.import.nilai.confirm') }}">
-            @csrf
-            <button type="submit" class="btn">✅ Konfirmasi & Simpan</button>
-        </form>
-    </div>
 </div>
-@endif
 @endsection
-
-@push('scripts')
-<script>
-function tampilkanNamaFile(input) {
-    var f = input.files[0];
-    document.getElementById('namaFile').textContent = f ? '📄 ' + f.name + ' (' + (f.size/1024).toFixed(1) + ' KB)' : '';
-}
-function unduhTemplate() {
-    alert('Template Excel akan tersedia setelah konfigurasi server.');
-}
-// Drag & drop
-var dz = document.getElementById('dropZone');
-dz.addEventListener('dragover', function(e){ e.preventDefault(); dz.style.borderColor='var(--p)'; });
-dz.addEventListener('dragleave', function(){ dz.style.borderColor='var(--ln)'; });
-dz.addEventListener('drop', function(e){
-    e.preventDefault(); dz.style.borderColor='var(--ln)';
-    var files = e.dataTransfer.files;
-    if(files.length){ document.getElementById('fileInput').files = files; tampilkanNamaFile(document.getElementById('fileInput')); }
-});
-</script>
-@endpush
-

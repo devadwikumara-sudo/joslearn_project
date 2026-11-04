@@ -19,5 +19,9 @@ class ImportKehadiranAdminController extends Controller
     {
         return back()->with('info', 'File kehadiran berhasil diunggah.');
     }
-}
 
+    public function template()
+    {
+        return back()->with('info', 'Template Excel kehadiran sedang diunduh.');
+    }
+}

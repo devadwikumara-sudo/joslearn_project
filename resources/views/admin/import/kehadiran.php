@@ -1,74 +1,88 @@
 @extends('layouts.app')
 
-@section('title', 'Import Kehadiran - JosBook Admin')
+@section('title', 'Import Kehadiran — JosBook Admin')
 
 @section('content')
-<h2>Import Kehadiran</h2>
-<p class="sub">Unggah data kehadiran / absensi siswa</p>
+<div class="hero2">
+    <div>
+        <h2>Import Kehadiran</h2>
+        <p class="sub">Upload file Excel/CSV untuk mengimpor data absensi dan kokurikuler siswa.</p>
+    </div>
+</div>
 
 <div class="g g2">
+    {{-- Card 1: Upload --}}
     <div class="card">
-        <h3>📤 Unggah File Kehadiran</h3>
-        <div class="note">
-            Format file: <b>.xlsx / .xls</b> — Kolom wajib: <b>NISN, Nama, Hadir, Izin, Sakit, Alpa, Bulan</b>
-        </div>
-        <form method="POST" action="{{ route('admin.import.kehadiran.store') }}" enctype="multipart/form-data">
+        <h3>1. Upload File</h3>
+
+        <form action="{{ route('admin.import.kehadiran.store') }}" method="POST" enctype="multipart/form-data">
             @csrf
-            <div class="fl" style="grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+
+            <div class="fl">
                 <div>
-                    <label>Tahun Ajaran</label>
-                    <select name="tahun_ajaran" style="width:100%">
-                        <option>2024/2025</option><option>2023/2024</option>
+                    <label>Mode</label>
+                    <select name="mode" id="mode">
+                        <option value="satu_kelas">Satu Kelas</option>
+                        <option value="semua_kelas">Semua Kelas</option>
                     </select>
                 </div>
                 <div>
-                    <label>Bulan</label>
-                    <select name="bulan" style="width:100%">
-                        <option value="7">Juli</option><option value="8">Agustus</option>
-                        <option value="9">September</option><option value="10">Oktober</option>
-                        <option value="11">November</option><option value="12">Desember</option>
-                        <option value="1">Januari</option><option value="2">Februari</option>
-                        <option value="3">Maret</option><option value="4">April</option>
-                        <option value="5">Mei</option><option value="6">Juni</option>
+                    <label>Tahun Ajaran</label>
+                    <select name="tahun_ajaran">
+                        <option value="2024/2025" selected>2024/2025</option>
+                        <option value="2023/2024">2023/2024</option>
                     </select>
                 </div>
                 <div>
                     <label>Kelas</label>
-                    <select name="kelas" style="width:100%">
-                        <option value="">Semua Kelas</option>
-                        @foreach($kelasList ?? [] as $k)
-                            <option>{{ $k }}</option>
+                    <select name="kelas">
+                        @foreach($kelasList ?? ['X-1', 'XI-1', 'XII-1'] as $k)
+                            <option value="{{ $k }}">{{ $k }}</option>
                         @endforeach
                     </select>
                 </div>
             </div>
-            <div style="border:2px dashed var(--ln);border-radius:12px;padding:24px;text-align:center;margin-bottom:14px">
-                <div style="font-size:32px;margin-bottom:8px">📋</div>
-                <p style="color:var(--mu);margin-bottom:12px">File Excel data kehadiran</p>
-                <input type="file" name="file" accept=".xlsx,.xls" id="fileHadir" style="display:none" required onchange="this.nextElementSibling.textContent='📄 '+this.files[0].name">
-                <button type="button" class="btn o" onclick="document.getElementById('fileHadir').click()">Pilih File</button>
-                <div style="font-size:12px;color:var(--mu);margin-top:6px"></div>
+
+            <div class="fl" style="margin-top:10px">
+                <div>
+                    <label>Semester</label>
+                    <select name="semester">
+                        <option value="Ganjil">Semester 1 (Ganjil)</option>
+                        <option value="Genap" selected>Semester 2 (Genap)</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Jika Duplikat</label>
+                    <select name="duplikat">
+                        <option value="skip">Lewati</option>
+                        <option value="overwrite">Timpa</option>
+                    </select>
+                </div>
             </div>
-            <div style="display:flex;gap:8px;justify-content:flex-end">
-                <button type="submit" class="btn">⬆ Import Kehadiran</button>
+
+            <div style="margin: 1rem 0;">
+                <label>File Excel / CSV</label>
+                <input type="file" name="file" accept=".xlsx,.xls,.csv" required>
+            </div>
+
+            <div class="bar">
+                <a href="{{ route('admin.import.kehadiran.template') }}" class="btn o">⬇ Download Template</a>
+                <span class="sp"></span>
+                <button type="submit" class="btn a">⬆ Upload &amp; Validasi</button>
             </div>
         </form>
     </div>
 
+    {{-- Card 2: Petunjuk Format --}}
     <div class="card">
-        <h3>🕒 Riwayat Import Kehadiran</h3>
-        @forelse($riwayat ?? [] as $r)
-        <div class="row">
-            <div>
-                <b style="font-size:12px">{{ $r->nama_file }}</b>
-                <div style="font-size:11px;color:var(--mu)">{{ $r->kelas }} · {{ $r->bulan_label }} {{ $r->tahun_ajaran }}</div>
-            </div>
-            <span class="bd {{ $r->status === 'sukses' ? 'ok' : 'w' }}">{{ ucfirst($r->status) }}</span>
+        <h3>2. Format Kolom Excel</h3>
+        <p class="sub">Pastikan file spreadsheet memiliki header kolom berikut:</p>
+        <div style="background:#f4f7fb;padding:12px;border-radius:10px;font-family:monospace;font-size:12px;line-height:1.8">
+            <b>nisn</b>, <b>kelas</b>, <b>sakit</b>, <b>izin</b>, <b>alpa</b>, <b>kokurikuler</b>
         </div>
-        @empty
-        <p style="color:var(--mu);font-size:12px;text-align:center;padding:20px">Belum ada riwayat.</p>
-        @endforelse
+        <div class="note" style="margin-top:12px">
+            ℹ️ Kolom sakit, izin, dan alpa diisi angka jumlah hari. Kolom kokurikuler berisi catatan perkembangan siswa.
+        </div>
     </div>
 </div>
 @endsection
-

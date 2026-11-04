@@ -16,5 +16,9 @@ class ImportEkskulAdminController extends Controller
     {
         return back()->with('info', 'File ekskul berhasil diunggah.');
     }
-}
 
+    public function template()
+    {
+        return back()->with('info', 'Template Excel ekskul sedang diunduh.');
+    }
+}

@@ -11,7 +11,7 @@ class DataGuruController extends Controller
     public function index(): View
     {
         $guru = GuruBiodata::all();
-        $mapelList = [];
+        $mapelList = ['mtk' => 'Matematika', 'ind' => 'Bahasa Indonesia', 'big' => 'Bahasa Inggris', 'fis' => 'Fisika'];
 
         return view('admin.data-guru', compact('guru', 'mapelList'));
     }
@@ -38,15 +38,23 @@ class DataGuruController extends Controller
 
     public function edit(int $id): View
     {
-        $guru = GuruBiodata::findOrFail($id);
-        return view('admin.data-guru', ['guru' => collect([$guru]), 'mapelList' => []]);
+        $guru = GuruBiodata::all();
+        $editGuru = GuruBiodata::findOrFail($id);
+        $mapelList = ['mtk' => 'Matematika', 'ind' => 'Bahasa Indonesia', 'big' => 'Bahasa Inggris', 'fis' => 'Fisika'];
+        return view('admin.data-guru', compact('guru', 'editGuru', 'mapelList'));
     }
 
     public function update(Request $request, int $id)
     {
         $guru = GuruBiodata::findOrFail($id);
         $guru->update($request->only(['nama', 'nip', 'nomor_hp', 'email']));
-        return back()->with('success', 'Data guru berhasil diperbarui.');
+        return redirect()->route('admin.data-guru')->with('success', 'Data guru berhasil diperbarui.');
+    }
+
+    public function destroy(int $id)
+    {
+        $guru = GuruBiodata::findOrFail($id);
+        $guru->delete();
+        return redirect()->route('admin.data-guru')->with('success', 'Data guru berhasil dihapus.');
     }
 }
-
