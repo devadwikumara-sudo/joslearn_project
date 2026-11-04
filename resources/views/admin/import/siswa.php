@@ -4,7 +4,7 @@
 
 @section('content')
 <h2>Import Data Siswa</h2>
-<p class="sub">Unggah file Excel sekolah. Untuk file database sekolah, biodata dibaca dari sheet <b>PesertaDidik</b>; sheet <b>Kontrol Induk</b> tidak diimpor sebagai biodata.</p>
+<p class="sub">Unggah file Excel dari sekolah. Format dan tatanan tabel dideteksi otomatis secara fleksibel; sheet PesertaDidik &amp; Kontrol Induk, maupun format tabel kelas apa pun terbaca langsung.</p>
 
 {{-- Card 1: Unggah file & pengaturan (Sesuai Prototype impPg) --}}
 <div class="card">

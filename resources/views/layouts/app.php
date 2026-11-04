@@ -238,7 +238,7 @@ document.addEventListener('click', function(e){
 </script>
 
 <script src="{{ asset('js/xlsx.full.min.js') }}"></script>
-<script src="{{ asset('js/josbook-excel.js') }}"></script>
+<script src="{{ asset('js/josbook-excel.js') }}?v={{ file_exists(public_path('js/josbook-excel.js')) ? filemtime(public_path('js/josbook-excel.js')) : time() }}"></script>
 @stack('scripts')
 <script>
 function toast(message, duration) {

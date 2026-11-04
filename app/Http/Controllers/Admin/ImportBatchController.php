@@ -52,13 +52,17 @@ class ImportBatchController extends Controller
 
         DB::beginTransaction();
         try {
-            // 1. Do not invent an academic year for a student biodata import.
-            $ta = $type === 'siswa'
-                ? ($taName !== '' ? SekolahTahunAjaran::where('nama', $taName)->first() : null)
-                : SekolahTahunAjaran::firstOrCreate(
-                    ['nama' => $taName !== '' ? $taName : '2024/2025'],
-                    ['sedang_berjalan' => 0]
+            // 1. Tahun Ajaran
+            if ($taName !== '') {
+                $ta = SekolahTahunAjaran::firstOrCreate(
+                    ['nama' => $taName],
+                    ['sedang_berjalan' => 1]
                 );
+            } else {
+                $ta = SekolahTahunAjaran::where('sedang_berjalan', 1)->first()
+                    ?? SekolahTahunAjaran::latest('id')->first()
+                    ?? SekolahTahunAjaran::create(['nama' => '2024/2025', 'sedang_berjalan' => 1]);
+            }
 
             // 2. Buat kelas baru untuk tipe impor selain biodata siswa.
             if ($type !== 'siswa') {
@@ -103,7 +107,7 @@ class ImportBatchController extends Controller
 
             // 5. Catat Log Aktivitas
             CatatanAktivitas::create([
-                'pengguna_id' => auth()->id(),
+                'pengguna_id' => auth()->user()?->id ?? (is_numeric(auth()->id()) ? (int)auth()->id() : null),
                 'peran'       => auth()->user()->peran ?? 'admin',
                 'aksi'        => 'import_' . $type,
                 'keterangan'  => "Import {$type} {$taName}: {$savedCount} baris tersimpan, {$skippedCount} dilewati.",
@@ -548,6 +552,57 @@ class ImportBatchController extends Controller
         return null;
     }
 
+    /**
+     * Pencocokan siswa bertingkat presisi tinggi:
+     * 1. Berdasarkan NISN 10 digit (jika ada)
+     * 2. Berdasarkan NIS / Nomor Induk (jika ada)
+     * 3. Berdasarkan Nama Lengkap + Kelas di Tahun Ajaran aktif (mencegah salah sasaran jika ada nama sama)
+     * 4. Berdasarkan Nama Lengkap global (case-insensitive & trimmed)
+     */
+    private function findStudent(array $r, $taId, $kelasId = null): ?SiswaBiodata
+    {
+        // 1. Cek NISN
+        $nisn = $this->normN($r['nisn'] ?? '');
+        if ($nisn && preg_match('/^\d{10}$/', $nisn)) {
+            $siswa = SiswaBiodata::where('nisn', $nisn)->first();
+            if ($siswa) return $siswa;
+        }
+
+        // 2. Cek NIS / Nomor Induk
+        $nis = $this->cleanVal($r['nis'] ?? $r['nomor_induk'] ?? null);
+        if ($nis) {
+            $siswa = SiswaBiodata::where('nomor_induk', $nis)->first();
+            if ($siswa) return $siswa;
+        }
+
+        // 3. Cek Nama Lengkap dalam Kelas yang bersangkutan (Tahun Ajaran aktif)
+        $rawNama = $r['nama'] ?? $r['nama_lengkap'] ?? null;
+        if (!empty($rawNama)) {
+            $nama = preg_replace('/\s+/', ' ', trim((string)$rawNama));
+            if ($kelasId && $taId) {
+                $siswa = SiswaBiodata::where(function ($q) use ($nama) {
+                    $q->where('nama_lengkap', $nama)
+                      ->orWhereRaw('LOWER(TRIM(nama_lengkap)) = ?', [strtolower($nama)]);
+                })->whereHas('riwayatKelas', function ($q) use ($taId, $kelasId) {
+                    $q->where('tahun_ajaran_id', $taId)
+                      ->where('kelas_id', $kelasId);
+                })->first();
+
+                if ($siswa) return $siswa;
+            }
+
+            // 4. Cek Nama Lengkap global
+            $siswa = SiswaBiodata::where(function ($q) use ($nama) {
+                $q->where('nama_lengkap', $nama)
+                  ->orWhereRaw('LOWER(TRIM(nama_lengkap)) = ?', [strtolower($nama)]);
+            })->first();
+
+            if ($siswa) return $siswa;
+        }
+
+        return null;
+    }
+
     private function saveNilai($rows, $ta, $semester, $mode, $kelasInput)
     {
         $saved = 0;
@@ -555,22 +610,15 @@ class ImportBatchController extends Controller
         $mapelCache = SekolahMapel::all()->keyBy('kode');
 
         foreach ($rows as $r) {
-            $nisn = $this->normN($r['nisn'] ?? '');
-            $siswa = null;
-            if ($nisn) {
-                $siswa = SiswaBiodata::where('nisn', $nisn)->first();
-            }
-            if (!$siswa && !empty($r['nama'])) {
-                $siswa = SiswaBiodata::where('nama_lengkap', $r['nama'])->first();
-            }
+            $kStr = $mode === 'semua' ? ($r['kelas'] ?? '') : $kelasInput;
+            $kStr = $this->normK($kStr);
+            $kelas = $kStr ? $this->ensureKelas($kStr) : null;
+
+            $siswa = $this->findStudent($r, $ta->id, $kelas?->id);
             if (!$siswa) {
                 $skipped++;
                 continue;
             }
-
-            $kStr = $mode === 'semua' ? ($r['kelas'] ?? '') : $kelasInput;
-            $kStr = $this->normK($kStr);
-            $kelas = $kStr ? $this->ensureKelas($kStr) : null;
 
             $riwayat = $this->getOrCreateRiwayatKelas($siswa->id, $ta->id, $kelas);
 
@@ -624,22 +672,15 @@ class ImportBatchController extends Controller
         $skipped = 0;
 
         foreach ($rows as $r) {
-            $nisn = $this->normN($r['nisn'] ?? '');
-            $siswa = null;
-            if ($nisn) {
-                $siswa = SiswaBiodata::where('nisn', $nisn)->first();
-            }
-            if (!$siswa && !empty($r['nama'])) {
-                $siswa = SiswaBiodata::where('nama_lengkap', $r['nama'])->first();
-            }
+            $kStr = $mode === 'semua' ? ($r['kelas'] ?? '') : $kelasInput;
+            $kStr = $this->normK($kStr);
+            $kelas = $kStr ? $this->ensureKelas($kStr) : null;
+
+            $siswa = $this->findStudent($r, $ta->id, $kelas?->id);
             if (!$siswa) {
                 $skipped++;
                 continue;
             }
-
-            $kStr = $mode === 'semua' ? ($r['kelas'] ?? '') : $kelasInput;
-            $kStr = $this->normK($kStr);
-            $kelas = $kStr ? $this->ensureKelas($kStr) : null;
 
             $riwayat = $this->getOrCreateRiwayatKelas($siswa->id, $ta->id, $kelas);
 
@@ -670,22 +711,15 @@ class ImportBatchController extends Controller
         $skipped = 0;
 
         foreach ($rows as $r) {
-            $nisn = $this->normN($r['nisn'] ?? '');
-            $siswa = null;
-            if ($nisn) {
-                $siswa = SiswaBiodata::where('nisn', $nisn)->first();
-            }
-            if (!$siswa && !empty($r['nama'])) {
-                $siswa = SiswaBiodata::where('nama_lengkap', $r['nama'])->first();
-            }
+            $kStr = $mode === 'semua' ? ($r['kelas'] ?? '') : $kelasInput;
+            $kStr = $this->normK($kStr);
+            $kelas = $kStr ? $this->ensureKelas($kStr) : null;
+
+            $siswa = $this->findStudent($r, $ta->id, $kelas?->id);
             if (!$siswa) {
                 $skipped++;
                 continue;
             }
-
-            $kStr = $mode === 'semua' ? ($r['kelas'] ?? '') : $kelasInput;
-            $kStr = $this->normK($kStr);
-            $kelas = $kStr ? $this->ensureKelas($kStr) : null;
 
             $riwayat = $this->getOrCreateRiwayatKelas($siswa->id, $ta->id, $kelas);
 

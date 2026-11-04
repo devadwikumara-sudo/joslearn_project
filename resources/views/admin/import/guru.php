@@ -48,6 +48,6 @@
 @endsection
 
 @push('scripts')
-<script src="{{ asset('js/josbook-excel.js') }}"></script>
+{{-- josbook-excel.js sudah dimuat di layout utama --}}
 @endpush
 

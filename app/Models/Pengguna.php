@@ -51,14 +51,6 @@ class Pengguna extends Authenticatable
         return ucfirst($this->username);
     }
 
-    /**
-     * Tell Laravel to use 'username' as the auth identifier field.
-     */
-    public function getAuthIdentifierName(): string
-    {
-        return 'username';
-    }
-
     public function getAuthPassword(): string
     {
         return $this->password;

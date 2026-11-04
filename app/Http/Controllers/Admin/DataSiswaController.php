@@ -20,8 +20,9 @@ class DataSiswaController extends Controller
 {
     public function index(Request $request): View
     {
-        $taAktifObj = SekolahTahunAjaran::where('sedang_berjalan', 1)->first();
-        $taAktif = $taAktifObj?->nama ?? 'Belum diatur';
+        $taAktifObj = SekolahTahunAjaran::where('sedang_berjalan', 1)->first()
+            ?? SekolahTahunAjaran::latest('id')->first();
+        $taAktif = $taAktifObj?->nama ?? '2024/2025';
         $taAktifId = $taAktifObj?->id ?? 0;
 
         $kelasSelected = $request->input('kelas', '');
@@ -99,7 +100,7 @@ class DataSiswaController extends Controller
     {
         $taAktifObj = SekolahTahunAjaran::where('sedang_berjalan', 1)->first()
             ?? SekolahTahunAjaran::latest('id')->first();
-        $taAktif = $taAktifObj?->nama;
+        $taAktif = $taAktifObj?->nama ?? '2024/2025';
 
         $taAktifId = $taAktifObj?->id ?? 0;
         $kelasList = SekolahKelas::orderBy('nama')->pluck('nama')->toArray();

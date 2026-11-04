@@ -35,6 +35,19 @@
         BZ:'wali_prov', CA:'wali_pos', CD:'nopes'
     };
 
+    // ─── Pemetaan Kolom Kontrol Induk (DATABASE_SISWA.xlsx) ────────────────────
+    const KMAP = {
+        I: 'alasan_keluar',
+        J: 'tgl_keluar',
+        K: 'kelas_keluar',
+        L: 'tujuan',
+        M: 'nopes',
+        N: 'no_skl',
+        O: 'no_ijazah_sma',
+        P: 'tgl_ijazah_sma',
+        Q: 'no_transkrip'
+    };
+
     const BLN = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 
     const iso = v => {
@@ -230,10 +243,24 @@
         return '';
     };
 
-    // ─── Pembaca biodata dari sheet PesertaDidik ────────────────────────────────
+    // ─── Pembaca biodata dari sheet PesertaDidik & Kontrol Induk ──────────────
     function realRows(w) {
-        const rows = XLSX.utils.sheet_to_json(w.Sheets.PesertaDidik, {header:1, defval:''});
-        const headers = rows[4] || [];
+        const pKey = w.SheetNames.find(s => /peserta\s*didik/i.test(s)) || 'PesertaDidik';
+        const kKey = w.SheetNames.find(s => /kontrol\s*induk/i.test(s)) || 'Kontrol Induk';
+
+        const rd = n => (n && w.Sheets[n]) ? XLSX.utils.sheet_to_json(w.Sheets[n], {header: 1, defval: ''}) : [];
+        const km = {};
+        if (w.Sheets[kKey]) {
+            rd(kKey).slice(5).forEach(r => {
+                if (r[2] !== undefined && r[2] !== '') km[String(r[2]).trim()] = r;
+            });
+        }
+
+        const out = [];
+        const rows = rd(pKey);
+        if (!rows.length) return out;
+
+        const headers = rows[4] || rows[3] || [];
         const headerFields = headers.map(fieldOf);
         const headerCounts = headerFields.reduce((counts, field) => {
             if (field) counts[field] = (counts[field] || 0) + 1;
@@ -250,36 +277,47 @@
             'hp_ayah','hp_ibu','hp_wali',
             'kerja_ayah','kerja_ibu','kerja_wali'
         ]);
-        const out = [];
+
         rows.slice(5).forEach((r, offset) => {
             if (!cl(r[nameIndex]) || (r[nisIndex] === '' && r[nisnIndex] === '')) return;
             const o = {};
             let numericNik = false;
-            for (const [c,k] of Object.entries(RMAP)) {
+            for (const [c, k] of Object.entries(RMAP)) {
                 let columnIndex = CI(c);
                 const positionalHeaderField = headerFields[columnIndex];
                 if (positionalHeaderField !== k && positionalHeaderField && !groupedFields.has(k)) {
                     if (headerCounts[k] === 1) {
                         columnIndex = headerFields.indexOf(k);
-                    } else {
-                        continue;
                     }
                 }
                 let v = cl(r[columnIndex]);
-                if ((k==='tgl'||k==='tgl_masuk'||k==='tgl_ijazah_smp') && typeof v==='number') v = iso(v);
+                if ((k === 'tgl' || k === 'tgl_masuk' || k === 'tgl_ijazah_smp') && typeof v === 'number') v = iso(v);
                 if (k === 'nik' && typeof v === 'number' && String(v).replace(/\D/g, '').length === 16) {
                     numericNik = true;
                 }
-                if (['nis','nisn','nik'].includes(k) && typeof v === 'number') v = numStr(v);
-                o[k] = (v===''||v==null)?'-':v;
+                if (['nis', 'nisn', 'nik'].includes(k) && typeof v === 'number') v = numStr(v);
+                o[k] = (v === '' || v == null) ? '-' : v;
             }
             o.nis = String(o.nis ?? '');
-            o.nisn = normN(String(o.nisn ?? '').trim());
+            o.nisn = normN(String(r[nisnIndex] ?? o.nisn ?? '').trim());
             if (numericNik) {
                 o.__numeric_nik = true;
             }
             o.jk = /^p/i.test(String(o.jk)) ? 'P' : (/^l/i.test(String(o.jk)) ? 'L' : '');
-            o.kelas = normK((o.kelas_masuk||'')+'-'+(o.rombel_masuk||''));
+            o.kelas = normK((o.kelas_masuk || '') + '-' + (o.rombel_masuk || ''));
+
+            // Gabungkan data dari Kontrol Induk berdasarkan NIS
+            const q = km[o.nis];
+            if (q) {
+                for (const [c, k] of Object.entries(KMAP)) {
+                    let v = cl(q[CI(c)]);
+                    if (typeof v === 'number' && k.startsWith('tgl')) v = iso(v);
+                    o[k] = (v === '' || v == null) ? '-' : v;
+                }
+                if (q[CI('K')]) o.kelas = normK(q[CI('K')]) || o.kelas;
+            }
+            o.status = (o.alasan_keluar === 'Lulus') ? 'Lulus' : 'Aktif';
+            if (o.tgl_keluar && o.tgl_keluar !== '-') o.thn_lulus = +String(o.tgl_keluar).slice(0, 4);
             o.__excel_row = offset + 6;
             out.push(o);
         });
@@ -306,22 +344,36 @@
     // ─── Analisis Sheet Otomatis ────────────────────────────────────────────────
     function analyze(name, aoa, lockType) {
         let best = null;
-        for (let r=0; r<Math.min(aoa.length, 30); r++) {
-            let sc=0, idf=0;
-            (aoa[r]||[]).forEach(h => {
+        for (let r = 0; r < Math.min(aoa.length, 30); r++) {
+            let sc = 0, idf = 0;
+            (aoa[r] || []).forEach(h => {
                 const t = String(h).trim();
                 if (!t || /^\d+$/.test(t)) return;
-                const b = hsplit(t).b, f = fx(b)||fx(t);
-                if (f||mapelOf(b)) {
+                const b = hsplit(t).b, f = fx(b) || fx(t);
+                if (f || mapelOf(b)) {
                     sc++;
-                    if (f==='nama'||f==='nisn'||f==='nis'||f==='kelas') idf=1;
+                    if (['nama', 'nisn', 'nis', 'kelas', 'nip', 'nuptk', 'ekskul', 'sakit'].includes(f)) idf++;
                 }
             });
-            if (idf && sc >= 2 && (!best || sc > best.sc)) best = {r, sc};
+            if ((idf >= 1 || sc >= 2) && (!best || sc > best.sc)) best = {r, sc};
         }
+
+        if (!best) {
+            for (let r = 0; r < Math.min(aoa.length, 15); r++) {
+                const textCells = (aoa[r] || []).filter(c => {
+                    const s = String(c ?? '').trim();
+                    return s !== '' && isNaN(s) && !/^(no|nomor|urut)$/i.test(s);
+                });
+                if (textCells.length >= 2) {
+                    best = {r, sc: 1};
+                    break;
+                }
+            }
+        }
+
         if (!best) return null;
-        const hr = best.r, heads = (aoa[hr]||[]).map(h=>String(h).trim()), map={}, semOf={}, base={};
-        heads.forEach((h,i) => {
+        const hr = best.r, heads = (aoa[hr] || []).map(h => String(h).trim()), map = {}, semOf = {}, base = {};
+        heads.forEach((h, i) => {
             if (!h) return;
             const q = hsplit(h);
             base[i] = q.b;
@@ -332,7 +384,7 @@
 
         const ks = Object.values(map);
         const has = k => ks.includes(k);
-        const nm = ks.filter(k=>k.startsWith('m:')).length;
+        const nm = ks.filter(k => k.startsWith('m:')).length;
         const ts = [];
 
         // JIKA HALAMAN SUDAH DIKUNCI (lockType)
@@ -353,12 +405,52 @@
         let kelas = '';
         if (/^\s*(kelas\s*)?(XII|XI|X|12|11|10)([\s\-._]*[A-Za-z0-9 ]*)?$/i.test(name)) kelas = normK(name);
         if (!kelas) {
-            for (let r=0; r<hr && !kelas; r++) {
-                const m = /kelas\s*[:=]?\s*([A-Za-z0-9.\- ]{1,10})/i.exec((aoa[r]||[]).join(' '));
+            for (let r = 0; r < hr && !kelas; r++) {
+                const m = /kelas\s*[:=]?\s*([A-Za-z0-9.\- ]{1,10})/i.exec((aoa[r] || []).join(' '));
                 if (m && /^(XII|XI|X|12|11|10)/i.test(m[1].trim())) kelas = normK(m[1]);
             }
         }
-        return {name, aoa, hr, heads, map, semOf, base, t: ts[0]||'siswa', ts, kelas};
+        return {name, aoa, hr, heads, map, semOf, base, t: ts[0] || 'siswa', ts, kelas};
+    }
+
+    // ─── Deteksi Kolom Otomatis (assignX Sesuai Prototipe) ──────────────────────
+    function assignX(z, pt) {
+        const ty = k => !k || k === 'x' ? '' : (k.startsWith('m:') || k === 'new' || k === 'mapelcol' || k === 'nilaicol') ? 'nilai' : ['sakit', 'izin', 'alpa', 'kokur'].includes(k) ? 'hadir' : ['ekskul', 'predikat'].includes(k) ? 'ekskul' : FK.includes(k) ? 'siswa' : '';
+        const ty2 = j => {
+            const m = z.map[j];
+            return m === 'x' ? (z.xt && z.xt[j]) : m === 'new' ? 'nilai' : ty(m);
+        };
+        const n = (z.heads || []).length;
+        const single = (z.ts && z.ts.length === 1) ? z.ts[0] : '';
+        z.xt = z.xt || {};
+        for (let i = 0; i < n; i++) {
+            const h = z.heads[i];
+            if (!h || (z.map[i] && z.map[i] !== 'x' && z.map[i] !== 'new')) continue;
+            const vals = (z.aoa || []).slice(z.hr + 1).map(r => String(r[i] ?? '').trim()).filter(x => x !== '' && x.toUpperCase() !== 'X');
+            if (!vals.length) {
+                z.map[i] = '';
+                continue;
+            }
+            const b = z.base[i] || h, nb = nz(b);
+            if (/^((no|nomor)( urut)?|(jumlah|total|rata|ranking|rank|peringkat|kkm|kktp|absen|urut)\b.*)$/.test(nb)) {
+                z.map[i] = '';
+                continue;
+            }
+            let T = /terlambat|dispensasi|bolos|cuti|hadir/.test(nb) ? 'hadir' : /ekskul|ekstra|pramuka|organisasi/.test(nb) ? 'ekskul' : '';
+            for (let d = 1; d < n && !T; d++) {
+                T = (i - d >= 0 ? ty2(i - d) : '') || (i + d < n ? ty2(i + d) : '');
+            }
+            T = T || single || pt;
+            z.xt[i] = T;
+            const nn = x => +x.replace(',', '.');
+            if (T === 'nilai' && vals.filter(x => !isNaN(nn(x)) && nn(x) >= 0 && nn(x) <= 100).length >= vals.length * 0.8) {
+                z.map[i] = 'new';
+            } else if (T === 'siswa') {
+                z.map[i] = fieldOf(b) || '';
+            } else {
+                z.map[i] = z.map[i] || '';
+            }
+        }
     }
 
     // ─── Pilihan Dropdown Pemetaan Kolom (FOPT) ─────────────────────────────────
@@ -589,6 +681,7 @@
             warns: []
         }
     };
+    window.JosBookState = S;
 
     function readFormOptions() {
         const I = S.imp;
@@ -647,10 +740,26 @@
         });
 
         // 1. Deteksi Otomatis & Pemetaan Kolom (detBox Sesuai Prototype)
-        const opts = FOPT(t);
-        const ignoredCols = (I.raws || []).reduce((acc, z) => acc + (z.heads || []).filter((h, i) => h && !z.map[i]).length, 0);
+        let detHtml = '';
+        if (!I.raws) {
+            // Khusus format database sekolah (PesertaDidik + Kontrol Induk): semua kolom sudah terpetakan penuh
+            detHtml = `
+            <div class="card" style="margin-top:14px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                    <h3 style="margin:0">2. Hasil Deteksi Otomatis</h3>
+                    <span class="bd ok" style="font-size:12px;padding:4px 10px">Terdeteksi: Data Siswa (Peserta Didik + Kontrol Induk)</span>
+                </div>
+                <div class="bar" style="flex-wrap:wrap;gap:6px">
+                    <span class="bd ok">Sheet “Peserta Didik” &amp; “Kontrol Induk” terbaca 100% lengkap</span>
+                    <span class="bd ok">Total: <b>${I.rows.length} siswa</b></span>
+                    ${uniqueClasses.length ? `<span class="bd ok">Kelas: <b>${uniqueClasses.join(', ')}</b></span>` : ''}
+                </div>
+            </div>`;
+        } else {
+            const opts = FOPT(t);
+            const ignoredCols = (I.raws || []).reduce((acc, z) => acc + (z.heads || []).filter((h, i) => h && !z.map[i]).length, 0);
 
-        let detHtml = `
+            detHtml = `
             <div class="card" style="margin-top:14px">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
                     <h3 style="margin:0">2. Hasil Deteksi Otomatis</h3>
@@ -660,11 +769,11 @@
                     ${(I.raws||[]).map(z => `<span class="bd">Sheet “<b>${z.name}</b>” · baris ${z.hr+1}${z.kelas ? ' · ' + z.kelas : ''}</span>`).join('')}
                     ${uniqueClasses.length ? `<span class="bd ok">Kelas: <b>${uniqueClasses.join(', ')}</b></span>` : ''}
                     ${(I.newM||[]).length ? `<span class="bd w">⚠️ Mapel Baru (${I.newM.length}): <b>${I.newM.map(m=>m.nama).join(', ')}</b></span>` : ''}
+                    ${(I.newX||[]).length ? `<span class="bd ok">Kolom Baru (${I.newX.length}): <b>${I.newX.map(x=>x.l).join(', ')}</b></span>` : ''}
                     ${ignoredCols > 0 ? `<span class="bd w">${ignoredCols} kolom diabaikan</span>` : ''}
                 </div>
 
-                {{-- Panel Fleksibel: Lihat / Ubah Pemetaan Kolom --}}
-                <details open style="margin-top:12px;padding-top:12px;border-top:1px solid #e2e8f0">
+                <details ${ignoredCols > 0 ? 'open' : ''} style="margin-top:12px;padding-top:12px;border-top:1px solid #e2e8f0">
                     <summary style="cursor:pointer;font-weight:600;font-size:13px;color:var(--pr, #2563eb)">
                         🔍 Lihat / Ubah Pemetaan Kolom Excel
                     </summary>
@@ -707,6 +816,7 @@
                     `).join('')}
                 </details>
             </div>`;
+        }
 
         // 2. Peringatan & Laporan Validasi
         let warnHtml = '';
@@ -833,42 +943,26 @@
             // KUNCI TIPE: Tipe selalu sesuai dengan halaman import yang sedang dibuka
             I.t = expectedType || 'siswa';
 
-            // 1. Import biodata dari format database sekolah dengan header di baris kelima.
-            const pesertaDidikRows = w.Sheets.PesertaDidik
-                ? XLSX.utils.sheet_to_json(w.Sheets.PesertaDidik, {header:1, defval:''})
-                : [];
-            const pesertaDidikHeader = pesertaDidikRows[4] || [];
-            const isSchoolDatabaseSheet = fieldOf(pesertaDidikHeader[CI('C')]) === 'nis'
-                && fieldOf(pesertaDidikHeader[CI('D')]) === 'nama'
-                && fieldOf(pesertaDidikHeader[CI('F')]) === 'nisn';
-            if (isSchoolDatabaseSheet && I.t === 'siswa') {
-                I.raws = [{
-                    name: 'PesertaDidik',
-                    hr: 4,
-                    heads: Object.keys(RMAP),
-                    map: RMAP,
-                    semOf: {},
-                    base: RMAP,
-                    aoa: [],
-                    kelas: ''
-                }];
-                I.rows = realRows(w);
-                I.mode = 'semua';
-                I.newM = [];
-                renderPreviewUI();
-                if (window.toast) toast(I.rows.length + ' baris biodata terbaca dari PesertaDidik');
-                return;
+            // 1. Cek apakah ini file database sekolah dengan sheet PesertaDidik yang cocok
+            const pSheetKey = w.SheetNames.find(s => /peserta\s*didik/i.test(s));
+            if (pSheetKey && I.t === 'siswa') {
+                const rows = realRows(w);
+                if (rows && rows.length > 0) {
+                    I.raws = null;
+                    I.rows = rows;
+                    I.mode = 'semua';
+                    I.newM = [];
+                    I.newX = [];
+                    renderPreviewUI();
+                    if (window.toast) window.toast(I.rows.length + ' siswa terbaca dari ' + pSheetKey + (w.Sheets['Kontrol Induk'] ? ' + Kontrol Induk' : ''));
+                    return;
+                }
             }
 
-            if (I.t === 'siswa' && w.Sheets['Kontrol Induk']) {
-                alert('Sheet PesertaDidik tidak ditemukan. Sheet Kontrol Induk tidak dapat diimpor sebagai biodata siswa.');
-                return;
-            }
-
-            // 2. Analisis Lembar Kerja Umum
+            // 2. Analisis Fleksibel — semua sheet (skip Kontrol Induk untuk siswa)
             const rd = n => XLSX.utils.sheet_to_json(w.Sheets[n], {header: 1, defval: ''});
             const sheetNames = I.t === 'siswa'
-                ? w.SheetNames.filter(name => name !== 'Kontrol Induk')
+                ? w.SheetNames.filter(name => !/kontrol\s*induk/i.test(name))
                 : w.SheetNames;
             const allAnalyzed = sheetNames.map(n => analyze(n, rd(n), I.t)).filter(Boolean);
 
@@ -892,12 +986,15 @@
                 }];
             }
 
+            // Jalankan deteksi kolom otomatis untuk kolom tambahan/baru
+            use.forEach(z => assignX(z, I.t));
+
             I.raws = use;
             I.rows = buildRows(I);
             if (I.rows.some(q => q.kelas)) I.mode = 'semua';
 
             renderPreviewUI();
-            if (window.toast) toast('Terdeteksi ' + I.rows.length + ' baris dari ' + use.length + ' sheet');
+            if (window.toast) window.toast('Terdeteksi ' + I.rows.length + ' baris dari ' + use.length + ' sheet');
         };
         r.readAsArrayBuffer(f);
     };
@@ -991,7 +1088,7 @@
                             </div>
                         </div>`;
                 }
-                if (window.toast) toast(data.message, 4000);
+                if (window.toast) window.toast(data.message, 4000);
             } else {
                 alert('Gagal mengimpor: ' + (data.message || 'Kesalahan sistem'));
                 if (btn) {
