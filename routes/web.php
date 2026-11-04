@@ -1,31 +1,31 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Auth\AuthController;
-use App\Http\Controllers\Auth\GantiPasswordController;
+use App\Http\Controllers\Admin\AlumniController;
+use App\Http\Controllers\Admin\CekKualitasDataController;
 use App\Http\Controllers\Admin\DashboardAdminController;
-use App\Http\Controllers\Admin\DataSiswaController;
 use App\Http\Controllers\Admin\DataGuruController;
-use App\Http\Controllers\Admin\ImportNilaiAdminController;
+use App\Http\Controllers\Admin\DataSiswaController;
+use App\Http\Controllers\Admin\FormPendataanController;
+use App\Http\Controllers\Admin\ImportBatchController;
 use App\Http\Controllers\Admin\ImportEkskulAdminController;
 use App\Http\Controllers\Admin\ImportKehadiranAdminController;
+use App\Http\Controllers\Admin\ImportNilaiAdminController;
 use App\Http\Controllers\Admin\KenaikanKelasController;
-use App\Http\Controllers\Admin\MutasiSiswaController;
-use App\Http\Controllers\Admin\AlumniController;
 use App\Http\Controllers\Admin\LaporanController;
-use App\Http\Controllers\Admin\CekKualitasDataController;
 use App\Http\Controllers\Admin\LogAktivitasController;
-use App\Http\Controllers\Admin\SettingController;
-use App\Http\Controllers\Admin\FormPendataanController;
-use App\Http\Controllers\Admin\PelacakanAlumniController;
 use App\Http\Controllers\Admin\MasterKelasController;
-use App\Http\Controllers\Admin\ImportBatchController;
+use App\Http\Controllers\Admin\MutasiSiswaController;
+use App\Http\Controllers\Admin\PelacakanAlumniController;
+use App\Http\Controllers\Admin\SettingController;
+use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\Auth\GantiPasswordController;
 use App\Http\Controllers\Guru\BerandaGuruController;
 use App\Http\Controllers\Guru\DataSiswaGuruController;
-use App\Http\Controllers\Guru\ImportNilaiGuruController;
 use App\Http\Controllers\Guru\ImportEkskulGuruController;
 use App\Http\Controllers\Guru\ImportKetidakhadiranController;
+use App\Http\Controllers\Guru\ImportNilaiGuruController;
 use App\Http\Controllers\Guru\InputNilaiMapelController;
+use Illuminate\Support\Facades\Route;
 
 // ─── ALUR LOGIN & AUTENTIKASI GURU & ADMIN ───────────────────────────────────
 
@@ -63,10 +63,12 @@ Route::middleware(['auth'])->group(function () {
 Route::get('/', function () {
     if (auth()->check()) {
         $peran = auth()->user()->peran;
+
         return $peran === 'admin'
             ? redirect()->route('admin.dashboard')
             : redirect()->route('guru.beranda');
     }
+
     return redirect()->route('login');
 });
 
@@ -89,8 +91,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin.only'])->grou
     Route::get('/data-siswa/{id}', [DataSiswaController::class, 'show'])->name('data-siswa.show');
     Route::get('/data-siswa/{id}/edit', [FormPendataanController::class, 'edit'])->name('data-siswa.edit');
     Route::get('/data-siswa/{id}/pdf', [DataSiswaController::class, 'pdf'])->name('data-siswa.pdf');
-    Route::post('/data-siswa', [DataSiswaController::class, 'store'])->name('data-siswa.store');
-    Route::put('/data-siswa/{id}', [DataSiswaController::class, 'update'])->name('data-siswa.update');
+    Route::post('/data-siswa', [FormPendataanController::class, 'store'])->name('data-siswa.store');
+    Route::put('/data-siswa/{id}', [FormPendataanController::class, 'update'])->name('data-siswa.update');
     Route::delete('/data-siswa/{id}', [DataSiswaController::class, 'destroy'])->name('data-siswa.destroy');
 
     // Data Guru (data guru.png)
@@ -203,6 +205,7 @@ Route::prefix('guru')->name('guru.')->middleware(['auth', 'role.web'])->group(fu
 Route::middleware(['auth', 'role.web'])->group(function () {
     Route::get('/dashboard', function () {
         $peran = auth()->user()->peran;
+
         return $peran === 'admin'
             ? redirect()->route('admin.dashboard')
             : redirect()->route('guru.beranda');

@@ -1,11 +1,16 @@
 <?php
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class SiswaRiwayatKelas extends Model
 {
+    use SoftDeletes;
+
     protected $table = 'siswa_riwayat_kelas';
+
     protected $guarded = ['id'];
 
     public function siswa()
@@ -23,4 +28,3 @@ class SiswaRiwayatKelas extends Model
         return $this->belongsTo(SekolahKelas::class, 'kelas_id');
     }
 }
-

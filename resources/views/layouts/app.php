@@ -234,13 +234,6 @@ document.addEventListener('click', function(e){
     }
 });
 
-function toast(t, ms){
-    var el = document.getElementById('ts');
-    if(!el) return;
-    el.textContent = t;
-    el.style.display = 'block';
-    setTimeout(function(){ el.style.display = 'none'; }, ms || 2200);
-}
 </script>
 
 <script src="{{ asset('js/xlsx.full.min.js') }}"></script>

@@ -17,7 +17,7 @@
                     <option value="">— Pilih siswa aktif —</option>
                     @foreach($siswaAktif as $s)
                         @php
-                            $kName = $s->riwayatKelas->first() ? $s->riwayatKelas->first()->kelas : '-';
+                            $kName = $s->riwayatKelas->first()?->kelas?->nama ?? '-';
                         @endphp
                         <option value="{{ $s->id }}">{{ $s->nama_lengkap }} · {{ $kName }}</option>
                     @endforeach
@@ -64,7 +64,7 @@
                 @forelse($riwayatMutasi as $m)
                 @php
                     $rk = $m->riwayatKelas->first();
-                    $kName = $rk ? $rk->kelas : ($m->kelas_keluar ?? '-');
+                    $kName = $rk?->kelas?->nama ?? ($m->kelas_keluar ?? '-');
                     $isMasuk = ($rk && $rk->status === 'Aktif') && ($m->jenis_registrasi === 'Pindahan');
                     $labelJenis = $isMasuk ? 'Pindahan masuk' : ($rk ? $rk->status : 'Pindah keluar');
                     $tujuanAsal = $isMasuk ? ($m->pindahan_dari_sekolah ?? $m->sekolah_asal ?? '-') : ($m->sekolah_tujuan ?? '-');

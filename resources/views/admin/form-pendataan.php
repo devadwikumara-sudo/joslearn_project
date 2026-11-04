@@ -85,7 +85,7 @@
                 </div>
                 <div>
                     <label>Tanggal Lahir</label>
-                    <input type="date" name="tanggal_lahir" value="{{ old('tanggal_lahir', $edit->tanggal_lahir ? \Carbon\Carbon::parse($edit->tanggal_lahir)->format('Y-m-d') : '') }}">
+                    <input type="date" name="tanggal_lahir" value="{{ old('tanggal_lahir', $edit?->tanggal_lahir ? \Carbon\Carbon::parse($edit->tanggal_lahir)->format('Y-m-d') : '') }}">
                 </div>
                 <div>
                     <label>Agama</label>
@@ -128,7 +128,7 @@
                     <label>Kelas Saat Ini *</label>
                     <select name="kelas" required>
                         @foreach($kelasList as $k)
-                            <option value="{{ $k }}" {{ old('kelas', ($edit && $edit->riwayatKelas->first()) ? $edit->riwayatKelas->first()->kelas : '') == $k ? 'selected' : '' }}>{{ $k }}</option>
+                            <option value="{{ $k }}" {{ old('kelas', ($edit && $edit->riwayatKelas->first()) ? $edit->riwayatKelas->first()->kelas?->nama : '') == $k ? 'selected' : '' }}>{{ $k }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -270,7 +270,7 @@
                 </div>
                 <div>
                     <label>Tanggal Diterima</label>
-                    <input type="date" name="tanggal_diterima" value="{{ old('tanggal_diterima', $edit->tanggal_diterima ? \Carbon\Carbon::parse($edit->tanggal_diterima)->format('Y-m-d') : '') }}">
+                    <input type="date" name="tanggal_diterima" value="{{ old('tanggal_diterima', $edit?->tanggal_diterima ? \Carbon\Carbon::parse($edit->tanggal_diterima)->format('Y-m-d') : '') }}">
                 </div>
             </div>
         </div>
@@ -381,7 +381,7 @@
             <div class="fl">
                 <div>
                     <label>Tanggal Keluar</label>
-                    <input type="date" name="tanggal_keluar" value="{{ old('tanggal_keluar', $edit->tanggal_keluar ? \Carbon\Carbon::parse($edit->tanggal_keluar)->format('Y-m-d') : '') }}">
+                    <input type="date" name="tanggal_keluar" value="{{ old('tanggal_keluar', $edit?->tanggal_keluar ? \Carbon\Carbon::parse($edit->tanggal_keluar)->format('Y-m-d') : '') }}">
                 </div>
                 <div>
                     <label>Alasan Keluar</label>
@@ -409,7 +409,7 @@
                 </div>
                 <div>
                     <label>Tanggal Pengesahan Ijazah</label>
-                    <input type="date" name="tanggal_ijazah_sma" value="{{ old('tanggal_ijazah_sma', $edit->tanggal_ijazah_sma ? \Carbon\Carbon::parse($edit->tanggal_ijazah_sma)->format('Y-m-d') : '') }}">
+                    <input type="date" name="tanggal_ijazah_sma" value="{{ old('tanggal_ijazah_sma', $edit?->tanggal_ijazah_sma ? \Carbon\Carbon::parse($edit->tanggal_ijazah_sma)->format('Y-m-d') : '') }}">
                 </div>
                 <div>
                     <label>Nomor Transkrip Nilai</label>

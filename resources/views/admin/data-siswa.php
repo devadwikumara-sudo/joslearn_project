@@ -92,7 +92,7 @@
                 @forelse($siswaList as $s)
                 @php
                     $rk = $s->riwayatKelas->first();
-                    $kelasNama = $rk ? $rk->kelas : '-';
+                    $kelasNama = $rk?->kelas?->nama ?? '-';
                     $statusNama = $rk ? $rk->status : 'Aktif';
                     $badgeClass = $statusNama === 'Aktif' ? 'ok' : ($statusNama === 'Lulus' ? 'ok' : ($statusNama === 'Pindah keluar' ? 'w' : 'e'));
                 @endphp

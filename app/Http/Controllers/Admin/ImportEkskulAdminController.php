@@ -1,12 +1,13 @@
 <?php
+
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-use Illuminate\View\View;
 use App\Models\SekolahKelas;
 use App\Models\SekolahTahunAjaran;
-use App\Models\SiswaEkskul;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\View\View;
 
 class ImportEkskulAdminController extends Controller
 {
@@ -21,10 +22,16 @@ class ImportEkskulAdminController extends Controller
             $kelasList = ['X-1', 'X-2', 'XI-1', 'XI-2', 'XII-1', 'XII-2'];
         }
 
-        $riwayatImport = SiswaEkskul::where('tahun_ajaran', $taAktif)
-            ->selectRaw('kelas, semester, count(*) as baris')
-            ->groupBy('kelas', 'semester')
-            ->orderBy('kelas')
+        $riwayatImport = DB::table('siswa_ekskul as data')
+            ->join('siswa_riwayat_kelas as riwayat', 'riwayat.id', '=', 'data.riwayat_kelas_id')
+            ->join('sekolah_tahun_ajaran as tahun', 'tahun.id', '=', 'riwayat.tahun_ajaran_id')
+            ->join('sekolah_kelas as kelas', 'kelas.id', '=', 'riwayat.kelas_id')
+            ->where('tahun.id', $taAktifObj?->id ?? 0)
+            ->whereNull('riwayat.deleted_at')
+            ->select('kelas.nama as kelas', 'data.semester')
+            ->selectRaw('COUNT(*) as baris')
+            ->groupBy('kelas.id', 'kelas.nama', 'data.semester')
+            ->orderBy('kelas.nama')
             ->get();
 
         return view('admin.import.ekskul', compact(

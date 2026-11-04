@@ -1,15 +1,17 @@
 <?php
+
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-use Illuminate\View\View;
-use Illuminate\Support\Facades\DB;
+use App\Models\CatatanAktivitas;
 use App\Models\GuruBiodata;
 use App\Models\SekolahKelas;
 use App\Models\SekolahMapel;
 use App\Models\SekolahTahunAjaran;
-use App\Models\CatatanAktivitas;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\View\View;
 
 class DataGuruController extends Controller
 {
@@ -18,12 +20,18 @@ class DataGuruController extends Controller
         $taAktifObj = SekolahTahunAjaran::where('sedang_berjalan', 1)->first()
             ?? SekolahTahunAjaran::latest('id')->first();
         $taAktif = $taAktifObj ? $taAktifObj->nama : '2024/2025';
+        $taAktifId = $taAktifObj?->id ?? 0;
 
-        $guruList = GuruBiodata::with(['waliKelas.kelas', 'mengajar.mapel', 'mengajar.kelas'])->get();
+        $guruList = GuruBiodata::whereNull('deleted_at')
+            ->with([
+                'waliKelas' => fn ($query) => $query->where('tahun_ajaran_id', $taAktifId)->with('kelas'),
+                'mengajar' => fn ($query) => $query->where('tahun_ajaran_id', $taAktifId)->with(['mapel', 'kelas']),
+            ])
+            ->get();
 
         $totalGuru = $guruList->count();
-        $totalGuruMapel = $guruList->filter(fn($g) => $g->mengajar && $g->mengajar->count() > 0)->count();
-        $totalWaliKelas = $guruList->filter(fn($g) => $g->waliKelas && $g->waliKelas->count() > 0)->count();
+        $totalGuruMapel = $guruList->filter(fn ($g) => $g->mengajar && $g->mengajar->count() > 0)->count();
+        $totalWaliKelas = $guruList->filter(fn ($g) => $g->waliKelas && $g->waliKelas->count() > 0)->count();
 
         $kelasList = SekolahKelas::pluck('nama')->toArray();
         if (empty($kelasList)) {
@@ -67,19 +75,19 @@ class DataGuruController extends Controller
         DB::beginTransaction();
         try {
             $guru = GuruBiodata::create([
-                'nama'                => $request->input('nama'),
-                'nip'                 => $request->input('nip'),
-                'nuptk'               => $request->input('nuptk'),
-                'nik'                 => $request->input('nik'),
-                'jenis_kelamin'       => $request->input('jenis_kelamin', 'L'),
-                'tempat_lahir'        => $request->input('tempat_lahir'),
-                'tanggal_lahir'       => $request->input('tanggal_lahir'),
+                'nama' => $request->input('nama'),
+                'nip' => $request->input('nip'),
+                'nuptk' => $request->input('nuptk'),
+                'nik' => $request->input('nik'),
+                'jenis_kelamin' => $request->input('jenis_kelamin', 'L'),
+                'tempat_lahir' => $request->input('tempat_lahir'),
+                'tanggal_lahir' => $request->input('tanggal_lahir'),
                 'pendidikan_terakhir' => $request->input('pendidikan_terakhir'),
-                'status_kepegawaian'  => $request->input('status_kepegawaian', 'PNS'),
-                'mulai_bertugas'      => $request->input('mulai_bertugas'),
-                'nomor_hp'            => $request->input('nomor_hp'),
-                'email'               => $request->input('email'),
-                'alamat'              => $request->input('alamat'),
+                'status_kepegawaian' => $request->input('status_kepegawaian', 'PNS'),
+                'mulai_bertugas' => $request->input('mulai_bertugas'),
+                'nomor_hp' => $request->input('nomor_hp'),
+                'email' => $request->input('email'),
+                'alamat' => $request->input('alamat'),
             ]);
 
             $taAktifObj = SekolahTahunAjaran::where('sedang_berjalan', 1)->first()
@@ -99,7 +107,9 @@ class DataGuruController extends Controller
             if ($request->has('is_mapel') && $request->filled('mapel_ampu') && $request->filled('kelas_ajar')) {
                 foreach ($request->input('mapel_ampu') as $mKode) {
                     $mObj = SekolahMapel::where('kode', $mKode)->first();
-                    if (!$mObj) continue;
+                    if (! $mObj) {
+                        continue;
+                    }
                     foreach ($request->input('kelas_ajar') as $kNama) {
                         $kObj = SekolahKelas::firstOrCreate(['nama' => $kNama], ['tingkat' => 'X']);
                         DB::table('guru_mengajar')->updateOrInsert(
@@ -112,20 +122,35 @@ class DataGuruController extends Controller
 
             CatatanAktivitas::create([
                 'pengguna_id' => auth()->id(),
-                'peran'       => auth()->user()->peran ?? 'admin',
-                'aksi'        => 'tambah_guru',
-                'keterangan'  => "Menambahkan guru baru: {$guru->nama} (NIP: " . ($guru->nip ?? '-') . ")",
-                'objek_tipe'  => 'guru',
-                'objek_id'    => $guru->id,
-                'alamat_ip'   => $request->ip(),
+                'peran' => auth()->user()->peran ?? 'admin',
+                'aksi' => 'tambah_guru',
+                'keterangan' => "Menambahkan guru baru: {$guru->nama} (NIP: ".($guru->nip ?? '-').')',
+                'objek_tipe' => 'guru',
+                'objek_id' => $guru->id,
+                'alamat_ip' => $request->ip(),
             ]);
 
             DB::commit();
+
             return redirect()->route('admin.data-guru')->with('success', "Data guru {$guru->nama} berhasil disimpan.");
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->withInput()->with('error', 'Gagal menyimpan data guru: ' . $e->getMessage());
+
+            return back()->withInput()->with('error', 'Gagal menyimpan data guru: '.$e->getMessage());
         }
+    }
+
+    public function edit(int $id): JsonResponse
+    {
+        $taAktifId = SekolahTahunAjaran::where('sedang_berjalan', 1)->value('id')
+            ?? SekolahTahunAjaran::latest('id')->value('id')
+            ?? 0;
+        $guru = GuruBiodata::with([
+            'waliKelas' => fn ($query) => $query->where('tahun_ajaran_id', $taAktifId)->with('kelas'),
+            'mengajar' => fn ($query) => $query->where('tahun_ajaran_id', $taAktifId)->with(['mapel', 'kelas']),
+        ])->findOrFail($id);
+
+        return response()->json($guru);
     }
 
     public function update(Request $request, int $id)
@@ -139,36 +164,38 @@ class DataGuruController extends Controller
         DB::beginTransaction();
         try {
             $guru->update([
-                'nama'                => $request->input('nama'),
-                'nip'                 => $request->input('nip'),
-                'nuptk'               => $request->input('nuptk'),
-                'nik'                 => $request->input('nik'),
-                'jenis_kelamin'       => $request->input('jenis_kelamin', 'L'),
-                'tempat_lahir'        => $request->input('tempat_lahir'),
-                'tanggal_lahir'       => $request->input('tanggal_lahir'),
+                'nama' => $request->input('nama'),
+                'nip' => $request->input('nip'),
+                'nuptk' => $request->input('nuptk'),
+                'nik' => $request->input('nik'),
+                'jenis_kelamin' => $request->input('jenis_kelamin', 'L'),
+                'tempat_lahir' => $request->input('tempat_lahir'),
+                'tanggal_lahir' => $request->input('tanggal_lahir'),
                 'pendidikan_terakhir' => $request->input('pendidikan_terakhir'),
-                'status_kepegawaian'  => $request->input('status_kepegawaian', 'PNS'),
-                'mulai_bertugas'      => $request->input('mulai_bertugas'),
-                'nomor_hp'            => $request->input('nomor_hp'),
-                'email'               => $request->input('email'),
-                'alamat'              => $request->input('alamat'),
+                'status_kepegawaian' => $request->input('status_kepegawaian', 'PNS'),
+                'mulai_bertugas' => $request->input('mulai_bertugas'),
+                'nomor_hp' => $request->input('nomor_hp'),
+                'email' => $request->input('email'),
+                'alamat' => $request->input('alamat'),
             ]);
 
             CatatanAktivitas::create([
                 'pengguna_id' => auth()->id(),
-                'peran'       => auth()->user()->peran ?? 'admin',
-                'aksi'        => 'edit_guru',
-                'keterangan'  => "Memperbarui data guru: {$guru->nama}",
-                'objek_tipe'  => 'guru',
-                'objek_id'    => $guru->id,
-                'alamat_ip'   => $request->ip(),
+                'peran' => auth()->user()->peran ?? 'admin',
+                'aksi' => 'edit_guru',
+                'keterangan' => "Memperbarui data guru: {$guru->nama}",
+                'objek_tipe' => 'guru',
+                'objek_id' => $guru->id,
+                'alamat_ip' => $request->ip(),
             ]);
 
             DB::commit();
+
             return redirect()->route('admin.data-guru')->with('success', "Data guru {$guru->nama} berhasil diperbarui.");
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->with('error', 'Gagal memperbarui guru: ' . $e->getMessage());
+
+            return back()->with('error', 'Gagal memperbarui guru: '.$e->getMessage());
         }
     }
 

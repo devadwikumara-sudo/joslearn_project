@@ -1,15 +1,16 @@
 <?php
+
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use Illuminate\View\View;
-use Illuminate\Support\Facades\DB;
-use App\Models\SiswaBiodata;
-use App\Models\SiswaRiwayatKelas;
+use App\Models\CatatanAktivitas;
+use App\Models\GuruBiodata;
 use App\Models\SekolahKelas;
 use App\Models\SekolahTahunAjaran;
-use App\Models\GuruBiodata;
-use App\Models\CatatanAktivitas;
+use App\Models\SiswaBiodata;
+use App\Models\SiswaRiwayatKelas;
+use Illuminate\Support\Facades\DB;
+use Illuminate\View\View;
 
 class DashboardAdminController extends Controller
 {
@@ -21,23 +22,30 @@ class DashboardAdminController extends Controller
         $taAktif = $taAktifObj ? $taAktifObj->nama : '2024/2025';
 
         // 2. Query Siswa Aktif pada Tahun Ajaran Ini
-        $riwayatQuery = SiswaRiwayatKelas::where('tahun_ajaran', $taAktif);
+        $riwayatQuery = SiswaRiwayatKelas::whereNull('deleted_at')
+            ->where('tahun_ajaran_id', $taAktifObj?->id ?? 0);
         $siswaAktifIds = (clone $riwayatQuery)->where('status', 'Aktif')->pluck('siswa_id')->toArray();
         $totalSiswaAktif = count($siswaAktifIds);
 
         // 3. Guru & Alumni & Sampah
         $totalGuru = GuruBiodata::count();
-        $totalAlumni = SiswaRiwayatKelas::where('status', 'Lulus')->distinct('siswa_id')->count('siswa_id');
-        $totalSampah = SiswaBiodata::onlyTrashed()->count() + GuruBiodata::onlyTrashed()->count();
+        $totalAlumni = SiswaRiwayatKelas::whereNull('deleted_at')
+            ->where('status', 'Lulus')
+            ->distinct('siswa_id')
+            ->count('siswa_id');
+        $totalSampah = DB::table('siswa_biodata')->whereNotNull('deleted_at')->count()
+            + DB::table('guru_biodata')->whereNotNull('deleted_at')->count();
 
         // 4. Gender Siswa Aktif
         $siswaAktifList = SiswaBiodata::whereIn('id', $siswaAktifIds)->get();
-        $totalLaki = $siswaAktifList->filter(function($s) {
+        $totalLaki = $siswaAktifList->filter(function ($s) {
             $jk = strtoupper(trim($s->jenis_kelamin ?? ''));
+
             return $jk === 'L' || str_starts_with($jk, 'LAKI');
         })->count();
-        $totalPerempuan = $siswaAktifList->filter(function($s) {
+        $totalPerempuan = $siswaAktifList->filter(function ($s) {
             $jk = strtoupper(trim($s->jenis_kelamin ?? ''));
+
             return $jk === 'P' || str_starts_with($jk, 'PEREMPUAN');
         })->count();
 
@@ -64,7 +72,13 @@ class DashboardAdminController extends Controller
         $missingFieldsCount = 0;
 
         // Dapatkan kelas terkini per siswa
-        $kelasMap = (clone $riwayatQuery)->where('status', 'Aktif')->pluck('kelas', 'siswa_id')->toArray();
+        $kelasMap = (clone $riwayatQuery)->where('status', 'Aktif')
+            ->with('kelas:id,nama')
+            ->get(['siswa_id', 'kelas_id'])
+            ->mapWithKeys(fn (SiswaRiwayatKelas $riwayat): array => [
+                $riwayat->siswa_id => $riwayat->kelas?->nama ?? '-',
+            ])
+            ->toArray();
 
         foreach ($siswaAktifList as $s) {
             $missing = [];
@@ -75,7 +89,7 @@ class DashboardAdminController extends Controller
                     $missingFieldsCount++;
                 }
             }
-            if (!empty($missing)) {
+            if (! empty($missing)) {
                 $perluDilengkapi[] = [
                     'id' => $s->id,
                     'nama' => $s->nama_lengkap ?? 'Tanpa Nama',
@@ -86,7 +100,7 @@ class DashboardAdminController extends Controller
         }
 
         // Urutkan yang paling banyak kurangnya
-        usort($perluDilengkapi, fn($a, $b) => count($b['missing']) <=> count($a['missing']));
+        usort($perluDilengkapi, fn ($a, $b) => count($b['missing']) <=> count($a['missing']));
         $perluDilengkapi = array_slice($perluDilengkapi, 0, 6);
 
         $persenLengkap = $totalFields > 0
@@ -94,29 +108,41 @@ class DashboardAdminController extends Controller
             : 100;
 
         // 7. Komposisi per Kelas
-        $allKelas = SekolahKelas::pluck('nama')->toArray();
+        $allKelas = SekolahKelas::orderBy('nama')->pluck('nama')->toArray();
         if (empty($allKelas)) {
-            $allKelas = (clone $riwayatQuery)->whereNotNull('kelas')->distinct()->pluck('kelas')->toArray();
+            $allKelas = (clone $riwayatQuery)->where('status', 'Aktif')
+                ->with('kelas:id,nama')
+                ->get(['kelas_id'])
+                ->pluck('kelas.nama')
+                ->filter()
+                ->unique()
+                ->values()
+                ->toArray();
         }
         sort($allKelas);
+        $kelasIds = SekolahKelas::pluck('id', 'nama')->toArray();
 
         $komposisiKelas = [];
         foreach ($allKelas as $k) {
-            $idsInK = (clone $riwayatQuery)->where('status', 'Aktif')->where('kelas', $k)->pluck('siswa_id')->toArray();
-            $countK = count($idsInK);
-            if ($countK === 0 && empty(SekolahKelas::where('nama', $k)->first())) {
+            $kelasId = $kelasIds[$k] ?? null;
+            if ($kelasId === null) {
                 continue;
             }
+
+            $idsInK = (clone $riwayatQuery)->where('status', 'Aktif')->where('kelas_id', $kelasId)->pluck('siswa_id')->toArray();
+            $countK = count($idsInK);
             $studentsInK = $siswaAktifList->whereIn('id', $idsInK);
-            $lInK = $studentsInK->filter(fn($s) => strtoupper(trim($s->jenis_kelamin ?? '')) === 'L' || str_starts_with(strtoupper(trim($s->jenis_kelamin ?? '')), 'LAKI'))->count();
-            $pInK = $studentsInK->filter(fn($s) => strtoupper(trim($s->jenis_kelamin ?? '')) === 'P' || str_starts_with(strtoupper(trim($s->jenis_kelamin ?? '')), 'PEREMPUAN'))->count();
+            $lInK = $studentsInK->filter(fn ($s) => strtoupper(trim($s->jenis_kelamin ?? '')) === 'L' || str_starts_with(strtoupper(trim($s->jenis_kelamin ?? '')), 'LAKI'))->count();
+            $pInK = $studentsInK->filter(fn ($s) => strtoupper(trim($s->jenis_kelamin ?? '')) === 'P' || str_starts_with(strtoupper(trim($s->jenis_kelamin ?? '')), 'PEREMPUAN'))->count();
 
             // Hitung kelengkapan di kelas ini
             $kMissing = 0;
             foreach ($studentsInK as $s) {
                 foreach ($requiredCols as $col => $lbl) {
                     $val = trim($s->{$col} ?? '');
-                    if ($val === '' || $val === '-') $kMissing++;
+                    if ($val === '' || $val === '-') {
+                        $kMissing++;
+                    }
                 }
             }
             $kTotal = $countK * count($requiredCols);
@@ -148,8 +174,11 @@ class DashboardAdminController extends Controller
         }
 
         // 9. Alumni per Tahun Lulus
-        $alumniPerTahun = SiswaRiwayatKelas::where('status', 'Lulus')
-            ->selectRaw('COALESCE(tahun_lulus, SUBSTRING_INDEX(tahun_ajaran, "/", -1)) as thn, COUNT(DISTINCT siswa_id) as total')
+        $alumniPerTahun = DB::table('siswa_riwayat_kelas as riwayat')
+            ->join('sekolah_tahun_ajaran as tahun', 'tahun.id', '=', 'riwayat.tahun_ajaran_id')
+            ->whereNull('riwayat.deleted_at')
+            ->where('riwayat.status', 'Lulus')
+            ->selectRaw('RIGHT(tahun.nama, 4) as thn, COUNT(DISTINCT riwayat.siswa_id) as total')
             ->groupBy('thn')
             ->orderByDesc('thn')
             ->pluck('total', 'thn')

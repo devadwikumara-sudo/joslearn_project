@@ -1,15 +1,16 @@
 <?php
+
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-use Illuminate\View\View;
-use Illuminate\Support\Facades\DB;
+use App\Models\CatatanAktivitas;
 use App\Models\SekolahKelas;
 use App\Models\SekolahTahunAjaran;
 use App\Models\SiswaBiodata;
 use App\Models\SiswaRiwayatKelas;
-use App\Models\CatatanAktivitas;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\View\View;
 
 class KenaikanKelasController extends Controller
 {
@@ -18,11 +19,12 @@ class KenaikanKelasController extends Controller
         $taAktifObj = SekolahTahunAjaran::where('sedang_berjalan', 1)->first()
             ?? SekolahTahunAjaran::latest('id')->first();
         $taAktif = $taAktifObj ? $taAktifObj->nama : '2024/2025';
+        $taAktifId = $taAktifObj?->id ?? 0;
 
         // Hitung tahun ajaran berikutnya (contoh: 2024/2025 -> 2025/2026)
         $parts = explode('/', $taAktif);
         $taBerikutnya = (count($parts) === 2 && is_numeric($parts[0]))
-            ? ((int)$parts[0] + 1) . '/' . ((int)$parts[1] + 1)
+            ? ((int) $parts[0] + 1).'/'.((int) $parts[1] + 1)
             : '2025/2026';
 
         $kelasList = SekolahKelas::pluck('nama')->toArray();
@@ -33,13 +35,18 @@ class KenaikanKelasController extends Controller
         $kelasAsal = $request->input('kelas', $kelasList[0] ?? 'X-1');
 
         // Ambil siswa aktif di kelas asal
-        $siswaList = SiswaBiodata::whereHas('riwayatKelas', function($q) use ($kelasAsal, $taAktif) {
-            $q->where('kelas', $kelasAsal)
-              ->where('tahun_ajaran', $taAktif)
-              ->where('status', 'Aktif');
-        })->with(['riwayatKelas' => function($q) use ($taAktif) {
-            $q->where('tahun_ajaran', $taAktif);
-        }])->get();
+        $kelasAsalId = SekolahKelas::where('nama', $kelasAsal)->value('id') ?? 0;
+        $siswaList = SiswaBiodata::whereNull('deleted_at')
+            ->whereHas('riwayatKelas', function ($q) use ($kelasAsalId, $taAktifId) {
+                $q->where('kelas_id', $kelasAsalId)
+                    ->where('tahun_ajaran_id', $taAktifId)
+                    ->whereNull('deleted_at')
+                    ->where('status', 'Aktif');
+            })->with(['riwayatKelas' => function ($q) use ($taAktifId) {
+                $q->where('tahun_ajaran_id', $taAktifId)
+                    ->whereNull('deleted_at')
+                    ->with('kelas');
+            }])->get();
 
         // Hitung kelas tujuan berikutnya untuk tiap kelas
         $nextKelasMap = [];
@@ -79,6 +86,8 @@ class KenaikanKelasController extends Controller
         try {
             // Pastikan tahun ajaran baru ada di database
             $taBaru = SekolahTahunAjaran::firstOrCreate(['nama' => $taBerikutnya], ['sedang_berjalan' => 0]);
+            $taAktifId = SekolahTahunAjaran::where('nama', $taAktif)->value('id') ?? 0;
+            $kelasAsalId = SekolahKelas::where('nama', $kelasAsal)->value('id');
 
             $naikCount = 0;
             $lulusCount = 0;
@@ -86,29 +95,36 @@ class KenaikanKelasController extends Controller
 
             foreach ($keputusan as $siswaId => $aksi) {
                 $siswa = SiswaBiodata::find($siswaId);
-                if (!$siswa) continue;
+                if (! $siswa) {
+                    continue;
+                }
 
                 $rkLama = SiswaRiwayatKelas::where('siswa_id', $siswaId)
-                    ->where('tahun_ajaran', $taAktif)
+                    ->where('tahun_ajaran_id', $taAktifId)
+                    ->whereNull('deleted_at')
                     ->first();
 
                 if ($aksi === 'Naik') {
                     $targetKelas = $kelasTujuan[$siswaId] ?? $kelasAsal;
+                    $targetTingkat = str_starts_with($targetKelas, 'XII-')
+                        ? 'XII'
+                        : (str_starts_with($targetKelas, 'XI-') ? 'XI' : 'X');
+                    $targetKelasObj = SekolahKelas::firstOrCreate(
+                        ['nama' => $targetKelas],
+                        ['tingkat' => $targetTingkat]
+                    );
                     if ($rkLama) {
                         $rkLama->update([
                             'keputusan_kenaikan' => 'NAIK',
-                            'kelas_tujuan_id'    => SekolahKelas::where('nama', $targetKelas)->value('id'),
+                            'kelas_tujuan_id' => $targetKelasObj->id,
                             'tanggal_keputusan_kenaikan' => now()->toDateString(),
                         ]);
                     }
 
-                    // Buat kelas baru jika belum ada
-                    SekolahKelas::firstOrCreate(['nama' => $targetKelas], ['tingkat' => str_starts_with($targetKelas, 'XII') ? 'XII' : 'XI']);
-
                     // Buat riwayat kelas di tahun baru
                     SiswaRiwayatKelas::updateOrCreate(
-                        ['siswa_id' => $siswaId, 'tahun_ajaran' => $taBerikutnya],
-                        ['kelas' => $targetKelas, 'status' => 'Aktif']
+                        ['siswa_id' => $siswaId, 'tahun_ajaran_id' => $taBaru->id],
+                        ['kelas_id' => $targetKelasObj->id, 'status' => 'Aktif']
                     );
                     $naikCount++;
 
@@ -120,23 +136,23 @@ class KenaikanKelasController extends Controller
                         ]);
                     }
                     SiswaRiwayatKelas::updateOrCreate(
-                        ['siswa_id' => $siswaId, 'tahun_ajaran' => $taBerikutnya],
-                        ['kelas' => $kelasAsal, 'status' => 'Aktif']
+                        ['siswa_id' => $siswaId, 'tahun_ajaran_id' => $taBaru->id],
+                        ['kelas_id' => $rkLama?->kelas_id ?? $kelasAsalId, 'status' => 'Aktif']
                     );
                     $naikCount++;
 
                 } elseif ($aksi === 'Lulus') {
                     if ($rkLama) {
                         $rkLama->update([
-                            'status'             => 'Lulus',
+                            'status' => 'Lulus',
                             'keputusan_kenaikan' => 'LULUS',
                             'tanggal_keputusan_kenaikan' => now()->toDateString(),
                         ]);
                     }
                     $siswa->update([
-                        'tahun_lulus'   => substr($taAktif, 5, 4) ?: now()->format('Y'),
+                        'tahun_lulus' => substr($taAktif, 5, 4) ?: now()->format('Y'),
                         'alasan_keluar' => 'Lulus',
-                        'kelas_keluar'  => $kelasAsal,
+                        'kelas_keluar' => $kelasAsal,
                     ]);
                     $lulusCount++;
 
@@ -145,8 +161,8 @@ class KenaikanKelasController extends Controller
                         $rkLama->update(['status' => 'Keluar']);
                     }
                     $siswa->update([
-                        'alasan_keluar'  => 'Keluar',
-                        'kelas_keluar'   => $kelasAsal,
+                        'alasan_keluar' => 'Keluar',
+                        'kelas_keluar' => $kelasAsal,
                         'tanggal_keluar' => now()->toDateString(),
                     ]);
                     $keluarCount++;
@@ -155,19 +171,21 @@ class KenaikanKelasController extends Controller
 
             CatatanAktivitas::create([
                 'pengguna_id' => auth()->id(),
-                'peran'       => auth()->user()->peran ?? 'admin',
-                'aksi'        => 'kenaikan_kelas',
-                'keterangan'  => "Kenaikan kelas {$kelasAsal} ({$taAktif} -> {$taBerikutnya}): {$naikCount} lanjut, {$lulusCount} lulus, {$keluarCount} keluar.",
-                'objek_tipe'  => 'kenaikan_kelas',
-                'alamat_ip'   => $request->ip(),
+                'peran' => auth()->user()->peran ?? 'admin',
+                'aksi' => 'kenaikan_kelas',
+                'keterangan' => "Kenaikan kelas {$kelasAsal} ({$taAktif} -> {$taBerikutnya}): {$naikCount} lanjut, {$lulusCount} lulus, {$keluarCount} keluar.",
+                'objek_tipe' => 'kenaikan_kelas',
+                'alamat_ip' => $request->ip(),
             ]);
 
             DB::commit();
+
             return redirect()->route('admin.kenaikan-kelas', ['kelas' => $kelasAsal])
                 ->with('success', "Proses kenaikan kelas {$kelasAsal} berhasil: {$naikCount} lanjut ke {$taBerikutnya}, {$lulusCount} lulus, {$keluarCount} keluar.");
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->with('error', 'Gagal memproses kenaikan kelas: ' . $e->getMessage());
+
+            return back()->with('error', 'Gagal memproses kenaikan kelas: '.$e->getMessage());
         }
     }
 }
