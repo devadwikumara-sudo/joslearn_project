@@ -33,7 +33,7 @@
                 </ul>
             </div>
 
-            <small>© 2026 JosLearn. Hak Cipta Dilindungi.</small>
+            <small>2026 JosLearn. Hak Cipta Dilindungi.</small>
         </div>
 
         <!-- Panel Kanan Form Login Sesuai Desain Login.png -->
@@ -49,21 +49,21 @@
 
                 @if(session('error'))
                 <div class="mban">
-                    <b>◎ Login gagal</b>
+                    <b>Login gagal</b>
                     <small>{{ session('error') }}</small>
                 </div>
                 @endif
 
                 @if(session('success'))
                 <div style="background:#e8f8f0;border:1px solid #a3e6c0;color:#1f8a5b;border-radius:10px;padding:9px 12px;font-size:12px;margin-bottom:12px">
-                    <b>✔ Berhasil</b>
+                    <b>Berhasil</b>
                     <small style="display:block;margin-top:2px">{{ session('success') }}</small>
                 </div>
                 @endif
 
                 @if(isset($errors) && $errors->any())
                 <div class="mban">
-                    <b>◎ Login gagal</b>
+                    <b>Login gagal</b>
                     <small>{{ $errors->first() }}</small>
                 </div>
                 @endif
@@ -72,13 +72,11 @@
                     @csrf
                     <label for="l_u">NIS/NIP, Email</label>
                     <div class="wf">
-                        <i>👤</i>
                         <input id="l_u" name="username" type="text" placeholder="Masukkan Nama Pengguna atau NIS/NIP" value="{{ old('username') }}" autocomplete="username" required autofocus>
                     </div>
 
                     <label for="l_p">Kata Sandi</label>
                     <div class="wf">
-                        <i>🔒</i>
                         <input id="l_p" name="password" type="password" placeholder="Masukkan kata sandi Anda" autocomplete="current-password" required>
                         <span class="eye" onclick="togglePassword('l_p')">👁</span>
                     </div>

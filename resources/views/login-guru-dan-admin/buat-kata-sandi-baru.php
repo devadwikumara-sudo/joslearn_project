@@ -29,14 +29,13 @@
         </div>
 
         <div class="wcard">
-            <span class="wic">🔒</span>
             <div class="pl">LANGKAH 3 DARI 3: AMANKAN AKUN GURU</div>
             <h2>Buat Kata Sandi Baru</h2>
             <p class="ws">Buat kata sandi baru untuk mengamankan akun Anda.</p>
 
             @if(isset($errors) && $errors->any())
             <div class="mban">
-                <b>◎ Kesalahan</b>
+                <b>Kesalahan</b>
                 <small>{{ $errors->first() }}</small>
             </div>
             @endif
@@ -45,7 +44,6 @@
                 @csrf
                 <label for="n_p">Kata Sandi Baru</label>
                 <div class="wf">
-                    <i>🔒</i>
                     <input id="n_p" name="password" type="password" placeholder="••••••••••••••••" oninput="checkStrength(this.value)" required autofocus>
                     <span class="eye" onclick="togglePassword('n_p')">👁</span>
                 </div>
@@ -65,7 +63,6 @@
 
                 <label for="n_p2" style="margin-top:16px">Konfirmasi Kata Sandi</label>
                 <div class="wf">
-                    <i>⟲</i>
                     <input id="n_p2" name="password_confirmation" type="password" placeholder="••••••••••••••••" required>
                     <span class="eye" onclick="togglePassword('n_p2')">👁</span>
                 </div>

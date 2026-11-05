@@ -29,7 +29,7 @@
 <div class="g g2">
     {{-- Kelas yang Diampu --}}
     <div class="card">
-        <h3>📚 Kelas yang Diampu</h3>
+        <h3>Kelas yang Diampu</h3>
         @forelse($kelasList ?? [] as $kls)
         <div class="row">
             <div>
@@ -45,10 +45,10 @@
 
     {{-- Tugas dan Pengingat --}}
     <div class="card">
-        <h3>🔔 Pengingat</h3>
+        <h3>Pengingat</h3>
         @if(($nilaiPending ?? 0) > 0)
         <div class="note">
-            ⚠️ Ada <b>{{ $nilaiPending }} siswa</b> yang nilainya belum diinput.
+            Ada <b>{{ $nilaiPending }} siswa</b> yang nilainya belum diinput.
             <a href="{{ route('guru.input-nilai-mapel') }}" style="color:var(--p);font-weight:700;display:block;margin-top:4px">→ Input Nilai Sekarang</a>
         </div>
         @endif
@@ -71,7 +71,7 @@
 
 {{-- Akses Cepat --}}
 <div class="card">
-    <h3>⚡ Akses Cepat</h3>
+    <h3>Akses Cepat</h3>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
         <a href="{{ route('guru.import-nilai') }}" class="btn">📊 Import Nilai</a>
         <a href="{{ route('guru.import-ekskul') }}" class="btn o">🏃 Import Ekskul</a>

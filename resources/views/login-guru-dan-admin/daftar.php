@@ -34,7 +34,7 @@
 
             @if(isset($errors) && $errors->any())
             <div class="mban">
-                <b>◎ Terjadi kesalahan</b>
+                <b>Terjadi kesalahan</b>
                 <small>{{ $errors->first() }}</small>
             </div>
             @endif
