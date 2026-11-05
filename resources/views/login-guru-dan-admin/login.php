@@ -72,13 +72,11 @@
                     @csrf
                     <label for="l_u">NIS/NIP, Email</label>
                     <div class="wf">
-                        <i>👤</i>
                         <input id="l_u" name="username" type="text" placeholder="Masukkan Nama Pengguna atau NIS/NIP" value="{{ old('username') }}" autocomplete="username" required autofocus>
                     </div>
 
                     <label for="l_p">Kata Sandi</label>
                     <div class="wf">
-                        <i>🔒</i>
                         <input id="l_p" name="password" type="password" placeholder="Masukkan kata sandi Anda" autocomplete="current-password" required>
                         <span class="eye" onclick="togglePassword('l_p')">👁</span>
                     </div>

@@ -29,7 +29,6 @@
         </div>
 
         <div class="wcard">
-            <span class="wic">🔒</span>
             <div class="pl">LANGKAH 3 DARI 3: AMANKAN AKUN GURU</div>
             <h2>Buat Kata Sandi Baru</h2>
             <p class="ws">Buat kata sandi baru untuk mengamankan akun Anda.</p>
@@ -45,7 +44,6 @@
                 @csrf
                 <label for="n_p">Kata Sandi Baru</label>
                 <div class="wf">
-                    <i>🔒</i>
                     <input id="n_p" name="password" type="password" placeholder="••••••••••••••••" oninput="checkStrength(this.value)" required autofocus>
                     <span class="eye" onclick="togglePassword('n_p')">👁</span>
                 </div>
