@@ -35,7 +35,7 @@
 
             @if(isset($errors) && $errors->any())
             <div class="mban">
-                <b>◎ Kesalahan</b>
+                <b>Kesalahan</b>
                 <small>{{ $errors->first() }}</small>
             </div>
             @endif
@@ -63,7 +63,6 @@
 
                 <label for="n_p2" style="margin-top:16px">Konfirmasi Kata Sandi</label>
                 <div class="wf">
-                    <i>⟲</i>
                     <input id="n_p2" name="password_confirmation" type="password" placeholder="••••••••••••••••" required>
                     <span class="eye" onclick="togglePassword('n_p2')">👁</span>
                 </div>
