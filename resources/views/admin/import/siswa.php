@@ -20,9 +20,7 @@
         <div>
             <label>Tahun ajaran</label>
             <input value="{{ $taAktif ?? '' }}" name="tahun_ajaran" id="tahun_ajaran" readonly>
-            @if (empty($taAktif))
-                <small class="sub">Tahun ajaran belum terdaftar; biodata dapat diimpor, tetapi riwayat kelas tidak akan dibuat.</small>
-            @endif
+            <small class="sub">Tahun ajaran dari Excel akan dipakai otomatis jika terdeteksi; jika tidak, sistem memakai tahun ajaran aktif.</small>
         </div>
         <div>
             <label>Kelas (ketik baru = dibuat otomatis)</label>

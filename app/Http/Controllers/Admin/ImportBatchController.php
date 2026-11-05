@@ -25,7 +25,8 @@ class ImportBatchController extends Controller
     public function saveBatch(Request $request)
     {
         $type       = $request->input('type', 'siswa'); // siswa, nilai, hadir, ekskul, guru
-        $taName     = trim((string) $request->input('tahun_ajaran', ''));
+        $requestedTaName = trim((string) $request->input('tahun_ajaran', ''));
+        $taName = $requestedTaName === '' ? '' : $this->normAcademicYear($requestedTaName);
         $semester   = $request->input('semester', 'Genap');
         $mode       = $request->input('mode', 'semua');
         $kelasInput = $request->input('kelas', '');
@@ -50,13 +51,20 @@ class ImportBatchController extends Controller
             ], 422);
         }
 
+        if ($requestedTaName !== '' && $taName === null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Format tahun ajaran tidak valid. Gunakan format seperti 2024/2025.',
+            ], 422);
+        }
+
         DB::beginTransaction();
         try {
             // 1. Tahun Ajaran
             if ($taName !== '') {
                 $ta = SekolahTahunAjaran::firstOrCreate(
                     ['nama' => $taName],
-                    ['sedang_berjalan' => 1]
+                    ['sedang_berjalan' => 0]
                 );
             } else {
                 $ta = SekolahTahunAjaran::where('sedang_berjalan', 1)->first()
@@ -157,6 +165,28 @@ class ImportBatchController extends Controller
         return $k;
     }
 
+    private function normAcademicYear(string $year): ?string
+    {
+        if (!preg_match('/^((?:19|20)\d{2})\s*[\/-]\s*((?:19|20)\d{2}|\d{2})$/', trim($year), $matches)) {
+            return null;
+        }
+
+        $startYear = (int) $matches[1];
+        $endYear = (int) $matches[2];
+        if (strlen($matches[2]) === 2) {
+            $endYear += intdiv($startYear, 100) * 100;
+            if ($endYear <= $startYear) {
+                $endYear += 100;
+            }
+        }
+
+        if ($endYear !== $startYear + 1) {
+            return null;
+        }
+
+        return $startYear . '/' . $endYear;
+    }
+
     private function ensureKelas($cName)
     {
         $cName = $this->normK($cName);
@@ -248,6 +278,17 @@ class ImportBatchController extends Controller
                 continue;
             }
             $rowNumber = max(1, (int) ($r['__excel_row'] ?? $rowIndex + 1));
+            $rowTa = $ta;
+            $rowTaName = null;
+            $rawRowTaName = trim((string) ($r['tahun_ajaran'] ?? ''));
+            if ($rawRowTaName !== '') {
+                $rowTaName = $this->normAcademicYear($rawRowTaName);
+                if ($rowTaName === null) {
+                    $skipped++;
+                    $errors[] = ['row' => $rowNumber, 'reason' => 'Format tahun ajaran tidak valid. Gunakan format seperti 2024/2025.'];
+                    continue;
+                }
+            }
             $nisn = $this->normN($r['nisn'] ?? '');
             $nama = $this->cleanVal($r['nama'] ?? $r['nama_lengkap'] ?? '');
             $nis = $this->cleanVal($r['nis'] ?? $r['nomor_induk'] ?? null);
@@ -312,6 +353,13 @@ class ImportBatchController extends Controller
                 $skipped++;
                 $errors[] = ['row' => $rowNumber, 'reason' => 'Nama kelas melebihi batas 30 karakter.'];
                 continue;
+            }
+
+            if ($rowTaName !== null && (!$rowTa || $rowTa->nama !== $rowTaName)) {
+                $rowTa = SekolahTahunAjaran::firstOrCreate(
+                    ['nama' => $rowTaName],
+                    ['sedang_berjalan' => 0]
+                );
             }
 
             $data = [
@@ -421,11 +469,11 @@ class ImportBatchController extends Controller
             }
 
             try {
-                DB::transaction(function () use ($data, $kStr, $ta, $r): void {
+                DB::transaction(function () use ($data, $kStr, $rowTa, $r): void {
                     $siswa = SiswaBiodata::create($data);
-                    $kelas = $ta && $kStr ? $this->ensureKelas($kStr) : null;
+                    $kelas = $rowTa && $kStr ? $this->ensureKelas($kStr) : null;
 
-                    if ($kelas && $ta) {
+                    if ($kelas && $rowTa) {
                         $statusSiswa = 'Aktif';
                         if (!empty($r['alasan_keluar']) && stripos($r['alasan_keluar'], 'Lulus') !== false) {
                             $statusSiswa = 'Lulus';
@@ -436,7 +484,7 @@ class ImportBatchController extends Controller
                         SiswaRiwayatKelas::updateOrCreate(
                             [
                                 'siswa_id'        => $siswa->id,
-                                'tahun_ajaran_id' => $ta->id,
+                                'tahun_ajaran_id' => $rowTa->id,
                             ],
                             [
                                 'kelas_id'        => $kelas->id,
@@ -460,7 +508,7 @@ class ImportBatchController extends Controller
             if ($nis !== null) {
                 $seenNis[$nis] = true;
             }
-            if (!$ta || !$kStr) {
+            if (!$rowTa || !$kStr) {
                 $unlinked++;
             }
             $saved++;

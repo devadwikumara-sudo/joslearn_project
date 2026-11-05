@@ -70,6 +70,21 @@
         return r ? t + '-' + r : t + '-1';
     };
 
+    const normAcademicYear = v => {
+        const match = /(?:^|\D)(20\d{2})\s*[/-]\s*(\d{2}|20\d{2})(?:\D|$)/.exec(String(v ?? '').trim());
+        if (!match) return '';
+        const start = Number(match[1]);
+        const end = match[2].length === 2 ? Number('20' + match[2]) : Number(match[2]);
+        return end === start + 1 ? `${start}/${end}` : '';
+    };
+
+    const yearBeforeHeader = (rows, headerIndex, sheetName = '') => {
+        const metadata = [sheetName, ...(rows || []).slice(0, headerIndex).map(row => (row || []).join(' '))].join(' ');
+        const labeledMatch = /(?:tahun\s*(?:ajaran|pelajaran)|academic\s*year|ta)\s*[:=-]?\s*((?:19|20)\d{2}\s*[/-]\s*(?:\d{2}|(?:19|20)\d{2}))/i.exec(metadata);
+        const match = labeledMatch || /((?:19|20)\d{2}\s*[/-]\s*(?:\d{2}|(?:19|20)\d{2}))/.exec(metadata);
+        return match ? normAcademicYear(match[1]) : '';
+    };
+
     const normSem = v => (/genap|2/i.test(String(v)) ? 'Genap' : /ganjil|1/i.test(String(v)) ? 'Ganjil' : '');
 
     const normN = v => {
@@ -100,7 +115,8 @@
         jk: 'jk|l p|jenis kelamin|gender|kelamin',
         tmp: 'tempat lahir|tmp lahir|kota lahir',
         tgl: 'tanggal lahir|tgl lahir|tgl lhr',
-        kelas: 'kelas|rombel|rombongan belajar|nama rombel|kls',
+        kelas: 'kelas|kelas saat ini|kelas sekarang|rombel|rombongan belajar|nama rombel|kls',
+        tahun_ajaran: 'tahun ajaran|tahunajaran|tahun pelajaran|academic year|ta',
         agama: 'agama',
         kewarganegaraan: 'kewarganegaraan|warga negara|wn',
         nik: 'nik|no nik|nomor induk kependudukan',
@@ -201,7 +217,7 @@
     const SN = Object.fromEntries(SUB);
 
     const FD = [
-        ['A',['nama','panggilan','nisn','nis','jk','tmp','tgl','agama','kewarganegaraan','nik','anak_ke','jml_saudara','yatim','bahasa','kelas']],
+        ['A',['nama','panggilan','nisn','nis','jk','tmp','tgl','agama','kewarganegaraan','nik','anak_ke','jml_saudara','yatim','bahasa','kelas','tahun_ajaran']],
         ['B',['alamat','rt_rw','kelurahan','kecamatan','kab','prov','kodepos','hp','tinggal','jarak']],
         ['C',['gol_darah','penyakit','kelainan','tinggi','berat']],
         ['D',['asal','tgl_ijazah_smp','no_ijazah_smp','lama','masuk','sekolah_pindah','alasan_pindah','kelas_masuk','rombel_masuk','tgl_masuk']],
@@ -219,7 +235,7 @@
         nik:'NIK', alamat:'Alamat Jalan', ayah:'Nama Ayah', ibu:'Nama Ibu',
         wali:'Nama Wali', hp:'Nomor HP', asal:'Sekolah Asal',
         sakit:'Sakit (hari)', izin:'Izin (hari)', alpa:'Alpa (hari)', kokur:'Kokurikuler',
-        ekskul:'Ekstrakurikuler', predikat:'Predikat', sem:'Semester'
+        ekskul:'Ekstrakurikuler', predikat:'Predikat', sem:'Semester', tahun_ajaran:'Tahun Ajaran'
     };
 
     let _am = null;
@@ -269,6 +285,8 @@
         const headerIndex = (field, fallback) => headerCounts[field] === 1
             ? headerFields.indexOf(field)
             : fallback;
+        const yearIndex = headerIndex('tahun_ajaran', -1);
+        const classIndex = headerIndex('kelas', -1);
         const nisIndex = headerIndex('nis', CI('C'));
         const nisnIndex = headerIndex('nisn', CI('F'));
         const nameIndex = headerIndex('nama', CI('D'));
@@ -300,11 +318,17 @@
             }
             o.nis = String(o.nis ?? '');
             o.nisn = normN(String(r[nisnIndex] ?? o.nisn ?? '').trim());
+            const classFromSheet = classIndex >= 0 ? normK(r[classIndex]) : '';
+            const classFromAdmission = normK((o.kelas_masuk || '') + '-' + (o.rombel_masuk || ''));
+            o.kelas = classFromSheet || classFromAdmission;
+            const rawAcademicYear = yearIndex >= 0 ? String(r[yearIndex] ?? '').trim() : '';
+            o.tahun_ajaran = rawAcademicYear
+                ? (normAcademicYear(rawAcademicYear) || rawAcademicYear)
+                : yearBeforeHeader(rows, 4, pKey);
             if (numericNik) {
                 o.__numeric_nik = true;
             }
             o.jk = /^p/i.test(String(o.jk)) ? 'P' : (/^l/i.test(String(o.jk)) ? 'L' : '');
-            o.kelas = normK((o.kelas_masuk || '') + '-' + (o.rombel_masuk || ''));
 
             // Gabungkan data dari Kontrol Induk berdasarkan NIS
             const q = km[o.nis];
@@ -314,7 +338,6 @@
                     if (typeof v === 'number' && k.startsWith('tgl')) v = iso(v);
                     o[k] = (v === '' || v == null) ? '-' : v;
                 }
-                if (q[CI('K')]) o.kelas = normK(q[CI('K')]) || o.kelas;
             }
             o.status = (o.alasan_keluar === 'Lulus') ? 'Lulus' : 'Aktif';
             if (o.tgl_keluar && o.tgl_keluar !== '-') o.thn_lulus = +String(o.tgl_keluar).slice(0, 4);
@@ -410,7 +433,8 @@
                 if (m && /^(XII|XI|X|12|11|10)/i.test(m[1].trim())) kelas = normK(m[1]);
             }
         }
-        return {name, aoa, hr, heads, map, semOf, base, t: ts[0] || 'siswa', ts, kelas};
+        const tahunAjaran = yearBeforeHeader(aoa, hr, name);
+        return {name, aoa, hr, heads, map, semOf, base, t: ts[0] || 'siswa', ts, kelas, tahunAjaran};
     }
 
     // ─── Deteksi Kolom Otomatis (assignX Sesuai Prototipe) ──────────────────────
@@ -462,6 +486,7 @@
                 ['nis', 'Nomor Induk (NIS)'],
                 ['nama', 'Nama Lengkap'],
                 ['kelas', 'Kelas'],
+                ['tahun_ajaran', 'Tahun Ajaran'],
                 ['jk', 'Jenis Kelamin (L/P)'],
                 ['tmp', 'Tempat Lahir'],
                 ['tgl', 'Tanggal Lahir (YYYY-MM-DD)'],
@@ -538,7 +563,7 @@
         const t = I.t;
         const newM = [], lm = {}, out = [];
         const sw = /^(rata|jumlah|total|ttd|mengetahui|keterangan)/i;
-        const com = ['nisn','nama','kelas','sem','nis'];
+        const com = ['nisn','nama','kelas','sem','nis','tahun_ajaran'];
 
         const newFor = h => {
             const q = nz(h);
@@ -555,6 +580,7 @@
             if (k.startsWith('tgl')||k==='tgl') return toIso(v);
             if (k==='jk') return /^p/i.test(String(v)) ? 'P' : 'L';
             if (k==='kelas') return normK(v);
+            if (k==='tahun_ajaran') return normAcademicYear(v) || String(v).trim();
             if (k==='sem') return normSem(v);
             if (['sakit','izin','alpa'].includes(k)) return /\d/.test(String(v)) ? parseInt(String(v).match(/\d+/)[0]) : 0;
             if ((k.startsWith('m:')||k==='new'||k==='nilaicol') && typeof v==='string' && /^\d+([.,]\d+)?$/.test(v.trim())) {
@@ -592,6 +618,7 @@
                 if (!o0.nisn && !o0.nama) continue;
                 if (!o0.nisn && sw.test(String(o0.nama).trim())) continue;
                 if (!o0.kelas && Z.kelas) o0.kelas = Z.kelas;
+                if (!o0.tahun_ajaran && Z.tahunAjaran) o0.tahun_ajaran = Z.tahunAjaran;
                 if (o0.nisn) o0.nisn = normN(o0.nisn);
 
                 if (t === 'siswa') {
@@ -701,6 +728,16 @@
         if (kelasEl && kelasEl.value) I.kelas = normK(kelasEl.value) || I.kelas;
     }
 
+    function syncDetectedAcademicYear(rows) {
+        const years = [...new Set((rows || []).map(row => normAcademicYear(row.tahun_ajaran || '')).filter(Boolean))];
+        if (years.length !== 1) return;
+
+        const I = S.imp;
+        I.ta = years[0];
+        const taEl = document.querySelector('input[name="tahun_ajaran"]') || document.getElementById('tahun_ajaran');
+        if (taEl) taEl.value = years[0];
+    }
+
     // ─── Render Panel Pratinjau & Pemetaan Kolom ────────────────────────────────
     function renderPreviewUI() {
         const I = S.imp;
@@ -728,6 +765,7 @@
 
         const totalRows = I.rows.length;
         const uniqueClasses = [...new Set(I.rows.map(r => normK(r.kelas || '')).filter(Boolean))];
+        const uniqueAcademicYears = [...new Set(I.rows.map(r => normAcademicYear(r.tahun_ajaran || '')).filter(Boolean))];
         const {errors, warns} = validateRows(I.rows, t);
         I.errors = errors;
         I.warns = warns;
@@ -753,6 +791,7 @@
                     <span class="bd ok">Sheet “Peserta Didik” &amp; “Kontrol Induk” terbaca 100% lengkap</span>
                     <span class="bd ok">Total: <b>${I.rows.length} siswa</b></span>
                     ${uniqueClasses.length ? `<span class="bd ok">Kelas: <b>${uniqueClasses.join(', ')}</b></span>` : ''}
+                    ${uniqueAcademicYears.length ? `<span class="bd ok">Tahun ajaran: <b>${uniqueAcademicYears.join(', ')}</b></span>` : ''}
                 </div>
             </div>`;
         } else {
@@ -768,6 +807,7 @@
                 <div class="bar" style="flex-wrap:wrap;gap:6px">
                     ${(I.raws||[]).map(z => `<span class="bd">Sheet “<b>${z.name}</b>” · baris ${z.hr+1}${z.kelas ? ' · ' + z.kelas : ''}</span>`).join('')}
                     ${uniqueClasses.length ? `<span class="bd ok">Kelas: <b>${uniqueClasses.join(', ')}</b></span>` : ''}
+                    ${uniqueAcademicYears.length ? `<span class="bd ok">Tahun ajaran: <b>${uniqueAcademicYears.join(', ')}</b></span>` : ''}
                     ${(I.newM||[]).length ? `<span class="bd w">⚠️ Mapel Baru (${I.newM.length}): <b>${I.newM.map(m=>m.nama).join(', ')}</b></span>` : ''}
                     ${(I.newX||[]).length ? `<span class="bd ok">Kolom Baru (${I.newX.length}): <b>${I.newX.map(x=>x.l).join(', ')}</b></span>` : ''}
                     ${ignoredCols > 0 ? `<span class="bd w">${ignoredCols} kolom diabaikan</span>` : ''}
@@ -837,7 +877,7 @@
         // 3. Pratinjau Tabel & Tombol Eksekusi
         const sampleRow = I.rows[0] || {};
         const allKeys = Object.keys(sampleRow);
-        const priorityKeys = ['nisn','nis','nama','kelas','jk','tgl','ayah','ibu','sakit','izin','alpa','ekskul','predikat'];
+        const priorityKeys = ['nisn','nis','nama','kelas','tahun_ajaran','jk','tgl','ayah','ibu','sakit','izin','alpa','ekskul','predikat'];
         const previewKeys = priorityKeys.filter(k => allKeys.includes(k))
             .concat(allKeys.filter(k => !priorityKeys.includes(k)))
             .slice(0, 8);
@@ -854,7 +894,6 @@
                     </div>
                 </div>
 
-                {{-- Badges per kelas --}}
                 <div class="bar" style="flex-wrap:wrap;gap:6px;margin-bottom:12px">
                     ${Object.entries(classBreakdown).map(([k, n]) => `<span class="bd ${k === '(Belum Ada Kelas)' ? 'e' : 'ok'}">${k}: <b>${n}</b> siswa</span>`).join('')}
                 </div>
@@ -953,6 +992,7 @@
                     I.mode = 'semua';
                     I.newM = [];
                     I.newX = [];
+                    syncDetectedAcademicYear(I.rows);
                     renderPreviewUI();
                     if (window.toast) window.toast(I.rows.length + ' siswa terbaca dari ' + pSheetKey + (w.Sheets['Kontrol Induk'] ? ' + Kontrol Induk' : ''));
                     return;
@@ -991,6 +1031,7 @@
 
             I.raws = use;
             I.rows = buildRows(I);
+            syncDetectedAcademicYear(I.rows);
             if (I.rows.some(q => q.kelas)) I.mode = 'semua';
 
             renderPreviewUI();
@@ -1024,8 +1065,19 @@
 
         const token = document.querySelector('meta[name="csrf-token"]');
         const csrfToken = token ? token.getAttribute('content') : '';
-        const isGuru = window.location.pathname.startsWith('/guru');
-        const endpoint = isGuru ? '/guru/import/save-batch' : '/admin/import/save-batch';
+        const endpointMeta = document.querySelector('meta[name="batch-import-url"]');
+        const endpoint = endpointMeta ? endpointMeta.getAttribute('content') : '';
+        const appBaseMeta = document.querySelector('meta[name="app-base-url"]');
+        const appBaseUrl = appBaseMeta ? appBaseMeta.getAttribute('content').replace(/\/+$/, '') : '';
+
+        if (!endpoint) {
+            alert('Alamat layanan import tidak tersedia. Muat ulang halaman lalu coba lagi.');
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = '⬇ Coba Impor Lagi';
+            }
+            return;
+        }
 
         const payload = {
             type: I.t,
@@ -1050,7 +1102,15 @@
             },
             body: JSON.stringify(payload)
         })
-        .then(res => res.json())
+        .then(async res => {
+            const contentType = res.headers.get('content-type') || '';
+            if (!contentType.includes('application/json')) {
+                await res.text();
+                throw new Error(`Server mengembalikan halaman, bukan JSON (HTTP ${res.status}). Muat ulang halaman dan pastikan sesi login masih aktif.`);
+            }
+
+            return res.json();
+        })
         .then(data => {
             if (data.success) {
                 const container = document.getElementById('josbook-import-preview-area');
@@ -1075,14 +1135,14 @@
                             ${errorSummary}
                             <div class="bar" style="margin-top:14px;gap:10px;flex-wrap:wrap">
                                 ${I.t === 'siswa' ? `
-                                    <a href="/admin/data-siswa" class="btn a" style="padding:6px 12px;font-size:12px;text-decoration:none;font-weight:600">👉 Buka Halaman Data Siswa</a>
-                                    ${targetKelas ? `<a href="/admin/data-siswa?kelas=${encodeURIComponent(targetKelas)}" class="btn" style="padding:6px 10px;font-size:12px;text-decoration:none">Lihat Kelas ${targetKelas}</a>` : ''}
+                                    <a href="${appBaseUrl}/admin/data-siswa" class="btn a" style="padding:6px 12px;font-size:12px;text-decoration:none;font-weight:600">👉 Buka Halaman Data Siswa</a>
+                                    ${targetKelas ? `<a href="${appBaseUrl}/admin/data-siswa?kelas=${encodeURIComponent(targetKelas)}" class="btn" style="padding:6px 10px;font-size:12px;text-decoration:none">Lihat Kelas ${targetKelas}</a>` : ''}
                                 ` : I.t === 'nilai' ? `
-                                    <a href="/admin/import/nilai" class="btn a" style="padding:6px 12px;font-size:12px;text-decoration:none;font-weight:600">🔄 Selesai &amp; Muat Ulang Data Nilai</a>
+                                    <a href="${appBaseUrl}/admin/import/nilai" class="btn a" style="padding:6px 12px;font-size:12px;text-decoration:none;font-weight:600">🔄 Selesai &amp; Muat Ulang Data Nilai</a>
                                 ` : I.t === 'hadir' ? `
-                                    <a href="/admin/import/kehadiran" class="btn a" style="padding:6px 12px;font-size:12px;text-decoration:none;font-weight:600">🔄 Selesai &amp; Muat Ulang Data Kehadiran</a>
+                                    <a href="${appBaseUrl}/admin/import/kehadiran" class="btn a" style="padding:6px 12px;font-size:12px;text-decoration:none;font-weight:600">🔄 Selesai &amp; Muat Ulang Data Kehadiran</a>
                                 ` : `
-                                    <a href="/admin/import/ekskul" class="btn a" style="padding:6px 12px;font-size:12px;text-decoration:none;font-weight:600">🔄 Selesai &amp; Muat Ulang Data Ekskul</a>
+                                    <a href="${appBaseUrl}/admin/import/ekskul" class="btn a" style="padding:6px 12px;font-size:12px;text-decoration:none;font-weight:600">🔄 Selesai &amp; Muat Ulang Data Ekskul</a>
                                 `}
                                 <button type="button" class="btn o" onclick="resetImportPreview()">⬆ Import File Lain</button>
                             </div>
@@ -1098,7 +1158,7 @@
             }
         })
         .catch(err => {
-            alert('Koneksi server gagal: ' + err.message);
+            alert('Impor gagal: ' + err.message);
             if (btn) {
                 btn.disabled = false;
                 btn.textContent = '⬇ Coba Impor Lagi';

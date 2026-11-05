@@ -89,6 +89,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin.only'])->grou
     // Data Siswa (data siswa.png)
     Route::get('/data-siswa', [DataSiswaController::class, 'index'])->name('data-siswa');
     Route::get('/data-siswa/export', [DataSiswaController::class, 'export'])->name('data-siswa.export');
+    Route::get('/data-siswa/pdf-semua', [DataSiswaController::class, 'pdfAll'])->name('data-siswa.pdf-all');
+    Route::post('/data-siswa/bulk-update', [DataSiswaController::class, 'bulkUpdate'])->name('data-siswa.bulk-update');
+    Route::delete('/data-siswa/bulk-delete', [DataSiswaController::class, 'bulkDestroy'])->name('data-siswa.bulk-delete');
     Route::get('/data-siswa/create', [FormPendataanController::class, 'index'])->name('data-siswa.create');
     Route::get('/data-siswa/{id}/foto', [DataSiswaController::class, 'foto'])->name('data-siswa.foto');
     Route::get('/data-siswa/{id}', [DataSiswaController::class, 'show'])->name('data-siswa.show');

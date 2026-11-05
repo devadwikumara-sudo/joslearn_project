@@ -6,7 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\SekolahKelas;
 use App\Models\SekolahTahunAjaran;
 use App\Models\SiswaBiodata;
+use App\Models\SiswaRiwayatKelas;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -20,65 +24,49 @@ class DataSiswaController extends Controller
 {
     public function index(Request $request): View
     {
-        $taAktifObj = SekolahTahunAjaran::where('sedang_berjalan', 1)->first()
-            ?? SekolahTahunAjaran::latest('id')->first();
-        $taAktif = $taAktifObj?->nama ?? '2024/2025';
-        $taAktifId = $taAktifObj?->id ?? 0;
+        $tahunAjaranList = SekolahTahunAjaran::orderBy('nama')->get(['id', 'nama']);
+        $taAktifObj = SekolahTahunAjaran::where('sedang_berjalan', 1)->first();
+        $taAktifDefaultId = $taAktifObj?->id ?? $tahunAjaranList->first()?->id;
+        $allYearsSelected = $request->input('tahun_ajaran') === '*';
+        $tahunAjaranTerpilih = $request->filled('tahun_ajaran') && ! $allYearsSelected
+            ? $tahunAjaranList->firstWhere('id', (int) $request->input('tahun_ajaran'))
+            : null;
+        $taAktifObj = $tahunAjaranTerpilih
+            ?? $taAktifObj
+            ?? $tahunAjaranList->first();
+        $taAktifId = $allYearsSelected ? null : ($taAktifObj?->id ?? 0);
+        $tahunAjaranTerpilihId = $allYearsSelected ? '*' : $taAktifObj?->id;
+        $taAktif = $allYearsSelected ? 'Semua Tahun Ajaran' : ($taAktifObj?->nama ?? '2024/2025');
 
-        $kelasSelected = $request->input('kelas', '');
+        $kelasSelected = (string) $request->input('kelas', '');
         $search = trim($request->input('q', ''));
         $statusFilter = trim($request->input('st', ''));
 
         $kelasList = SekolahKelas::orderBy('nama')->pluck('nama')->toArray();
-        sort($kelasList);
-        $kelasIds = SekolahKelas::pluck('id', 'nama')->toArray();
+        sort($kelasList, SORT_NATURAL);
 
         $kelasCounts = array_fill_keys($kelasList, 0);
-        $countsByClass = DB::table('siswa_riwayat_kelas as riwayat')
+        $countsQuery = DB::table('siswa_riwayat_kelas as riwayat')
             ->join('sekolah_kelas as kelas', 'kelas.id', '=', 'riwayat.kelas_id')
-            ->where('riwayat.tahun_ajaran_id', $taAktifId)
             ->whereNull('riwayat.deleted_at')
             ->where('riwayat.status', 'Aktif')
             ->select('kelas.nama')
-            ->selectRaw('COUNT(*) as total')
-            ->groupBy('kelas.id', 'kelas.nama')
-            ->pluck('total', 'kelas.nama');
+            ->selectRaw('COUNT(DISTINCT riwayat.siswa_id) as total')
+            ->groupBy('kelas.id', 'kelas.nama');
+        if ($taAktifId !== null) {
+            $countsQuery->where('riwayat.tahun_ajaran_id', $taAktifId);
+        }
+        $countsByClass = $countsQuery->pluck('total', 'kelas.nama');
         foreach ($countsByClass as $className => $count) {
             $kelasCounts[$className] = $count;
         }
 
         $siswaList = null;
         if ($kelasSelected !== '' || $search !== '' || $statusFilter !== '' || $kelasList === []) {
-            $query = SiswaBiodata::query();
-
-            if ($kelasSelected !== '' && $kelasSelected !== '*') {
-                $query->whereHas('riwayatKelas', function ($q) use ($kelasSelected, $taAktifId, $kelasIds) {
-                    $q->where('tahun_ajaran_id', $taAktifId)
-                        ->whereNull('deleted_at')
-                        ->where('kelas_id', $kelasIds[$kelasSelected] ?? 0);
-                });
-            }
-
-            if ($statusFilter !== '') {
-                $query->whereHas('riwayatKelas', function ($q) use ($statusFilter, $taAktifId) {
-                    $q->where('tahun_ajaran_id', $taAktifId)
-                        ->whereNull('deleted_at')
-                        ->where('status', $statusFilter);
-                });
-            }
-
-            if ($search !== '') {
-                $query->where(function ($q) use ($search) {
-                    $q->where('nama_lengkap', 'like', "%{$search}%")
-                        ->orWhere('nisn', 'like', "%{$search}%")
-                        ->orWhere('nomor_induk', 'like', "%{$search}%");
-                });
-            }
-
-            $siswaList = $query->with(['riwayatKelas' => function ($q) use ($taAktifId) {
-                $q->where('tahun_ajaran_id', $taAktifId)
-                    ->whereNull('deleted_at')
-                    ->with('kelas');
+            $query = $this->studentScopeQuery($taAktifId, $kelasSelected, $statusFilter, $search);
+            $siswaList = $query->with(['riwayatKelas' => function (Relation $historyQuery) use ($taAktifId, $kelasSelected, $statusFilter): void {
+                $this->applyHistoryFilters($historyQuery, $taAktifId, $kelasSelected, $statusFilter);
+                $historyQuery->with('kelas')->orderByDesc('tahun_ajaran_id');
             }])
                 ->latest('id')
                 ->paginate(25)
@@ -87,12 +75,15 @@ class DataSiswaController extends Controller
 
         return view('admin.data-siswa', compact(
             'taAktif',
+            'tahunAjaranList',
+            'tahunAjaranTerpilihId',
             'kelasList',
             'kelasCounts',
             'kelasSelected',
             'search',
             'statusFilter',
-            'siswaList'
+            'siswaList',
+            'taAktifDefaultId'
         ));
     }
 
@@ -123,14 +114,14 @@ class DataSiswaController extends Controller
         ));
     }
 
-    public function export(): StreamedResponse
+    public function export(Request $request): StreamedResponse
     {
-        $taAktifId = SekolahTahunAjaran::where('sedang_berjalan', 1)->value('id')
-            ?? SekolahTahunAjaran::latest('id')->value('id')
-            ?? 0;
+        $taAktifId = $this->selectedAcademicYearId($request);
         $siswaList = SiswaBiodata::with(['riwayatKelas' => function ($query) use ($taAktifId) {
-            $query->where('tahun_ajaran_id', $taAktifId)
-                ->with('kelas');
+            if ($taAktifId !== null) {
+                $query->where('tahun_ajaran_id', $taAktifId);
+            }
+            $query->with('kelas')->orderByDesc('tahun_ajaran_id');
         }])->orderBy('nama_lengkap')->get();
 
         return response()->streamDownload(function () use ($siswaList): void {
@@ -163,19 +154,46 @@ class DataSiswaController extends Controller
         ]);
     }
 
-    public function pdf(int $id): Response
+    public function pdf(Request $request, int $id): Response
     {
-        $taAktifId = SekolahTahunAjaran::where('sedang_berjalan', 1)->value('id')
-            ?? SekolahTahunAjaran::latest('id')->value('id')
-            ?? 0;
+        $taAktifId = $this->selectedAcademicYearId($request);
         $siswa = SiswaBiodata::with(['riwayatKelas' => function ($query) use ($taAktifId) {
-            $query->where('tahun_ajaran_id', $taAktifId)
-                ->with(['kelas', 'tahunAjaran']);
+            if ($taAktifId !== null) {
+                $query->where('tahun_ajaran_id', $taAktifId);
+            }
+            $query->with(['kelas', 'tahunAjaran'])->orderByDesc('tahun_ajaran_id');
         }])->findOrFail($id);
 
         return Pdf::loadView('admin.siswa-pdf', compact('siswa'))
             ->setPaper('a4')
             ->stream('biodata-siswa-'.$siswa->nisn.'.pdf');
+    }
+
+    public function pdfAll(Request $request): Response
+    {
+        $taId = $this->selectedAcademicYearId($request);
+        $kelasSelected = (string) $request->input('kelas', '');
+        $statusFilter = (string) $request->input('st', '');
+        $search = trim((string) $request->input('q', ''));
+
+        $siswaList = $this->studentScopeQuery($taId, $kelasSelected, $statusFilter, $search)
+            ->with(['riwayatKelas' => function (Relation $historyQuery) use ($taId, $kelasSelected, $statusFilter): void {
+                $this->applyHistoryFilters($historyQuery, $taId, $kelasSelected, $statusFilter);
+                $historyQuery->with(['kelas', 'tahunAjaran'])->orderByDesc('tahun_ajaran_id');
+            }])
+            ->orderBy('nama_lengkap')
+            ->get();
+
+        $tahunAjaranLabel = $taId === null
+            ? 'Semua Tahun Ajaran'
+            : (SekolahTahunAjaran::find($taId)?->nama ?? '-');
+        $kelasLabel = $kelasSelected !== '' && $kelasSelected !== '*'
+            ? $kelasSelected
+            : 'Semua Kelas';
+
+        return Pdf::loadView('admin.siswa-daftar-pdf', compact('siswaList', 'tahunAjaranLabel', 'kelasLabel'))
+            ->setPaper('a4', 'landscape')
+            ->stream('daftar-siswa-'.now()->format('Ymd-His').'.pdf');
     }
 
     public function foto(int $id): BinaryFileResponse
@@ -229,6 +247,170 @@ class DataSiswaController extends Controller
         }])->findOrFail($id);
 
         return view('admin.siswa-detail', compact('siswa'));
+    }
+
+    private function studentScopeQuery(?int $tahunAjaranId, string $kelas, string $status, string $search): Builder
+    {
+        $query = SiswaBiodata::query();
+        if ($tahunAjaranId !== null || ($kelas !== '' && $kelas !== '*') || $status !== '') {
+            $query->whereHas('riwayatKelas', function (Builder $historyQuery) use ($tahunAjaranId, $kelas, $status): void {
+                $this->applyHistoryFilters($historyQuery, $tahunAjaranId, $kelas, $status);
+            });
+        }
+
+        if ($search !== '') {
+            $query->where(function (Builder $searchQuery) use ($search): void {
+                $searchQuery->where('nama_lengkap', 'like', "%{$search}%")
+                    ->orWhere('nisn', 'like', "%{$search}%")
+                    ->orWhere('nomor_induk', 'like', "%{$search}%");
+            });
+        }
+
+        return $query;
+    }
+
+    private function applyHistoryFilters(Builder|Relation $query, ?int $tahunAjaranId, string $kelas, string $status): void
+    {
+        if ($tahunAjaranId !== null) {
+            $query->where('tahun_ajaran_id', $tahunAjaranId);
+        }
+
+        if ($kelas !== '' && $kelas !== '*') {
+            $query->whereHas('kelas', fn (Builder $kelasQuery) => $kelasQuery->where('nama', $kelas));
+        }
+
+        if ($status !== '') {
+            $query->where('status', $status);
+        }
+    }
+
+    public function bulkUpdate(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'tahun_ajaran' => ['required', 'integer', 'exists:sekolah_tahun_ajaran,id'],
+            'kelas' => ['nullable', 'string', 'max:64'],
+            'st' => ['nullable', 'in:Aktif,Pindah keluar,Keluar,Lulus'],
+            'q' => ['nullable', 'string', 'max:150'],
+            'target_tahun_ajaran' => ['required', 'integer', 'exists:sekolah_tahun_ajaran,id'],
+            'target_kelas' => ['required', 'string', 'exists:sekolah_kelas,nama'],
+            'target_status' => ['nullable', 'in:Aktif,Pindah keluar,Keluar,Lulus'],
+        ]);
+
+        $sourceYearId = (int) $validated['tahun_ajaran'];
+        $sourceClass = $validated['kelas'] ?? '';
+        if ($sourceClass !== '' && $sourceClass !== '*' && ! SekolahKelas::where('nama', $sourceClass)->exists()) {
+            return back()->with('error', 'Filter kelas tidak valid.');
+        }
+        $sourceStatus = $validated['st'] ?? '';
+        $search = trim($validated['q'] ?? '');
+        $targetYearId = (int) $validated['target_tahun_ajaran'];
+        $targetClassId = (int) SekolahKelas::where('nama', $validated['target_kelas'])->value('id');
+        $targetStatus = $validated['target_status'] ?? null;
+
+        $students = $this->studentScopeQuery($sourceYearId, $sourceClass, $sourceStatus, $search)
+            ->with(['riwayatKelas' => function (Relation $historyQuery) use ($sourceYearId, $sourceClass, $sourceStatus): void {
+                $this->applyHistoryFilters($historyQuery, $sourceYearId, $sourceClass, $sourceStatus);
+            }])
+            ->get();
+
+        if ($students->isEmpty()) {
+            return back()->with('error', 'Tidak ada siswa yang cocok dengan filter untuk diedit.');
+        }
+
+        DB::transaction(function () use ($students, $targetYearId, $targetClassId, $targetStatus): void {
+            foreach ($students as $student) {
+                $sourceHistory = $student->riwayatKelas->first();
+                if (! $sourceHistory) {
+                    continue;
+                }
+
+                SiswaRiwayatKelas::updateOrCreate(
+                    [
+                        'siswa_id' => $student->id,
+                        'tahun_ajaran_id' => $targetYearId,
+                    ],
+                    [
+                        'kelas_id' => $targetClassId,
+                        'status' => $targetStatus ?? $sourceHistory->status,
+                    ]
+                );
+            }
+        });
+
+        $targetYear = SekolahTahunAjaran::findOrFail($targetYearId);
+
+        return back()->with(
+            'success',
+            "{$students->count()} siswa berhasil diperbarui ke kelas {$validated['target_kelas']} tahun ajaran {$targetYear->nama}."
+        );
+    }
+
+    public function bulkDestroy(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'tahun_ajaran' => ['required', 'string'],
+            'kelas' => ['nullable', 'string', 'max:64'],
+            'st' => ['nullable', 'in:Aktif,Pindah keluar,Keluar,Lulus'],
+            'q' => ['nullable', 'string', 'max:150'],
+            'konfirmasi' => ['required', 'in:hapus'],
+        ]);
+
+        $selectedYear = $validated['tahun_ajaran'];
+        $yearId = null;
+        if ($selectedYear !== '*') {
+            if (! ctype_digit($selectedYear) || ! SekolahTahunAjaran::whereKey((int) $selectedYear)->exists()) {
+                return back()->with('error', 'Filter tahun ajaran tidak valid.');
+            }
+            $yearId = (int) $selectedYear;
+        }
+
+        $selectedClass = $validated['kelas'] ?? '';
+        if ($selectedClass !== '' && $selectedClass !== '*' && ! SekolahKelas::where('nama', $selectedClass)->exists()) {
+            return back()->with('error', 'Filter kelas tidak valid.');
+        }
+        if ($yearId === null && ($selectedClass === '' || $selectedClass === '*')) {
+            return back()->with('error', 'Pilih tahun ajaran tertentu atau kelas tertentu agar penghapusan massal memiliki batas yang jelas.');
+        }
+
+        $query = $this->studentScopeQuery(
+            $yearId,
+            $selectedClass,
+            $validated['st'] ?? '',
+            trim($validated['q'] ?? '')
+        );
+        $deletedCount = 0;
+        DB::transaction(function () use ($query, &$deletedCount): void {
+            $query->orderBy('id')->chunkById(200, function ($students) use (&$deletedCount): void {
+                foreach ($students as $student) {
+                    $student->delete();
+                    $deletedCount++;
+                }
+            });
+        });
+
+        if ($deletedCount === 0) {
+            return back()->with('error', 'Tidak ada siswa yang cocok dengan filter untuk dihapus.');
+        }
+
+        return back()->with('success', "{$deletedCount} data siswa berhasil dipindahkan ke Tempat Sampah.");
+    }
+
+    private function selectedAcademicYearId(Request $request): ?int
+    {
+        $selectedId = $request->input('tahun_ajaran');
+        if ($selectedId === '*') {
+            return null;
+        }
+
+        if (is_numeric($selectedId) && SekolahTahunAjaran::whereKey($selectedId)->exists()) {
+            return (int) $selectedId;
+        }
+
+        return (int) (
+            SekolahTahunAjaran::where('sedang_berjalan', 1)->value('id')
+            ?? SekolahTahunAjaran::orderBy('nama')->value('id')
+            ?? 0
+        );
     }
 
     public function destroy(int $id)
