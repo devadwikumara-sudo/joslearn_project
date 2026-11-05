@@ -59,5 +59,10 @@ class DatabaseSeeder extends Seeder
             'created_at'          => now(),
             'updated_at'          => now(),
         ]);
+        
+         // biodata siswa
+        $this->call([
+             SiswaBiodataSeeder::class,
+        ]);
     }
 }
