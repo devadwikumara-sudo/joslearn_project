@@ -4,6 +4,10 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    @if(Auth::check())
+        <meta name="batch-import-url" content="{{ Auth::user()->peran === 'guru' ? route('guru.import.save-batch') : route('admin.import.save-batch') }}">
+    @endif
+    <meta name="app-base-url" content="{{ url('/') }}">
     <title>@yield('title', 'JosBook — Portal Akademik')</title>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">

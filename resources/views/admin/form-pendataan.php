@@ -3,13 +3,17 @@
 @section('title', ($edit ? 'Edit Data Siswa' : 'Form Pendataan · Siswa Baru') . ' — JosBook Admin')
 
 @section('content')
+@php
+    $tahunAjaranForm = old('tahun_ajaran', $tahunAjaranTerpilih);
+    $riwayatTerpilih = $edit?->riwayatKelas->firstWhere('tahunAjaran.nama', $tahunAjaranForm);
+@endphp
 <h2>Form Pendataan · Siswa {{ $edit ? 'Edit' : 'Baru' }}</h2>
 @if($errors->any())
     <div class="note err" role="alert" style="margin-bottom:14px">{{ $errors->first() }}</div>
 @endif
-@if(!$taAktif)
+@if(count($tahunAjaranList) === 0)
     <div class="note err" role="alert" style="margin-bottom:14px">
-        Tahun ajaran aktif belum diatur. Data belum dapat disimpan sampai tahun ajaran aktif tersedia.
+        Pilihan tahun ajaran belum tersedia. Jalankan pembaruan data master sebelum menyimpan siswa.
     </div>
 @endif
 <p class="sub">
@@ -133,10 +137,18 @@
                     <input type="text" name="bahasa_sehari_hari" value="{{ old('bahasa_sehari_hari', $edit->bahasa_sehari_hari ?? 'Indonesia') }}">
                 </div>
                 <div>
+                    <label>Tahun Ajaran *</label>
+                    <select name="tahun_ajaran" required>
+                        @foreach($tahunAjaranList as $tahunAjaran)
+                            <option value="{{ $tahunAjaran }}" {{ $tahunAjaranForm === $tahunAjaran ? 'selected' : '' }}>{{ $tahunAjaran }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
                     <label>Kelas Saat Ini *</label>
                     <select name="kelas" required>
                         @foreach($kelasList as $k)
-                            <option value="{{ $k }}" {{ old('kelas', ($edit && $edit->riwayatKelas->first()) ? $edit->riwayatKelas->first()->kelas?->nama : '') == $k ? 'selected' : '' }}>{{ $k }}</option>
+                            <option value="{{ $k }}" {{ old('kelas', $riwayatTerpilih?->kelas?->nama ?? '') == $k ? 'selected' : '' }}>{{ $k }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -144,7 +156,7 @@
                     <label>Status Siswa</label>
                     <select name="status">
                         @foreach(['Aktif', 'Pindah keluar', 'Keluar', 'Lulus'] as $st)
-                            <option value="{{ $st }}" {{ old('status', ($edit && $edit->riwayatKelas->first()) ? $edit->riwayatKelas->first()->status : 'Aktif') == $st ? 'selected' : '' }}>{{ $st }}</option>
+                            <option value="{{ $st }}" {{ old('status', $riwayatTerpilih?->status ?? 'Aktif') == $st ? 'selected' : '' }}>{{ $st }}</option>
                         @endforeach
                     </select>
                 </div>

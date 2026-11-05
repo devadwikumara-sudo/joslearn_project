@@ -97,62 +97,67 @@ class FormPendataanController extends Controller
 
     public function index(): View
     {
-        $taAktif = SekolahTahunAjaran::where('sedang_berjalan', 1)->value('nama');
-
-        $kelasList = SekolahKelas::pluck('nama')->toArray();
-        if (empty($kelasList)) {
-            $kelasList = ['X-1', 'X-2', 'XI-1', 'XI-2', 'XII-1', 'XII-2'];
-        }
+        $tahunAjaranList = $this->academicYearOptions();
+        $kelasList = SekolahKelas::orderBy('nama')->pluck('nama')->all();
+        sort($kelasList, SORT_NATURAL);
+        $tahunAjaranTerpilih = SekolahTahunAjaran::where('sedang_berjalan', 1)->value('nama')
+            ?? $tahunAjaranList[0]
+            ?? null;
 
         return view('admin.form-pendataan', [
             'edit'      => null,
-            'taAktif'   => $taAktif,
             'kelasList' => $kelasList,
+            'tahunAjaranList' => $tahunAjaranList,
+            'tahunAjaranTerpilih' => $tahunAjaranTerpilih,
         ]);
     }
 
     public function edit(int $id): View
     {
-        $taAktifObj = SekolahTahunAjaran::where('sedang_berjalan', 1)->first();
-
-        $kelasList = SekolahKelas::pluck('nama')->toArray();
-        if (empty($kelasList)) {
-            $kelasList = ['X-1', 'X-2', 'XI-1', 'XI-2', 'XII-1', 'XII-2'];
-        }
-
-        $siswa = SiswaBiodata::with(['riwayatKelas' => function ($query) use ($taAktifObj) {
-            $query->where('tahun_ajaran_id', $taAktifObj?->id ?? 0)
-                ->with(['kelas', 'tahunAjaran']);
+        $tahunAjaranList = $this->academicYearOptions();
+        $kelasList = SekolahKelas::orderBy('nama')->pluck('nama')->all();
+        sort($kelasList, SORT_NATURAL);
+        $siswa = SiswaBiodata::with(['riwayatKelas' => function ($query) {
+            $query->with(['kelas', 'tahunAjaran'])->orderByDesc('tahun_ajaran_id');
         }])->findOrFail($id);
+        $tahunAjaranAktif = SekolahTahunAjaran::where('sedang_berjalan', 1)->first();
+        $tahunAjaranTerpilih = $siswa->riwayatKelas
+            ->firstWhere('tahun_ajaran_id', $tahunAjaranAktif?->id)
+            ?->tahunAjaran?->nama
+            ?? $siswa->riwayatKelas->first()?->tahunAjaran?->nama
+            ?? $tahunAjaranAktif?->nama
+            ?? $tahunAjaranList[0]
+            ?? null;
 
         return view('admin.form-pendataan', [
             'edit'      => $siswa,
-            'taAktif'   => $taAktifObj?->nama,
             'kelasList' => $kelasList,
+            'tahunAjaranList' => $tahunAjaranList,
+            'tahunAjaranTerpilih' => $tahunAjaranTerpilih,
         ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate($this->validationRules());
-        $taAktif = SekolahTahunAjaran::where('sedang_berjalan', 1)->first();
-        if (! $taAktif) {
-            return back()->withInput()->with('error', 'Tahun ajaran aktif belum diatur. Atur tahun ajaran yang sedang berjalan sebelum menyimpan siswa.');
-        }
+        $tahunAjaran = SekolahTahunAjaran::firstOrCreate(
+            ['nama' => $data['tahun_ajaran']],
+            ['sedang_berjalan' => false]
+        );
+        $kelas = SekolahKelas::where('nama', $data['kelas'])->firstOrFail();
 
-        unset($data['kelas'], $data['status'], $data['foto_file']);
+        unset($data['kelas'], $data['status'], $data['tahun_ajaran'], $data['foto_file']);
         $this->normalizeDocumentFlags($request, $data);
         $fotoPath = null;
 
         try {
-            $siswa = DB::transaction(function () use ($request, $data, $taAktif, &$fotoPath): SiswaBiodata {
+            $siswa = DB::transaction(function () use ($request, $data, $tahunAjaran, $kelas, &$fotoPath): SiswaBiodata {
                 $this->storePhoto($request, $data, $fotoPath);
                 $siswa = SiswaBiodata::create($data);
-                $kelas = $this->findOrCreateClass($request->input('kelas'));
 
                 SiswaRiwayatKelas::create([
                     'siswa_id' => $siswa->id,
-                    'tahun_ajaran_id' => $taAktif->id,
+                    'tahun_ajaran_id' => $tahunAjaran->id,
                     'kelas_id' => $kelas->id,
                     'status' => $request->input('status') ?: 'Aktif',
                 ]);
@@ -183,7 +188,10 @@ class FormPendataanController extends Controller
         }
 
         return redirect()
-            ->route('admin.data-siswa', ['kelas' => $request->input('kelas')])
+            ->route('admin.data-siswa', [
+                'kelas' => $kelas->nama,
+                'tahun_ajaran' => $tahunAjaran->id,
+            ])
             ->with('success', 'Data siswa berhasil disimpan.');
     }
 
@@ -191,23 +199,23 @@ class FormPendataanController extends Controller
     {
         $siswa = SiswaBiodata::findOrFail($id);
         $data = $request->validate($this->validationRules($siswa->id));
-        $taAktif = SekolahTahunAjaran::where('sedang_berjalan', 1)->first();
-        if (! $taAktif) {
-            return back()->withInput()->with('error', 'Tahun ajaran aktif belum diatur. Perubahan tidak disimpan agar kelas siswa tidak tercatat pada tahun ajaran yang salah.');
-        }
+        $tahunAjaran = SekolahTahunAjaran::firstOrCreate(
+            ['nama' => $data['tahun_ajaran']],
+            ['sedang_berjalan' => false]
+        );
+        $kelas = SekolahKelas::where('nama', $data['kelas'])->firstOrFail();
 
-        unset($data['kelas'], $data['status'], $data['foto_file']);
+        unset($data['kelas'], $data['status'], $data['tahun_ajaran'], $data['foto_file']);
         $this->normalizeDocumentFlags($request, $data);
         $fotoPath = null;
 
         try {
-            DB::transaction(function () use ($request, $data, $siswa, $taAktif, &$fotoPath): void {
+            DB::transaction(function () use ($request, $data, $siswa, $tahunAjaran, $kelas, &$fotoPath): void {
                 $this->storePhoto($request, $data, $fotoPath);
                 $siswa->update($data);
-                $kelas = $this->findOrCreateClass($request->input('kelas'));
                 $riwayat = SiswaRiwayatKelas::withTrashed()->firstOrNew([
                     'siswa_id' => $siswa->id,
-                    'tahun_ajaran_id' => $taAktif->id,
+                    'tahun_ajaran_id' => $tahunAjaran->id,
                 ]);
                 $riwayat->kelas_id = $kelas->id;
                 $riwayat->status = $request->input('status') ?: ($riwayat->status ?? 'Aktif');
@@ -238,7 +246,12 @@ class FormPendataanController extends Controller
             return back()->withInput()->with('error', 'Gagal memperbarui data siswa. Periksa log aplikasi atau hubungi administrator.');
         }
 
-        return redirect()->route('admin.data-siswa')->with('success', 'Perubahan biodata siswa berhasil disimpan.');
+        return redirect()
+            ->route('admin.data-siswa', [
+                'kelas' => $kelas->nama,
+                'tahun_ajaran' => $tahunAjaran->id,
+            ])
+            ->with('success', 'Perubahan biodata siswa berhasil disimpan.');
     }
 
     /**
@@ -267,7 +280,8 @@ class FormPendataanController extends Controller
             'berat_badan_kg' => 'nullable|integer|between:0,65535',
             'tahun_lulus' => 'nullable|digits:4',
             'catatan' => 'nullable|string|max:16000',
-            'kelas' => 'required|string|max:30',
+            'kelas' => ['required', 'string', Rule::exists('sekolah_kelas', 'nama')],
+            'tahun_ajaran' => ['required', 'string', Rule::in($this->academicYearOptions())],
             'status' => ['nullable', Rule::in(['Aktif', 'Pindah keluar', 'Keluar', 'Lulus'])],
             'foto_file' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
             'kk_ada' => 'nullable|boolean',
@@ -281,6 +295,23 @@ class FormPendataanController extends Controller
         }
 
         return $rules;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function academicYearOptions(): array
+    {
+        $years = [];
+        for ($year = 2024; $year <= 2049; $year++) {
+            $years[] = $year.'/'.($year + 1);
+        }
+
+        $years = array_merge($years, SekolahTahunAjaran::orderBy('nama')->pluck('nama')->all());
+        $years = array_values(array_unique($years));
+        sort($years, SORT_NATURAL);
+
+        return $years;
     }
 
     /**
@@ -311,18 +342,5 @@ class FormPendataanController extends Controller
 
         $data['foto'] = $fotoPath;
         $data['foto_ada'] = true;
-    }
-
-    private function findOrCreateClass(string $kelasNama): SekolahKelas
-    {
-        $kelasUpper = strtoupper($kelasNama);
-        $tingkat = str_starts_with($kelasUpper, 'XII')
-            ? 'XII'
-            : (str_starts_with($kelasUpper, 'XI') ? 'XI' : 'X');
-
-        return SekolahKelas::firstOrCreate(
-            ['nama' => $kelasNama],
-            ['tingkat' => $tingkat]
-        );
     }
 }
