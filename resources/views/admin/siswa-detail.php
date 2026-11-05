@@ -10,6 +10,7 @@
     </div>
     <span class="sp"></span>
     <a href="{{ route('admin.data-siswa') }}" class="btn o">Kembali</a>
+    <a href="{{ route('admin.data-siswa.pdf', $siswa->id) }}" target="_blank" class="btn" style="background:var(--p);color:#fff">⬇ Cetak PDF</a>
     <a href="{{ route('admin.form-pendataan.edit', $siswa->id) }}" class="btn a">Edit biodata</a>
 </div>
 

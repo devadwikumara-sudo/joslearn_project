@@ -72,9 +72,9 @@
             <span class="bd ok">{{ $kelasSelected }}</span>
         @endif
         <span class="sp"></span>
-        <button class="btn o" onclick="window.print()">⬇ PDF terpilih</button>
-        <button class="btn o" onclick="window.print()">⬇ PDF semua tampil</button>
-        <button class="btn o" onclick="toast('Fitur pindah kelas terpilih')">⇄ Pindah kelas</button>
+        <button type="button" class="btn o" onclick="cetakPdfTerpilih()">⬇ PDF terpilih</button>
+        <button type="button" class="btn o" onclick="cetakPdfSemua()">⬇ PDF semua tampil</button>
+        <button type="button" class="btn o" onclick="toast('Fitur pindah kelas terpilih')">⇄ Pindah kelas</button>
     </div>
 
     <div class="tw">
@@ -117,7 +117,7 @@
                     <td><span class="bd {{ $badgeClass }}">{{ $statusNama }}</span></td>
                     <td style="white-space:nowrap">
                         <a href="{{ route('admin.data-siswa.show', $s->id) }}" class="btn o" style="padding:3px 8px;font-size:12px">Lihat</a>
-                        <a href="{{ route('admin.data-siswa.pdf', $s->id) }}" class="btn a" style="padding:3px 8px;font-size:12px">⬇ PDF</a>
+                        <a href="{{ route('admin.data-siswa.pdf', $s->id) }}" target="_blank" class="btn a" style="padding:3px 8px;font-size:12px">⬇ PDF</a>
                         <a href="{{ route('admin.form-pendataan.edit', $s->id) }}" class="btn o" style="padding:3px 8px;font-size:12px">Edit</a>
                         <form action="{{ route('admin.data-siswa.destroy', $s->id) }}" method="POST" style="display:inline" onsubmit="return confirm('Pindahkan data {{ $s->nama_lengkap }} ke tempat sampah?')">
                             @csrf
@@ -153,6 +153,24 @@ document.getElementById('check-all')?.addEventListener('change', function() {
         c.checked = checked;
     });
 });
+
+function cetakPdfTerpilih() {
+    var checked = Array.from(document.querySelectorAll('.check-item:checked')).map(function(c) {
+        return c.value;
+    });
+    if (checked.length === 0) {
+        alert('Pilih minimal satu siswa untuk dicetak PDF.');
+        return;
+    }
+    var url = '{{ route("admin.data-siswa.pdf-batch") }}?ids=' + checked.join(',');
+    window.open(url, '_blank');
+}
+
+function cetakPdfSemua() {
+    var kelas = '{{ $kelasSelected ?: "*" }}';
+    var url = '{{ route("admin.data-siswa.pdf-batch") }}?kelas=' + encodeURIComponent(kelas);
+    window.open(url, '_blank');
+}
 </script>
 @endpush
 @endsection
