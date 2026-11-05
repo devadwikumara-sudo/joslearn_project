@@ -1,44 +1,50 @@
-# Migration Laravel untuk skema JosLearn
+# Menyiapkan database JosLearn
 
-Paket ini mengubah `database.sql` acuan menjadi satu migration Laravel yang membuat 30 tabel dan 6 trigger, serta seeder untuk role dan settings awal.
+Skema database aplikasi dikelola dengan migration Laravel di `database/migrations`. Setiap anggota tim menjalankan migration pada database lokalnya sendiri; `git pull` membagikan perubahan skema, bukan isi database lokal.
 
-## Penting sebelum dipasang
+Migration skema membuat 30 tabel dan membutuhkan MySQL 8.0 atau lebih baru. Migration lain membuat tabel sesi serta data referensi kelas dan tahun ajaran. Jangan mengimpor dump SQL untuk tabel yang sama sebelum menjalankan migration.
 
-1. Pastikan database MySQL `joslearn_project` sudah dibuat dan `.env` menunjuk ke database tersebut.
-2. Cadangkan database jika sudah berisi data.
-3. Migration ini membuat tabel `users`, `password_reset_tokens`, `sessions`, dan `personal_access_tokens` sendiri sesuai skema SQL.
-4. Sebelum menjalankan migration, periksa `database/migrations` proyek Laravel. Nonaktifkan/hapus migration bawaan yang juga membuat tabel-tabel tersebut agar tidak terjadi `Table already exists`. Biasanya migration `create_users_table` bawaan membuat `users`, `password_reset_tokens`, dan `sessions`. Jika `php artisan install:api` sudah dijalankan, periksa juga migration `personal_access_tokens`. Jangan menghapus migration `cache` atau `jobs` karena tidak bentrok dengan skema ini.
-5. Jangan import `database.sql` ke database yang sama terlebih dahulu. Pilih migration Laravel sebagai cara membuat tabel.
-6. Skema memakai fitur MySQL 8.0+ (termasuk CHECK, generated columns, JSON, dan trigger).
+## Setup lokal
 
-## Cara memasang
+1. Pastikan MySQL berjalan dan buat database kosong:
 
-Salin file:
-- `migrations/2026_10_29_000000_create_joslearn_schema.php` ke `database/migrations/`
-- `seeders/JoslearnInitialDataSeeder.php` ke `database/seeders/`
+   ```sql
+   CREATE DATABASE josbook CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+   ```
 
-Lalu di terminal pada folder proyek Laravel:
+2. Pasang dependency dan buat file `.env` jika belum ada:
 
-```bash
-php artisan config:clear
-php artisan migrate
-php artisan db:seed --class=JoslearnInitialDataSeeder
-php artisan migrate:status
-```
+   ```powershell
+   composer install
+   if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+   ```
 
-Periksa tabel di HeidiSQL/phpMyAdmin. Migration akan mencatat prosesnya pada tabel `migrations`.
+3. Atur koneksi database di `.env` agar sesuai dengan MySQL lokal:
 
-## Mengulang dari awal (HATI-HATI)
+   ```dotenv
+   DB_CONNECTION=mysql
+   DB_HOST=127.0.0.1
+   DB_PORT=3306
+   DB_DATABASE=josbook
+   DB_USERNAME=root
+   DB_PASSWORD=
+   ```
 
-`php artisan migrate:fresh` menghapus semua tabel di database yang dikonfigurasi. Gunakan hanya pada database pengembangan yang boleh dihapus, dan pastikan migration lain yang bentrok sudah ditangani:
+4. Buat app key, jalankan migration dan data awal, lalu periksa statusnya:
 
-```bash
-php artisan migrate:fresh
-php artisan db:seed --class=JoslearnInitialDataSeeder
-```
+   ```powershell
+   php artisan key:generate
+   php artisan migrate --seed
+   php artisan migrate:status
+   ```
 
-## Catatan
+`--seed` menjalankan `DatabaseSeeder`, yang membuat akun demo dan memuat data siswa contoh. Gunakan hanya untuk development; jangan seed data ini ke production. Ganti kredensial demo dan pastikan data siswa contoh tidak dipakai atau dibagikan sebagai data nyata.
 
-- Migration ini memakai SQL DDL mentah agar tipe kolom, enum, constraint, generated column, dan nama constraint mengikuti skema sumber sedekat mungkin.
-- Akun admin tidak dibuat di seeder ini. Buat akun admin melalui seeder khusus yang menyimpan password menggunakan `Hash::make()`.
-- Migration hanya membuat struktur database. Model, relasi Eloquent, autentikasi, API, dan kebijakan akses tetap perlu dibuat terpisah.
+## Jika database sudah berisi data
+
+- Cadangkan database sebelum mengubah skema.
+- `php artisan migrate` hanya menjalankan migration yang belum tercatat. Periksa `php artisan migrate:status` terlebih dahulu jika status migration tidak diketahui.
+- Jangan gunakan `php artisan migrate:fresh` pada database yang datanya ingin dipertahankan: perintah itu menghapus semua tabel.
+- Jangan mengimpor dump SQL untuk skema yang sama bersamaan dengan migration. Database yang tabelnya sudah dibuat di luar migration perlu direkonsiliasi terlebih dahulu, bukan langsung dijalankan dengan migration ini.
+
+Setelah anggota tim melakukan `git pull`, mereka cukup menyiapkan database dan `.env` masing-masing, kemudian menjalankan `php artisan migrate --seed` untuk database development yang baru.
