@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\GuruBiodata;
-use App\Models\GuruWaliKelas;
+use App\Models\Guru\GuruBiodata;
+use App\Models\Guru\GuruWaliKelas;
 use App\Models\SekolahIdentitas;
 use App\Models\SekolahKelas;
 use App\Models\SekolahMapel;

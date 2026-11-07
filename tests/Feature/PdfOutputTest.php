@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\Pengguna;
+use App\Models\Auth\Pengguna;
 use App\Models\SekolahKelas;
 use App\Models\SekolahTahunAjaran;
 use App\Models\SiswaBiodata;

@@ -13,9 +13,9 @@ use App\Models\SiswaRiwayatKelas;
 use App\Models\SiswaNilai;
 use App\Models\SiswaKehadiran;
 use App\Models\SiswaEkskul;
-use App\Models\GuruBiodata;
-use App\Models\Pengguna;
-use App\Models\CatatanAktivitas;
+use App\Models\Guru\GuruBiodata;
+use App\Models\Auth\Pengguna;
+use App\Models\Admin\CatatanAktivitas;
 
 class ImportBatchController extends Controller
 {
@@ -461,6 +461,14 @@ class ImportBatchController extends Controller
                     'catatan'            => $this->cleanVal($r['catatan'] ?? null),
                 ];
 
+            $statusSiswa = $this->importedStudentStatus($r, $data);
+            if ($statusSiswa === 'Lulus') {
+                $data['alasan_keluar'] = $data['alasan_keluar'] ?: 'Lulus';
+                if ($data['tahun_lulus'] === null && $data['tanggal_keluar'] !== null) {
+                    $data['tahun_lulus'] = substr($data['tanggal_keluar'], 0, 4);
+                }
+            }
+
             $validationError = $this->validateImportedStudent($data, $r);
             if ($validationError !== null) {
                 $skipped++;
@@ -469,18 +477,11 @@ class ImportBatchController extends Controller
             }
 
             try {
-                DB::transaction(function () use ($data, $kStr, $rowTa, $r): void {
+                DB::transaction(function () use ($data, $kStr, $rowTa, $statusSiswa): void {
                     $siswa = SiswaBiodata::create($data);
                     $kelas = $rowTa && $kStr ? $this->ensureKelas($kStr) : null;
 
                     if ($kelas && $rowTa) {
-                        $statusSiswa = 'Aktif';
-                        if (!empty($r['alasan_keluar']) && stripos($r['alasan_keluar'], 'Lulus') !== false) {
-                            $statusSiswa = 'Lulus';
-                        } elseif (!empty($r['status']) && in_array($r['status'], ['Aktif', 'Pindah keluar', 'Keluar', 'Lulus'], true)) {
-                            $statusSiswa = $r['status'];
-                        }
-
                         SiswaRiwayatKelas::updateOrCreate(
                             [
                                 'siswa_id'        => $siswa->id,
@@ -598,6 +599,29 @@ class ImportBatchController extends Controller
         }
 
         return null;
+    }
+
+    private function importedStudentStatus(array $row, array $data): string
+    {
+        $reason = mb_strtolower(trim((string) ($data['alasan_keluar'] ?? '')));
+        $status = mb_strtolower(trim((string) ($row['status'] ?? '')));
+        $isGraduated = (
+            preg_match('/\blulus\b/u', $reason) === 1
+            && preg_match('/\b(?:belum|tidak)\s+lulus\b/u', $reason) !== 1
+        ) || (
+            preg_match('/\blulus\b/u', $status) === 1
+            && preg_match('/\b(?:belum|tidak)\s+lulus\b/u', $status) !== 1
+        ) || $data['tahun_lulus'] !== null;
+
+        if ($isGraduated) {
+            return 'Lulus';
+        }
+
+        return [
+            'aktif' => 'Aktif',
+            'pindah keluar' => 'Pindah keluar',
+            'keluar' => 'Keluar',
+        ][$status] ?? 'Aktif';
     }
 
     /**

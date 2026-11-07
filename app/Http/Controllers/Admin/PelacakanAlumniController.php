@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\View\View;
 use App\Models\SiswaBiodata;
 use App\Models\SiswaPelacakanAlumni;
-use App\Models\CatatanAktivitas;
+use App\Models\Admin\CatatanAktivitas;
 use Illuminate\Support\Facades\Auth;
 
 class PelacakanAlumniController extends Controller
@@ -16,15 +16,7 @@ class PelacakanAlumniController extends Controller
     {
         $y = $request->input('lcy', '');
 
-        // Query all alumni (status == 'Lulus' or has tahun_lulus)
-        $allAlumni = SiswaBiodata::where(function($q) {
-            $q->whereNotNull('tahun_lulus')
-              ->where('tahun_lulus', '!=', '')
-              ->orWhere('alasan_keluar', 'Lulus')
-              ->orWhereHas('riwayatKelas', function($rq) {
-                  $rq->where('status', 'Lulus');
-              });
-        })
+        $allAlumni = SiswaBiodata::graduated()
         ->with('pelacakan')
         ->get();
 

@@ -1,13 +1,18 @@
 <?php
 
-namespace App\Models;
+namespace App\Models\Admin;
 
+use App\Models\Auth\Pengguna;
+use App\Models\SekolahKelas;
+use App\Models\SekolahTahunAjaran;
 use Illuminate\Database\Eloquent\Model;
 
 class CatatanKenaikanKelas extends Model
 {
     protected $table = 'catatan_kenaikan_kelas';
+
     public $timestamps = false;
+
     protected $guarded = ['id'];
 
     public function pengguna()
@@ -30,4 +35,3 @@ class CatatanKenaikanKelas extends Model
         return $this->belongsTo(SekolahTahunAjaran::class, 'tahun_ajaran_tujuan_id');
     }
 }
-

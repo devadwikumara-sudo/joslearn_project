@@ -68,6 +68,7 @@ class DataSiswaController extends Controller
                 $this->applyHistoryFilters($historyQuery, $taAktifId, $kelasSelected, $statusFilter);
                 $historyQuery->with('kelas')->orderByDesc('tahun_ajaran_id');
             }])
+                ->with('berkas')
                 ->latest('id')
                 ->paginate(25)
                 ->withQueryString();
@@ -240,13 +241,37 @@ class DataSiswaController extends Controller
         abort(404);
     }
 
+    public function berkas(int $id, string $jenis): StreamedResponse
+    {
+        abort_unless(in_array($jenis, ['kk', 'akta', 'ijazah_smp', 'surat_pindah'], true), 404);
+
+        $berkas = SiswaBiodata::findOrFail($id)
+            ->berkas()
+            ->where('jenis', $jenis)
+            ->firstOrFail();
+        $disk = Storage::disk('local');
+        abort_unless($disk->exists($berkas->lokasi), 404);
+
+        return $disk->download($berkas->lokasi, $berkas->nama_file, [
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+    }
+
     public function show(int $id): View
     {
-        $siswa = SiswaBiodata::with(['riwayatKelas' => function ($query) {
-            $query->with(['kelas', 'tahunAjaran'])->orderBy('tahun_ajaran_id');
-        }])->findOrFail($id);
+        $siswa = $this->studentWithDetails($id);
 
         return view('admin.siswa-detail', compact('siswa'));
+    }
+
+    private function studentWithDetails(int $id): SiswaBiodata
+    {
+        return SiswaBiodata::with([
+            'riwayatKelas' => function ($query): void {
+                $query->with(['kelas', 'tahunAjaran'])->orderBy('tahun_ajaran_id');
+            },
+            'berkas',
+        ])->findOrFail($id);
     }
 
     private function studentScopeQuery(?int $tahunAjaranId, string $kelas, string $status, string $search): Builder

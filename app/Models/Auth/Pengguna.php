@@ -1,6 +1,9 @@
 <?php
-namespace App\Models;
 
+namespace App\Models\Auth;
+
+use App\Models\Guru\GuruBiodata;
+use App\Models\SiswaBiodata;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -28,11 +31,11 @@ class Pengguna extends Authenticatable
     protected $hidden = ['password', 'remember_token'];
 
     protected $casts = [
-        'password'              => 'hashed',
-        'terakhir_login_at'     => 'datetime',
+        'password' => 'hashed',
+        'terakhir_login_at' => 'datetime',
         'email_diverifikasi_at' => 'datetime',
-        'wajib_ganti_password'  => 'boolean',
-        'aktif'                 => 'boolean',
+        'wajib_ganti_password' => 'boolean',
+        'aktif' => 'boolean',
     ];
 
     public function guru(): BelongsTo

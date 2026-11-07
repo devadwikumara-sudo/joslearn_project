@@ -2,10 +2,11 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\CatatanAktivitas;
+use App\Models\Admin\CatatanAktivitas;
 use App\Models\SekolahKelas;
 use App\Models\SekolahTahunAjaran;
 use App\Models\SiswaBiodata;
+use App\Models\SiswaBerkas;
 use App\Models\SiswaRiwayatKelas;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -14,6 +15,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Http\UploadedFile;
 use Illuminate\View\View;
 use RuntimeException;
 
@@ -117,7 +119,7 @@ class FormPendataanController extends Controller
         $tahunAjaranList = $this->academicYearOptions();
         $kelasList = SekolahKelas::orderBy('nama')->pluck('nama')->all();
         sort($kelasList, SORT_NATURAL);
-        $siswa = SiswaBiodata::with(['riwayatKelas' => function ($query) {
+        $siswa = SiswaBiodata::with(['berkas', 'riwayatKelas' => function ($query) {
             $query->with(['kelas', 'tahunAjaran'])->orderByDesc('tahun_ajaran_id');
         }])->findOrFail($id);
         $tahunAjaranAktif = SekolahTahunAjaran::where('sedang_berjalan', 1)->first();
@@ -146,14 +148,17 @@ class FormPendataanController extends Controller
         );
         $kelas = SekolahKelas::where('nama', $data['kelas'])->firstOrFail();
 
-        unset($data['kelas'], $data['status'], $data['tahun_ajaran'], $data['foto_file']);
+        unset($data['kelas'], $data['status'], $data['tahun_ajaran'], $data['foto_file'], $data['berkas']);
         $this->normalizeDocumentFlags($request, $data);
         $fotoPath = null;
+        $uploadedAttachmentPaths = [];
+        $replacedAttachmentPaths = [];
 
         try {
-            $siswa = DB::transaction(function () use ($request, $data, $tahunAjaran, $kelas, &$fotoPath): SiswaBiodata {
+            $siswa = DB::transaction(function () use ($request, $data, $tahunAjaran, $kelas, &$fotoPath, &$uploadedAttachmentPaths, &$replacedAttachmentPaths): SiswaBiodata {
                 $this->storePhoto($request, $data, $fotoPath);
                 $siswa = SiswaBiodata::create($data);
+                $this->storeAttachments($request, $siswa, $uploadedAttachmentPaths, $replacedAttachmentPaths);
 
                 SiswaRiwayatKelas::create([
                     'siswa_id' => $siswa->id,
@@ -174,9 +179,14 @@ class FormPendataanController extends Controller
 
                 return $siswa;
             });
-        } catch (RuntimeException $exception) {
+        } catch (\Throwable $exception) {
             if ($fotoPath !== null) {
                 Storage::disk('local')->delete($fotoPath);
+            }
+            $this->deleteStoredFiles($uploadedAttachmentPaths);
+
+            if (! $exception instanceof RuntimeException) {
+                throw $exception;
             }
 
             Log::error('Gagal menyimpan biodata siswa.', [
@@ -186,6 +196,8 @@ class FormPendataanController extends Controller
 
             return back()->withInput()->with('error', 'Gagal menyimpan data siswa. Periksa log aplikasi atau hubungi administrator.');
         }
+
+        $this->deleteStoredFiles($replacedAttachmentPaths);
 
         return redirect()
             ->route('admin.data-siswa', [
@@ -205,14 +217,17 @@ class FormPendataanController extends Controller
         );
         $kelas = SekolahKelas::where('nama', $data['kelas'])->firstOrFail();
 
-        unset($data['kelas'], $data['status'], $data['tahun_ajaran'], $data['foto_file']);
+        unset($data['kelas'], $data['status'], $data['tahun_ajaran'], $data['foto_file'], $data['berkas']);
         $this->normalizeDocumentFlags($request, $data);
         $fotoPath = null;
+        $uploadedAttachmentPaths = [];
+        $replacedAttachmentPaths = [];
 
         try {
-            DB::transaction(function () use ($request, $data, $siswa, $tahunAjaran, $kelas, &$fotoPath): void {
+            DB::transaction(function () use ($request, $data, $siswa, $tahunAjaran, $kelas, &$fotoPath, &$uploadedAttachmentPaths, &$replacedAttachmentPaths): void {
                 $this->storePhoto($request, $data, $fotoPath);
                 $siswa->update($data);
+                $this->storeAttachments($request, $siswa, $uploadedAttachmentPaths, $replacedAttachmentPaths);
                 $riwayat = SiswaRiwayatKelas::withTrashed()->firstOrNew([
                     'siswa_id' => $siswa->id,
                     'tahun_ajaran_id' => $tahunAjaran->id,
@@ -232,9 +247,14 @@ class FormPendataanController extends Controller
                     'alamat_ip' => $request->ip(),
                 ]);
             });
-        } catch (RuntimeException $exception) {
+        } catch (\Throwable $exception) {
             if ($fotoPath !== null) {
                 Storage::disk('local')->delete($fotoPath);
+            }
+            $this->deleteStoredFiles($uploadedAttachmentPaths);
+
+            if (! $exception instanceof RuntimeException) {
+                throw $exception;
             }
 
             Log::error('Gagal memperbarui biodata siswa.', [
@@ -245,6 +265,8 @@ class FormPendataanController extends Controller
 
             return back()->withInput()->with('error', 'Gagal memperbarui data siswa. Periksa log aplikasi atau hubungi administrator.');
         }
+
+        $this->deleteStoredFiles($replacedAttachmentPaths);
 
         return redirect()
             ->route('admin.data-siswa', [
@@ -288,6 +310,11 @@ class FormPendataanController extends Controller
             'akta_ada' => 'nullable|boolean',
             'ijazah_smp_ada' => 'nullable|boolean',
             'surat_pindah_ada' => 'nullable|boolean',
+            'berkas' => ['sometimes', 'array'],
+            'berkas.kk' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
+            'berkas.akta' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
+            'berkas.ijazah_smp' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
+            'berkas.surat_pindah' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
         ];
 
         foreach (self::STRING_LIMITS as $column => $maxLength) {
@@ -342,5 +369,66 @@ class FormPendataanController extends Controller
 
         $data['foto'] = $fotoPath;
         $data['foto_ada'] = true;
+    }
+
+    /**
+     * @param array<int, string> $uploadedPaths
+     * @param array<int, string> $replacedPaths
+     */
+    private function storeAttachments(
+        Request $request,
+        SiswaBiodata $siswa,
+        array &$uploadedPaths,
+        array &$replacedPaths
+    ): void {
+        $documentTypes = [
+            'kk' => 'kk_ada',
+            'akta' => 'akta_ada',
+            'ijazah_smp' => 'ijazah_smp_ada',
+            'surat_pindah' => 'surat_pindah_ada',
+        ];
+
+        foreach ($documentTypes as $type => $flag) {
+            $file = $request->file('berkas.'.$type);
+            if (! $file instanceof UploadedFile) {
+                continue;
+            }
+
+            $filename = $type.'_'.Str::uuid().'.'.$file->extension();
+            $path = $file->storeAs('siswa/berkas/'.$siswa->id, $filename, 'local');
+            if ($path === false) {
+                throw new RuntimeException("Berkas {$type} tidak dapat disimpan.");
+            }
+            $uploadedPaths[] = $path;
+
+            $attachment = SiswaBerkas::firstOrNew([
+                'siswa_id' => $siswa->id,
+                'jenis' => $type,
+            ]);
+            if ($attachment->exists) {
+                $replacedPaths[] = $attachment->lokasi;
+            }
+
+            $attachment->fill([
+                'nama_file' => mb_substr(basename($file->getClientOriginalName()), 0, 255),
+                'lokasi' => $path,
+                'tipe_file' => $file->getMimeType(),
+                'ukuran_byte' => $file->getSize(),
+            ])->save();
+
+            $siswa->forceFill([$flag => true])->save();
+        }
+    }
+
+    /**
+     * @param array<int, string> $paths
+     */
+    private function deleteStoredFiles(array $paths): void
+    {
+        foreach (array_unique($paths) as $path) {
+            if (! Storage::disk('local')->delete($path)) {
+                Log::warning('Berkas siswa tidak dapat dihapus dari penyimpanan.', ['path' => $path]);
+            }
+        }
     }
 }

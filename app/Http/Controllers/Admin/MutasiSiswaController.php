@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\CatatanAktivitas;
+use App\Models\Admin\CatatanAktivitas;
 use App\Models\SekolahTahunAjaran;
 use App\Models\SiswaBiodata;
 use App\Models\SiswaRiwayatKelas;

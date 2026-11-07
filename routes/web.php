@@ -93,6 +93,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin.only'])->grou
     Route::post('/data-siswa/bulk-update', [DataSiswaController::class, 'bulkUpdate'])->name('data-siswa.bulk-update');
     Route::delete('/data-siswa/bulk-delete', [DataSiswaController::class, 'bulkDestroy'])->name('data-siswa.bulk-delete');
     Route::get('/data-siswa/create', [FormPendataanController::class, 'index'])->name('data-siswa.create');
+    Route::get('/data-siswa/{id}/berkas/{jenis}', [DataSiswaController::class, 'berkas'])->name('data-siswa.berkas');
     Route::get('/data-siswa/{id}/foto', [DataSiswaController::class, 'foto'])->name('data-siswa.foto');
     Route::get('/data-siswa/{id}', [DataSiswaController::class, 'show'])->name('data-siswa.show');
     Route::get('/data-siswa/{id}/edit', [FormPendataanController::class, 'edit'])->name('data-siswa.edit');
@@ -148,6 +149,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin.only'])->grou
     Route::get('/alumni', [AlumniController::class, 'index'])->name('alumni');
     Route::get('/alumni/export', [AlumniController::class, 'export'])->name('alumni.export');
     Route::get('/alumni/{id}', [AlumniController::class, 'show'])->name('alumni.show');
+    Route::put('/alumni/{id}', [AlumniController::class, 'update'])->name('alumni.update');
 
     // Pelacakan Alumni (pelacakan alumni.png)
     Route::get('/pelacakan-alumni', [PelacakanAlumniController::class, 'index'])->name('pelacakan-alumni');

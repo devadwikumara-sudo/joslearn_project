@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
-use App\Models\CatatanAktivitas;
-use App\Models\Pengguna;
+use App\Models\Admin\CatatanAktivitas;
+use App\Models\Auth\Pengguna;
 
 class LogAktivitasController extends Controller
 {

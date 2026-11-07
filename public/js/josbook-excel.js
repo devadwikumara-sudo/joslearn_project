@@ -117,6 +117,17 @@
         tgl: 'tanggal lahir|tgl lahir|tgl lhr',
         kelas: 'kelas|kelas saat ini|kelas sekarang|rombel|rombongan belajar|nama rombel|kls',
         tahun_ajaran: 'tahun ajaran|tahunajaran|tahun pelajaran|academic year|ta',
+        alasan_keluar: 'alasan keluar|alasan meninggalkan sekolah|keluar karena',
+        tgl_keluar: 'tgl keluar|tanggal keluar|tanggal lulus|tgl lulus',
+        kelas_keluar: 'kelas keluar|kelas terakhir',
+        tujuan: 'tujuan|sekolah tujuan',
+        nopes: 'nomor peserta psaj|nomor peserta|no peserta|nopes',
+        no_skl: 'nomor skl|no skl',
+        no_ijazah_sma: 'nomor ijazah sma|nomor ijazah nasional|no ijazah sma',
+        tgl_ijazah_sma: 'tanggal ijazah sma|tgl ijazah sma|tanggal pengesahan ijazah',
+        no_transkrip: 'nomor transkrip|no transkrip',
+        tahun_lulus: 'tahun lulus|thn lulus|tahun kelulusan',
+        lanjut: 'melanjutkan studi|melanjutkan studi bekerja|kegiatan setelah lulus|lanjut',
         agama: 'agama',
         kewarganegaraan: 'kewarganegaraan|warga negara|wn',
         nik: 'nik|no nik|nomor induk kependudukan',
@@ -183,7 +194,7 @@
         nip: 'nip|nomor induk pegawai',
         nuptk: 'nuptk',
         mulai_bertugas: 'mulai bertugas|tahun masuk|sejak tahun',
-        status: 'status|status kepegawaian'
+        status: 'status|status kepegawaian|status siswa|status peserta didik'
     };
 
     const MEX = {
@@ -266,11 +277,32 @@
 
         const rd = n => (n && w.Sheets[n]) ? XLSX.utils.sheet_to_json(w.Sheets[n], {header: 1, defval: ''}) : [];
         const km = {};
-        if (w.Sheets[kKey]) {
-            rd(kKey).slice(5).forEach(r => {
-                if (r[2] !== undefined && r[2] !== '') km[String(r[2]).trim()] = r;
-            });
-        }
+        const controlRows = rd(kKey);
+        const controlHeaderIndex = controlRows.slice(0, 10).findIndex(row => {
+            const fields = row.map(fieldOf);
+            return fields.includes('nis')
+                && fields.some(field => ['alasan_keluar', 'status', 'tahun_lulus'].includes(field));
+        });
+        const controlHeaderFields = controlHeaderIndex >= 0
+            ? controlRows[controlHeaderIndex].map(fieldOf)
+            : [];
+        const controlHeaderCounts = controlHeaderFields.reduce((counts, field) => {
+            if (field) counts[field] = (counts[field] || 0) + 1;
+            return counts;
+        }, {});
+        const controlColumn = (field, fallback = -1) => controlHeaderCounts[field] === 1
+            ? controlHeaderFields.indexOf(field)
+            : fallback;
+        const controlNisIndex = controlColumn('nis', CI('C'));
+        const controlDataRows = controlHeaderIndex >= 0
+            ? controlRows.slice(controlHeaderIndex + 1)
+            : controlRows.slice(5);
+        controlDataRows.forEach(row => {
+            const nisValue = row[controlNisIndex];
+            if (nisValue !== undefined && nisValue !== '') {
+                km[String(numStr(nisValue)).trim()] = row;
+            }
+        });
 
         const out = [];
         const rows = rd(pKey);
@@ -316,6 +348,29 @@
                 if (['nis', 'nisn', 'nik'].includes(k) && typeof v === 'number') v = numStr(v);
                 o[k] = (v === '' || v == null) ? '-' : v;
             }
+            const alumniFields = {
+                status: 'status',
+                tgl_keluar: 'tgl_keluar',
+                kelas_keluar: 'kelas_keluar',
+                alasan_keluar: 'alasan_keluar',
+                tujuan: 'tujuan',
+                no_skl: 'no_skl',
+                no_ijazah_sma: 'no_ijazah_sma',
+                tgl_ijazah_sma: 'tgl_ijazah_sma',
+                no_transkrip: 'no_transkrip',
+                tahun_lulus: 'tahun_lulus',
+                lanjut: 'lanjut'
+            };
+            for (const [field, key] of Object.entries(alumniFields)) {
+                const columnIndex = headerIndex(field, -1);
+                if (columnIndex < 0) continue;
+                let value = cl(r[columnIndex]);
+                if (field.startsWith('tgl_')) value = toIso(value);
+                if (field === 'tahun_lulus') {
+                    value = value === '' || value == null || value === '-' ? '' : numStr(value);
+                }
+                o[key] = (value === '' || value == null) && field !== 'tahun_lulus' ? '-' : value;
+            }
             o.nis = String(o.nis ?? '');
             o.nisn = normN(String(r[nisnIndex] ?? o.nisn ?? '').trim());
             const classFromSheet = classIndex >= 0 ? normK(r[classIndex]) : '';
@@ -334,13 +389,31 @@
             const q = km[o.nis];
             if (q) {
                 for (const [c, k] of Object.entries(KMAP)) {
-                    let v = cl(q[CI(c)]);
-                    if (typeof v === 'number' && k.startsWith('tgl')) v = iso(v);
+                    let v = cl(q[controlColumn(k, CI(c))]);
+                    if (k.startsWith('tgl')) v = toIso(v);
                     o[k] = (v === '' || v == null) ? '-' : v;
                 }
+
+                for (const field of ['status', 'tahun_lulus', 'lanjut']) {
+                    const columnIndex = controlColumn(field);
+                    if (columnIndex >= 0) {
+                        const value = cl(q[columnIndex]);
+                        if (value !== '' && value != null && !(field === 'tahun_lulus' && value === '-')) {
+                            o[field] = field === 'tahun_lulus' ? numStr(value) : value;
+                        }
+                    }
+                }
             }
-            o.status = (o.alasan_keluar === 'Lulus') ? 'Lulus' : 'Aktif';
-            if (o.tgl_keluar && o.tgl_keluar !== '-') o.thn_lulus = +String(o.tgl_keluar).slice(0, 4);
+            const graduationText = [o.alasan_keluar, o.status]
+                .map(value => String(value ?? '').trim().toLowerCase())
+                .filter(Boolean);
+            const isGraduated = graduationText.some(value =>
+                /\blulus\b/.test(value) && !/\b(belum|tidak)\s+lulus\b/.test(value)
+            ) || /^\d{4}$/.test(String(o.tahun_lulus ?? '').trim());
+            o.status = isGraduated ? 'Lulus' : (String(o.status ?? '').trim() || 'Aktif');
+            if (isGraduated && !o.tahun_lulus && /^\d{4}-\d{2}-\d{2}$/.test(String(o.tgl_keluar ?? ''))) {
+                o.tahun_lulus = String(o.tgl_keluar).slice(0, 4);
+            }
             o.__excel_row = offset + 6;
             out.push(o);
         });
@@ -1137,6 +1210,8 @@
                                 ${I.t === 'siswa' ? `
                                     <a href="${appBaseUrl}/admin/data-siswa" class="btn a" style="padding:6px 12px;font-size:12px;text-decoration:none;font-weight:600">👉 Buka Halaman Data Siswa</a>
                                     ${targetKelas ? `<a href="${appBaseUrl}/admin/data-siswa?kelas=${encodeURIComponent(targetKelas)}" class="btn" style="padding:6px 10px;font-size:12px;text-decoration:none">Lihat Kelas ${targetKelas}</a>` : ''}
+                                    <a href="${appBaseUrl}/admin/alumni?aj=${encodeURIComponent('Alumni (Lulus)')}" class="btn o" style="padding:6px 10px;font-size:12px;text-decoration:none">Lihat Alumni &amp; Kontrol Induk</a>
+                                    <a href="${appBaseUrl}/admin/pelacakan-alumni" class="btn o" style="padding:6px 10px;font-size:12px;text-decoration:none">Periksa Pelacakan Alumni</a>
                                 ` : I.t === 'nilai' ? `
                                     <a href="${appBaseUrl}/admin/import/nilai" class="btn a" style="padding:6px 12px;font-size:12px;text-decoration:none;font-weight:600">🔄 Selesai &amp; Muat Ulang Data Nilai</a>
                                 ` : I.t === 'hadir' ? `

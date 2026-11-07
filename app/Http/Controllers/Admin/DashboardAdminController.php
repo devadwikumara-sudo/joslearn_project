@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\CatatanAktivitas;
-use App\Models\GuruBiodata;
+use App\Models\Admin\CatatanAktivitas;
+use App\Models\Guru\GuruBiodata;
 use App\Models\SekolahKelas;
 use App\Models\SekolahTahunAjaran;
 use App\Models\SiswaBiodata;
@@ -29,10 +29,7 @@ class DashboardAdminController extends Controller
 
         // 3. Guru & Alumni & Sampah
         $totalGuru = GuruBiodata::count();
-        $totalAlumni = SiswaRiwayatKelas::whereNull('deleted_at')
-            ->where('status', 'Lulus')
-            ->distinct('siswa_id')
-            ->count('siswa_id');
+        $totalAlumni = SiswaBiodata::graduated()->count();
         $totalSampah = DB::table('siswa_biodata')->whereNotNull('deleted_at')->count()
             + DB::table('guru_biodata')->whereNotNull('deleted_at')->count();
 

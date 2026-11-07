@@ -1,23 +1,19 @@
 <?php
 
-namespace App\Models;
+namespace App\Models\Guru;
 
+use App\Models\SekolahKelas;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class GuruMengajar extends Model
+class GuruWaliKelas extends Model
 {
-    protected $table = 'guru_mengajar';
+    protected $table = 'guru_wali_kelas';
 
     protected $guarded = ['id'];
 
     public function kelas(): BelongsTo
     {
         return $this->belongsTo(SekolahKelas::class, 'kelas_id');
-    }
-
-    public function mapel(): BelongsTo
-    {
-        return $this->belongsTo(SekolahMapel::class, 'mapel_id');
     }
 }

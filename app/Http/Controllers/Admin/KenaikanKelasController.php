@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\CatatanAktivitas;
-use App\Models\CatatanKenaikanKelas;
+use App\Models\Admin\CatatanAktivitas;
+use App\Models\Admin\CatatanKenaikanKelas;
 use App\Models\SekolahKelas;
 use App\Models\SekolahTahunAjaran;
 use App\Models\SiswaBiodata;

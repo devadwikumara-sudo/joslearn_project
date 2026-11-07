@@ -2,6 +2,21 @@
 
 @section('title', 'Data Siswa — JosBook Admin')
 
+@push('styles')
+<style>
+    .student-detail-modal{position:fixed;inset:0;z-index:1000;display:none;place-items:center;padding:20px;background:rgba(9,24,43,.62);backdrop-filter:blur(3px)}
+    .student-detail-modal.on{display:grid}
+    .student-detail-box{display:flex;flex-direction:column;width:min(1040px,100%);max-height:92vh;overflow:hidden;border:1px solid #dce5ef;border-radius:20px;background:#f5f8fc;box-shadow:0 24px 80px #06172f55}
+    .student-detail-head{display:flex;align-items:center;gap:14px;padding:18px 22px;background:#fff;border-bottom:1px solid #dce5ef}
+    .student-detail-head h3{margin:0;color:#12355b;font-size:17px}
+    .student-detail-head p{margin:3px 0 0;color:#64748b;font-size:12px}
+    .student-detail-close{margin-left:auto;width:36px;height:36px;border:1px solid #dce5ef;border-radius:50%;background:#fff;color:#12355b;font-size:20px;cursor:pointer}
+    .student-detail-body{overflow:auto;padding:20px}
+    .student-detail-foot{display:flex;justify-content:flex-end;gap:8px;padding:14px 20px;border-top:1px solid #dce5ef;background:#fff}
+    @media(max-width:600px){.student-detail-modal{padding:8px}.student-detail-box{max-height:96vh;border-radius:14px}.student-detail-head{padding:14px}.student-detail-body{padding:12px}.student-detail-foot{padding:12px}}
+</style>
+@endpush
+
 @section('content')
 <h2>Data Siswa</h2>
 <p class="sub">
@@ -175,7 +190,18 @@
                     <td>{{ $s->nama_ayah ?? $s->nama_ibu ?? '-' }}</td>
                     <td><span class="bd {{ $badgeClass }}">{{ $statusNama }}</span></td>
                     <td style="white-space:nowrap">
-                        <a href="{{ route('admin.data-siswa.show', $s->id) }}" class="btn o" style="padding:3px 8px;font-size:12px">Lihat</a>
+                        <button
+                            type="button"
+                            data-pdf-url="{{ route('admin.data-siswa.pdf', $s->id) }}"
+                            data-edit-url="{{ route('admin.form-pendataan.edit', $s->id) }}"
+                            class="btn o"
+                            style="padding:3px 8px;font-size:12px"
+                            aria-haspopup="dialog"
+                            onclick="openStudentDetail(this)"
+                        >Lihat</button>
+                        <template class="student-detail-template">
+                            @include('admin.siswa-detail-content', ['siswa' => $s, 'includeGraduationDetails' => true])
+                        </template>
                         <a href="{{ route('admin.data-siswa.pdf', $s->id) }}" class="btn a" style="padding:3px 8px;font-size:12px">⬇ PDF</a>
                         <a href="{{ route('admin.form-pendataan.edit', $s->id) }}" class="btn o" style="padding:3px 8px;font-size:12px">Edit</a>
                         <form action="{{ route('admin.data-siswa.destroy', $s->id) }}" method="POST" style="display:inline" onsubmit="return confirm('Pindahkan data {{ $s->nama_lengkap }} ke tempat sampah?')">
@@ -204,8 +230,54 @@
 </div>
 @endif
 
+<div id="student-detail-modal" class="student-detail-modal" role="dialog" aria-modal="true" aria-labelledby="student-detail-title" onclick="closeStudentDetail(event, this)">
+    <div class="student-detail-box">
+        <div class="student-detail-head">
+            <div>
+                <h3 id="student-detail-title">Detail Lengkap Siswa</h3>
+                <p>Biodata, keluarga, riwayat kelas, dan dokumen</p>
+            </div>
+            <button type="button" class="student-detail-close" aria-label="Tutup" onclick="closeStudentDetail(null, document.getElementById('student-detail-modal'))">&times;</button>
+        </div>
+        <div id="student-detail-content" class="student-detail-body" aria-live="polite">
+            <p class="sub">Pilih siswa untuk melihat detailnya.</p>
+        </div>
+        <div class="student-detail-foot">
+            <a id="student-detail-pdf" class="btn o" target="_blank" rel="noopener">Cetak PDF</a>
+            <a id="student-detail-edit" class="btn a">Edit biodata</a>
+            <button type="button" class="btn o" onclick="closeStudentDetail(null, document.getElementById('student-detail-modal'))">Tutup</button>
+        </div>
+    </div>
+</div>
+
 @push('scripts')
 <script>
+function openStudentDetail(button) {
+    const modal = document.getElementById('student-detail-modal');
+    const content = document.getElementById('student-detail-content');
+    content.replaceChildren(button.parentElement.querySelector('.student-detail-template').content.cloneNode(true));
+    document.getElementById('student-detail-pdf').href = button.dataset.pdfUrl;
+    document.getElementById('student-detail-edit').href = button.dataset.editUrl;
+    modal.classList.add('on');
+    document.body.style.overflow = 'hidden';
+    modal.querySelector('.student-detail-close').focus();
+}
+
+function closeStudentDetail(event, modal) {
+    if (!modal || (event && event.target !== modal)) return;
+    modal.classList.remove('on');
+    document.getElementById('student-detail-content').replaceChildren();
+    if (!document.querySelector('.student-detail-modal.on, .alumni-modal.on')) {
+        document.body.style.overflow = '';
+    }
+}
+
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+        closeStudentDetail(null, document.getElementById('student-detail-modal'));
+    }
+});
+
 document.getElementById('check-all')?.addEventListener('change', function() {
     var checked = this.checked;
     document.querySelectorAll('.check-item').forEach(function(c) {

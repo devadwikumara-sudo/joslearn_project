@@ -2,11 +2,11 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Pengguna;
+use App\Models\Auth\Pengguna;
 use App\Models\SekolahTahunAjaran;
-use App\Models\CatatanAktivitas;
+use App\Models\Admin\CatatanAktivitas;
 use App\Models\SiswaBiodata;
-use App\Models\GuruBiodata;
+use App\Models\Guru\GuruBiodata;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;

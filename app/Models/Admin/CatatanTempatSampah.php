@@ -1,13 +1,16 @@
 <?php
 
-namespace App\Models;
+namespace App\Models\Admin;
 
+use App\Models\Auth\Pengguna;
 use Illuminate\Database\Eloquent\Model;
 
 class CatatanTempatSampah extends Model
 {
     protected $table = 'catatan_tempat_sampah';
+
     public $timestamps = false;
+
     protected $guarded = ['id'];
 
     public function pengguna()
@@ -15,4 +18,3 @@ class CatatanTempatSampah extends Model
         return $this->belongsTo(Pengguna::class, 'dihapus_oleh');
     }
 }
-

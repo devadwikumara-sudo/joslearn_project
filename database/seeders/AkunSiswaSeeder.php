@@ -1,7 +1,7 @@
 <?php
 namespace Database\Seeders;
 
-use App\Models\Pengguna;
+use App\Models\Auth\Pengguna;
 use App\Models\SiswaBiodata;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;

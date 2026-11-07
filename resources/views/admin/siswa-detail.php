@@ -2,6 +2,30 @@
 
 @section('title', 'Detail Siswa — JosBook Admin')
 
+@push('styles')
+<style>
+    .student-profile{display:grid;gap:14px}
+    .student-profile-identity{display:flex;align-items:center;gap:16px;padding:20px;border-radius:16px;background:linear-gradient(125deg,#12355b,#1d4f85);color:#fff}
+    .student-profile-photo,.student-profile-avatar{display:grid;place-items:center;width:68px;height:68px;flex:none;border:2px solid #ffffff44;border-radius:18px;object-fit:cover}
+    .student-profile-avatar{background:#ffffff20;font-size:26px;font-weight:800}
+    .student-profile-identity h4{margin:0 0 5px;font-size:19px}
+    .student-profile-identity p{margin:0;color:#d9e7f7;font-size:12px}
+    .student-profile-section{padding:18px;border:1px solid #dce5ef;border-radius:15px;background:#fff}
+    .student-profile-section h4{margin:0 0 14px;color:#12355b;font-size:13px}
+    .student-profile-history{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}
+    .student-profile-history-item{display:grid;gap:5px;padding:12px;border:1px solid #e2e8f0;border-radius:11px;color:#475569;font-size:12px}
+    .student-profile-history-item b{color:#1b2430}
+    .student-profile-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 22px}
+    .student-profile-item{min-width:0}
+    .student-profile-item span{display:block;margin-bottom:4px;color:#64748b;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+    .student-profile-item b{display:block;overflow-wrap:anywhere;color:#1b2430;font-size:12px;white-space:pre-wrap}
+    .student-profile-item a{color:#1d4f85}
+    .student-profile-note{grid-column:1/-1}
+    .student-profile-empty{margin:0;color:#64748b;font-size:12px}
+    @media(max-width:600px){.student-profile-grid{grid-template-columns:1fr}.student-profile-identity{align-items:flex-start;padding:15px}.student-profile-identity h4{font-size:16px}}
+</style>
+@endpush
+
 @section('content')
 <div class="bar">
     <div>
@@ -10,183 +34,11 @@
     </div>
     <span class="sp"></span>
     <a href="{{ route('admin.data-siswa') }}" class="btn o">Kembali</a>
-    <a href="{{ route('admin.data-siswa.pdf', $siswa->id) }}" target="_blank" class="btn" style="background:var(--p);color:#fff">⬇ Cetak PDF</a>
+    <a href="{{ route('admin.data-siswa.pdf', $siswa->id) }}" target="_blank" rel="noopener" class="btn" style="background:var(--p);color:#fff">⬇ Cetak PDF</a>
     <a href="{{ route('admin.form-pendataan.edit', $siswa->id) }}" class="btn a">Edit biodata</a>
 </div>
 
-<div class="card" style="margin-top:14px">
-    <h3>Riwayat Kelas</h3>
-    <div class="tw">
-        <table>
-            <thead>
-                <tr>
-                    <th>Tahun Ajaran</th>
-                    <th>Kelas</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                @forelse($siswa->riwayatKelas as $riwayat)
-                    <tr>
-                        <td>{{ $riwayat->tahunAjaran?->nama ?? '-' }}</td>
-                        <td>{{ $riwayat->kelas?->nama ?? '-' }}</td>
-                        <td>{{ $riwayat->status }}</td>
-                    </tr>
-                @empty
-                    <tr>
-                        <td colspan="3" style="text-align:center;padding:18px;color:var(--mu)">Belum ada riwayat kelas.</td>
-                    </tr>
-                @endforelse
-            </tbody>
-        </table>
-    </div>
-</div>
-
-@php
-    $sections = [
-        'Identitas Siswa' => [
-            ['Nama Lengkap', 'nama_lengkap'],
-            ['Nama Panggilan', 'nama_panggilan'],
-            ['NISN', 'nisn'],
-            ['NIS', 'nomor_induk'],
-            ['Jenis Kelamin', 'jenis_kelamin'],
-            ['Tempat Lahir', 'tempat_lahir'],
-            ['Tanggal Lahir', 'tanggal_lahir'],
-            ['Agama', 'agama'],
-            ['Kewarganegaraan', 'kewarganegaraan'],
-            ['NIK', 'nik'],
-            ['Anak Ke-', 'anak_ke'],
-            ['Jumlah Saudara', 'jumlah_saudara'],
-            ['Status Yatim/Piatu', 'status_yatim'],
-            ['Bahasa Sehari-hari', 'bahasa_sehari_hari'],
-        ],
-        'Alamat dan Kontak' => [
-            ['Alamat Jalan', 'alamat_jalan'],
-            ['RT/RW', 'alamat_rt_rw'],
-            ['Desa/Kelurahan', 'alamat_desa'],
-            ['Kecamatan', 'alamat_kecamatan'],
-            ['Kabupaten/Kota', 'alamat_kabupaten'],
-            ['Provinsi', 'alamat_provinsi'],
-            ['Kode Pos', 'alamat_kode_pos'],
-            ['Nomor HP', 'nomor_hp'],
-            ['Tinggal Bersama', 'tempat_tinggal'],
-            ['Jarak ke Sekolah (KM)', 'jarak_ke_sekolah_km'],
-        ],
-        'Kesehatan' => [
-            ['Golongan Darah', 'golongan_darah'],
-            ['Tinggi Badan (cm)', 'tinggi_badan_cm'],
-            ['Berat Badan (kg)', 'berat_badan_kg'],
-            ['Penyakit', 'penyakit'],
-            ['Kelainan Fisik', 'kelainan_fisik'],
-        ],
-        'Pendidikan dan Registrasi' => [
-            ['Sekolah Asal', 'sekolah_asal'],
-            ['Tanggal Ijazah SMP', 'tanggal_ijazah_smp'],
-            ['Nomor Ijazah SMP', 'nomor_ijazah_smp'],
-            ['Lama Belajar (Tahun)', 'lama_belajar_tahun'],
-            ['Jenis Registrasi', 'jenis_registrasi'],
-            ['Sekolah Asal Pindahan', 'pindahan_dari_sekolah'],
-            ['Alasan Pindah', 'alasan_pindah'],
-            ['Kelas Diterima', 'kelas_diterima'],
-            ['Rombel Diterima', 'rombel_diterima'],
-            ['Tanggal Diterima', 'tanggal_diterima'],
-        ],
-        'Data Ayah' => [
-            ['Nama Ayah', 'nama_ayah'],
-            ['Agama Ayah', 'agama_ayah'],
-            ['Kewarganegaraan Ayah', 'kewarganegaraan_ayah'],
-            ['Pendidikan Ayah', 'pendidikan_ayah'],
-            ['Pekerjaan Ayah', 'pekerjaan_ayah'],
-            ['Penghasilan Ayah', 'penghasilan_ayah'],
-            ['Nomor HP Ayah', 'nomor_hp_ayah'],
-            ['Keadaan Ayah', 'keadaan_ayah'],
-        ],
-        'Data Ibu' => [
-            ['Nama Ibu', 'nama_ibu'],
-            ['Agama Ibu', 'agama_ibu'],
-            ['Kewarganegaraan Ibu', 'kewarganegaraan_ibu'],
-            ['Pendidikan Ibu', 'pendidikan_ibu'],
-            ['Pekerjaan Ibu', 'pekerjaan_ibu'],
-            ['Penghasilan Ibu', 'penghasilan_ibu'],
-            ['Nomor HP Ibu', 'nomor_hp_ibu'],
-            ['Keadaan Ibu', 'keadaan_ibu'],
-        ],
-        'Alamat Orang Tua' => [
-            ['Jalan', 'ortu_alamat_jalan'],
-            ['RT/RW', 'ortu_alamat_rt_rw'],
-            ['Desa/Kelurahan', 'ortu_alamat_desa'],
-            ['Kecamatan', 'ortu_alamat_kecamatan'],
-            ['Kabupaten/Kota', 'ortu_alamat_kabupaten'],
-            ['Provinsi', 'ortu_alamat_provinsi'],
-            ['Kode Pos', 'ortu_alamat_kode_pos'],
-        ],
-        'Data Wali' => [
-            ['Nama Wali', 'nama_wali'],
-            ['Agama Wali', 'agama_wali'],
-            ['Kewarganegaraan Wali', 'kewarganegaraan_wali'],
-            ['Pendidikan Wali', 'pendidikan_wali'],
-            ['Pekerjaan Wali', 'pekerjaan_wali'],
-            ['Penghasilan Wali', 'penghasilan_wali'],
-            ['Nomor HP Wali', 'nomor_hp_wali'],
-            ['Alamat Jalan Wali', 'wali_alamat_jalan'],
-            ['RT/RW Wali', 'wali_alamat_rt_rw'],
-            ['Desa/Kelurahan Wali', 'wali_alamat_desa'],
-            ['Kecamatan Wali', 'wali_alamat_kecamatan'],
-            ['Kabupaten/Kota Wali', 'wali_alamat_kabupaten'],
-            ['Provinsi Wali', 'wali_alamat_provinsi'],
-            ['Kode Pos Wali', 'wali_alamat_kode_pos'],
-        ],
-        'Kelulusan dan Keluar Sekolah' => [
-            ['Tanggal Keluar', 'tanggal_keluar'],
-            ['Alasan Keluar', 'alasan_keluar'],
-            ['Kelas Keluar', 'kelas_keluar'],
-            ['Sekolah Tujuan', 'sekolah_tujuan'],
-            ['Nomor Peserta PSAJ', 'nomor_peserta_psaj'],
-            ['Nomor SKL', 'nomor_skl'],
-            ['Nomor Ijazah SMA', 'nomor_ijazah_sma'],
-            ['Tanggal Ijazah SMA', 'tanggal_ijazah_sma'],
-            ['Nomor Transkrip', 'nomor_transkrip'],
-            ['Tahun Lulus', 'tahun_lulus'],
-            ['Kegiatan Setelah Lulus', 'kegiatan_setelah_lulus'],
-        ],
-    ];
-@endphp
-
-@foreach($sections as $sectionTitle => $fields)
-    <div class="card" style="margin-top:14px">
-        <h3>{{ $sectionTitle }}</h3>
-        <div class="tw">
-            <table>
-                <tbody>
-                    @foreach($fields as [$label, $field])
-                        <tr>
-                            <th style="width:30%">{{ $label }}</th>
-                            <td>{{ filled($siswa->{$field}) ? $siswa->{$field} : '-' }}</td>
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
-        </div>
-    </div>
-@endforeach
-
-<div class="card" style="margin-top:14px">
-    <h3>Foto, Dokumen, dan Catatan</h3>
-    @if($siswa->foto)
-        <img src="{{ route('admin.data-siswa.foto', $siswa->id) }}" alt="Foto {{ $siswa->nama_lengkap }}" style="width:96px;height:128px;object-fit:cover;border-radius:6px">
-    @else
-        <p class="sub">Belum ada foto.</p>
-    @endif
-    <div class="tw" style="margin-top:12px">
-        <table>
-            <tbody>
-                <tr><th>Kartu Keluarga</th><td>{{ $siswa->kk_ada ? 'Sudah diterima' : 'Belum diterima' }}</td></tr>
-                <tr><th>Akta Kelahiran</th><td>{{ $siswa->akta_ada ? 'Sudah diterima' : 'Belum diterima' }}</td></tr>
-                <tr><th>Ijazah SMP</th><td>{{ $siswa->ijazah_smp_ada ? 'Sudah diterima' : 'Belum diterima' }}</td></tr>
-                <tr><th>Surat Pindah</th><td>{{ $siswa->surat_pindah_ada ? 'Sudah diterima' : 'Belum diterima' }}</td></tr>
-                <tr><th>Catatan</th><td>{{ filled($siswa->catatan) ? $siswa->catatan : '-' }}</td></tr>
-            </tbody>
-        </table>
-    </div>
+<div style="margin-top:14px">
+    @include('admin.siswa-detail-content', ['includeGraduationDetails' => true])
 </div>
 @endsection

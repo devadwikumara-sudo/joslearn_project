@@ -6,6 +6,12 @@
 @php
     $tahunAjaranForm = old('tahun_ajaran', $tahunAjaranTerpilih);
     $riwayatTerpilih = $edit?->riwayatKelas->firstWhere('tahunAjaran.nama', $tahunAjaranForm);
+    $lampiranBerkas = [
+        'kk' => ['Kartu Keluarga (KK)', 'kk_ada'],
+        'akta' => ['Akta Kelahiran', 'akta_ada'],
+        'ijazah_smp' => ['Ijazah SMP', 'ijazah_smp_ada'],
+        'surat_pindah' => ['Surat Pindah', 'surat_pindah_ada'],
+    ];
 @endphp
 <h2>Form Pendataan · Siswa {{ $edit ? 'Edit' : 'Baru' }}</h2>
 @if($errors->any())
@@ -483,32 +489,35 @@
 
         {{-- TAB LAMPIRAN BERKAS --}}
         <div id="tab-berkas" class="tab-pane" style="display:none">
-            <div class="note">Centang dokumen yang sudah diserahkan / diverifikasi:</div>
+            <div class="note">
+                Unggah dokumen PDF, JPG, JPEG, atau PNG (maksimal 5 MB per berkas). Berkas disimpan privat dan hanya dapat diunduh melalui akun admin.
+            </div>
             <div class="fl">
-                <div>
-                    <label style="display:flex;gap:8px;align-items:center;cursor:pointer">
-                        <input type="checkbox" name="kk_ada" value="1" {{ old('kk_ada', $edit->kk_ada ?? 0) ? 'checked' : '' }}>
-                        Kartu Keluarga (KK)
-                    </label>
-                </div>
-                <div>
-                    <label style="display:flex;gap:8px;align-items:center;cursor:pointer">
-                        <input type="checkbox" name="akta_ada" value="1" {{ old('akta_ada', $edit->akta_ada ?? 0) ? 'checked' : '' }}>
-                        Akta Kelahiran
-                    </label>
-                </div>
-                <div>
-                    <label style="display:flex;gap:8px;align-items:center;cursor:pointer">
-                        <input type="checkbox" name="ijazah_smp_ada" value="1" {{ old('ijazah_smp_ada', $edit->ijazah_smp_ada ?? 0) ? 'checked' : '' }}>
-                        Ijazah SMP
-                    </label>
-                </div>
-                <div>
-                    <label style="display:flex;gap:8px;align-items:center;cursor:pointer">
-                        <input type="checkbox" name="surat_pindah_ada" value="1" {{ old('surat_pindah_ada', $edit->surat_pindah_ada ?? 0) ? 'checked' : '' }}>
-                        Surat Pindah (Jika Pindahan)
-                    </label>
-                </div>
+                @foreach($lampiranBerkas as $jenisBerkas => [$labelBerkas, $statusField])
+                    @php($berkasTersimpan = $edit?->berkas?->firstWhere('jenis', $jenisBerkas))
+                    <div class="card" style="margin:0">
+                        <label for="berkas-{{ $jenisBerkas }}" style="font-size:13px;color:var(--p)">{{ $labelBerkas }}</label>
+                        <input
+                            type="file"
+                            id="berkas-{{ $jenisBerkas }}"
+                            name="berkas[{{ $jenisBerkas }}]"
+                            accept=".pdf,.jpg,.jpeg,.png"
+                            style="width:100%;margin:8px 0"
+                        >
+                        @if($berkasTersimpan)
+                            <p class="sub" style="margin:0 0 8px;font-size:11px">
+                                File tersimpan:
+                                <a href="{{ route('admin.data-siswa.berkas', [$edit->id, $jenisBerkas]) }}">{{ $berkasTersimpan->nama_file }}</a>
+                            </p>
+                        @else
+                            <p class="sub" style="margin:0 0 8px;font-size:11px">Belum ada file yang diunggah.</p>
+                        @endif
+                        <label style="display:flex;gap:8px;align-items:center;cursor:pointer">
+                            <input type="checkbox" name="{{ $statusField }}" value="1" {{ old($statusField, $edit->{$statusField} ?? 0) ? 'checked' : '' }}>
+                            Dokumen sudah diserahkan / diverifikasi
+                        </label>
+                    </div>
+                @endforeach
             </div>
         </div>
 

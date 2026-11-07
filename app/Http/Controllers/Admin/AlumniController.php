@@ -3,11 +3,13 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 use Illuminate\Support\Facades\DB;
 use App\Models\SiswaBiodata;
 use App\Models\SiswaRiwayatKelas;
 use App\Models\SekolahTahunAjaran;
+use App\Models\Admin\CatatanAktivitas;
 
 class AlumniController extends Controller
 {
@@ -47,14 +49,7 @@ class AlumniController extends Controller
 
         // Filter Jenis Siswa
         if ($aj === 'Alumni (Lulus)') {
-            $query->where(function($q) {
-                $q->whereNotNull('tahun_lulus')
-                  ->where('tahun_lulus', '!=', '')
-                  ->orWhere('alasan_keluar', 'Lulus')
-                  ->orWhereHas('riwayatKelas', function($rq) {
-                      $rq->where('status', 'Lulus');
-                  });
-            });
+            $query->graduated();
         } elseif ($aj === 'Pindah / Keluar') {
             $query->where(function($q) {
                 $q->whereIn('alasan_keluar', ['Pindah', 'Keluar', 'Pindah keluar'])
@@ -84,9 +79,12 @@ class AlumniController extends Controller
 
         $totalFiltered = (clone $query)->count();
 
-        $alumni = $query->with(['riwayatKelas' => function($rq) {
-            $rq->latest('id');
-        }])
+        $alumni = $query->with([
+            'riwayatKelas' => function($rq) {
+                $rq->with(['kelas', 'tahunAjaran'])->latest('id');
+            },
+            'berkas',
+        ])
         ->orderBy('nomor_induk', 'asc')
         ->paginate(25)
         ->withQueryString();
@@ -108,6 +106,60 @@ class AlumniController extends Controller
         return redirect()->route('admin.data-siswa.show', $id);
     }
 
+    public function update(Request $request, int $id): RedirectResponse
+    {
+        $validated = $request->validate([
+            'jenis_registrasi' => ['nullable', 'string', 'max:64'],
+            'tanggal_diterima' => ['nullable', 'date_format:Y-m-d'],
+            'kelas_diterima' => ['nullable', 'string', 'max:10'],
+            'rombel_diterima' => ['nullable', 'string', 'max:10'],
+            'sekolah_asal' => ['nullable', 'string', 'max:150'],
+            'alasan_keluar' => ['nullable', 'string', 'max:255'],
+            'tanggal_keluar' => ['nullable', 'date_format:Y-m-d'],
+            'kelas_keluar' => ['nullable', 'string', 'max:64'],
+            'sekolah_tujuan' => ['nullable', 'string', 'max:150'],
+            'nomor_peserta_psaj' => ['nullable', 'string', 'max:64'],
+            'nomor_skl' => ['nullable', 'string', 'max:64'],
+            'nomor_ijazah_sma' => ['nullable', 'string', 'max:64'],
+            'tanggal_ijazah_sma' => ['nullable', 'date_format:Y-m-d'],
+            'nomor_transkrip' => ['nullable', 'string', 'max:64'],
+            'tahun_lulus' => ['nullable', 'digits:4'],
+            'kegiatan_setelah_lulus' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $siswa = SiswaBiodata::findOrFail($id);
+
+        DB::transaction(function () use ($request, $siswa, $validated): void {
+            $siswa->fill($validated)->save();
+
+            if ($siswa->isGraduated()) {
+                $siswa->riwayatKelas()
+                    ->whereNull('deleted_at')
+                    ->latest('id')
+                    ->first()
+                    ?->update(['status' => 'Lulus']);
+            }
+
+            CatatanAktivitas::create([
+                'pengguna_id' => auth()->id(),
+                'peran' => auth()->user()->peran ?? 'admin',
+                'aksi' => 'edit_kontrol_induk',
+                'keterangan' => "Memperbarui Kontrol Induk alumni: {$siswa->nama_lengkap} ({$siswa->nisn})",
+                'objek_tipe' => 'siswa',
+                'objek_id' => $siswa->id,
+                'alamat_ip' => $request->ip(),
+            ]);
+        });
+
+        return redirect()
+            ->route('admin.alumni', array_filter([
+                'aj' => $request->input('aj'),
+                'ay' => $request->input('ay'),
+                'aq' => $request->input('aq'),
+            ], static fn ($value): bool => $value !== null && $value !== ''))
+            ->with('success', "Kontrol Induk {$siswa->nama_lengkap} berhasil diperbarui.");
+    }
+
     public function export(Request $request)
     {
         $aj = $request->input('aj', 'Alumni (Lulus)');
@@ -117,14 +169,7 @@ class AlumniController extends Controller
         $query = SiswaBiodata::query();
 
         if ($aj === 'Alumni (Lulus)') {
-            $query->where(function($q) {
-                $q->whereNotNull('tahun_lulus')
-                  ->where('tahun_lulus', '!=', '')
-                  ->orWhere('alasan_keluar', 'Lulus')
-                  ->orWhereHas('riwayatKelas', function($rq) {
-                      $rq->where('status', 'Lulus');
-                  });
-            });
+            $query->graduated();
         } elseif ($aj === 'Pindah / Keluar') {
             $query->where(function($q) {
                 $q->whereIn('alasan_keluar', ['Pindah', 'Keluar', 'Pindah keluar'])
