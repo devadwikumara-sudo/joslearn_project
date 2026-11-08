@@ -4,37 +4,33 @@
 
 @section('content')
 <h2>Import Kehadiran</h2>
-<p class="sub">Unggah file Excel kehadiran siswa (Sakit, Izin, Alpa, dan Nilai Kokurikuler). Data dicatat per semester dan otomatis masuk ke Buku Induk.</p>
+<p class="sub">Unggah file Excel dari berbagai format semester. Pilih kelas dan semester; sistem mencocokkan tahun ajaran dari riwayat kelas siswa. Nilai semester 1–2 di dalam kelas atau label Ganjil/Genap dikenali untuk kelas X, XI, dan XII.</p>
 
 {{-- Card 1: Unggah file & pengaturan (Sesuai Prototype impPg) --}}
 <div class="card">
     <h3>1. Unggah file &amp; pengaturan</h3>
     <div class="fl">
         <div>
-            <label>Mode</label>
-            <select name="mode" id="mode">
-                <option value="kelas">Satu kelas</option>
-                <option value="semua" selected>Semua kelas (dari kolom "kelas" di Excel)</option>
-            </select>
-        </div>
-        <div>
-            <label>Tahun ajaran</label>
-            <input value="{{ $taAktif ?? '2024/2025' }}" name="tahun_ajaran" id="tahun_ajaran" readonly>
-        </div>
-        <div>
-            <label>Kelas (ketik baru = dibuat otomatis)</label>
-            <input list="dlk" name="kelas" id="kelas" value="{{ $kelasList[0] ?? 'X-1' }}">
-            <datalist id="dlk">
+            <label>Kelas</label>
+            <select name="kelas" id="kelas">
+                <option value="*" selected>Semua kelas (gunakan kolom kelas di Excel)</option>
                 @foreach($kelasList ?? [] as $k)
-                    <option value="{{ $k }}">
+                    <option value="{{ $k }}">{{ $k }}</option>
                 @endforeach
-            </datalist>
+            </select>
         </div>
         <div>
             <label>Semester</label>
             <select name="semester" id="semester">
-                <option value="Ganjil">Semester 1 (Ganjil)</option>
-                <option value="Genap" selected>Semester 2 (Genap)</option>
+                <option value="auto" selected>Deteksi dari kolom Excel</option>
+                <option value="1">Semester 1 / Ganjil (sesuai tingkat kelas)</option>
+                <option value="2">Semester 2 / Genap (sesuai tingkat kelas)</option>
+                <option value="local-ganjil">Ganjil (sesuai tingkat kelas)</option>
+                <option value="local-genap">Genap (sesuai tingkat kelas)</option>
+                <option value="3">Semester global 3 (XI Ganjil)</option>
+                <option value="4">Semester global 4 (XI Genap)</option>
+                <option value="5">Semester global 5 (XII Ganjil)</option>
+                <option value="6">Semester global 6 (XII Genap)</option>
             </select>
         </div>
     </div>
@@ -55,12 +51,13 @@
 
 {{-- Card 4: Data Hasil Impor --}}
 <div class="card" style="margin-top:14px">
-    <h3>Data hasil impor {{ $taAktif ?? '2024/2025' }}</h3>
+    <h3>Data hasil impor seluruh tahun ajaran</h3>
     <div class="tw">
         <table>
             <thead>
                 <tr>
                     <th>Kelas</th>
+                    <th>Tahun ajaran</th>
                     <th>Semester</th>
                     <th>Baris Kehadiran</th>
                     <th>Aksi</th>
@@ -70,7 +67,8 @@
                 @forelse($riwayatImport ?? [] as $row)
                 <tr>
                     <td><strong>{{ $row->kelas }}</strong></td>
-                    <td>{{ $row->semester }}</td>
+                    <td>{{ $row->tahun_ajaran }}</td>
+                    <td>{{ $row->semester_number ? 'Semester '.$row->semester_number : $row->semester }}</td>
                     <td><b>{{ $row->baris }}</b> baris</td>
                     <td>
                         <a href="{{ route('admin.data-siswa', ['kelas' => $row->kelas]) }}" class="btn o" style="padding:3px 8px;font-size:12px">Lihat di Data Siswa</a>
@@ -78,8 +76,8 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="4" style="text-align:center;padding:24px;color:var(--mu)">
-                        Belum ada data kehadiran diimpor pada tahun ajaran ini.
+                    <td colspan="5" style="text-align:center;padding:24px;color:var(--mu)">
+                        Belum ada data kehadiran yang diimpor.
                     </td>
                 </tr>
                 @endforelse
@@ -97,8 +95,8 @@ function downloadTemplateHadir() {
     }
     var cols = ['nisn', 'nama', 'kelas', 'sem', 'sakit', 'izin', 'alpa', 'kokur'];
     var sample = [
-        ['0081234561', 'Ahmad Faiz', 'X-1', 'Genap', 1, 0, 0, 'Sangat baik dalam kegiatan P5'],
-        ['0081234562', 'Bunga Citra', 'X-1', 'Genap', 0, 1, 0, 'Aktif dan kreatif dalam pameran karya']
+        ['0081234561', 'Ahmad Faiz', 'X-1', '2', 1, 0, 0, 'Sangat baik dalam kegiatan P5'],
+        ['0081234562', 'Bunga Citra', 'X-1', '2', 0, 1, 0, 'Aktif dan kreatif dalam pameran karya']
     ];
     var w = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(w, XLSX.utils.aoa_to_sheet([cols, ...sample]), 'Kehadiran');
@@ -107,9 +105,9 @@ function downloadTemplateHadir() {
 
 function loadDemoHadir() {
     var dummy = [
-        { nisn: '0081234561', nama: 'Ahmad Faiz', kelas: 'X-1', sem: 'Genap', sakit: 1, izin: 0, alpa: 0, kokur: 'Menunjukkan komitmen tinggi dalam proyek penguatan profil pelajar pancasila.' },
-        { nisn: '0081234562', nama: 'Bunga Citra', kelas: 'X-1', sem: 'Genap', sakit: 0, izin: 2, alpa: 0, kokur: 'Mampu berkolaborasi aktif dan menyelesaikan tugas kelompok dengan tuntas.' },
-        { nisn: '0081234563', nama: 'Dimas Anggara', kelas: 'X-2', sem: 'Genap', sakit: 2, izin: 1, alpa: 0, kokur: 'Menunjukkan inisiatif kepemimpinan dalam kegiatan kokurikuler.' }
+        { nisn: '0081234561', nama: 'Ahmad Faiz', kelas: 'X-1', sem: '2', sakit: 1, izin: 0, alpa: 0, kokur: 'Menunjukkan komitmen tinggi dalam proyek penguatan profil pelajar pancasila.' },
+        { nisn: '0081234562', nama: 'Bunga Citra', kelas: 'X-1', sem: '2', sakit: 0, izin: 2, alpa: 0, kokur: 'Mampu berkolaborasi aktif dan menyelesaikan tugas kelompok dengan tuntas.' },
+        { nisn: '0081234563', nama: 'Dimas Anggara', kelas: 'X-2', sem: '2', sakit: 2, izin: 1, alpa: 0, kokur: 'Menunjukkan inisiatif kepemimpinan dalam kegiatan kokurikuler.' }
     ];
 
     var ws = XLSX.utils.json_to_sheet(dummy);

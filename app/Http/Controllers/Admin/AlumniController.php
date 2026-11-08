@@ -81,7 +81,7 @@ class AlumniController extends Controller
 
         $alumni = $query->with([
             'riwayatKelas' => function($rq) {
-                $rq->with(['kelas', 'tahunAjaran'])->latest('id');
+                $rq->with(['kelas', 'tahunAjaran', 'nilai.mapel', 'kehadiran', 'ekskul'])->latest('id');
             },
             'berkas',
         ])

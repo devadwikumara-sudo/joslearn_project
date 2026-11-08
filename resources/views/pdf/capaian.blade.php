@@ -18,6 +18,11 @@
     $kelasNama = $riwayatKelas?->kelas?->nama ?? $siswa->kelas_aktif ?? '-';
     $tingkat = explode('-', $kelasNama)[0] ?? 'X';
     $isXII = strtoupper($tingkat) === 'XII';
+    $semesterStart = ['X' => 1, 'XI' => 3, 'XII' => 5][strtoupper($tingkat)] ?? 1;
+    $termSemesterNumbers = [
+        'Ganjil' => $semesterStart,
+        'Genap' => $semesterStart + 1,
+    ];
 
     $semList = ($filterSem && $filterSem !== 'Semua') ? [$filterSem] : ['Ganjil', 'Genap'];
     $numSem = count($semList);
@@ -89,7 +94,7 @@
         {{ $ttl }}<br>
         &nbsp;&nbsp;&nbsp;&nbsp;PESERTA DIDIK TAHUN AJARAN {{ $taNama }}
         @if(count($semList) === 1)
-            · SEMESTER {{ $semList[0] === 'Ganjil' ? '1' : '2' }}
+            · SEMESTER {{ $termSemesterNumbers[$semList[0]] ?? $semList[0] }}
         @endif
     </div>
 
@@ -110,7 +115,7 @@
                 </tr>
                 <tr>
                     @foreach($semList as $sm)
-                        <th style="width:80px">Semester {{ $sm === 'Ganjil' ? '1' : '2' }}</th>
+                        <th style="width:80px">Semester {{ $termSemesterNumbers[$sm] ?? $sm }}</th>
                     @endforeach
                 </tr>
             </thead>
@@ -172,8 +177,8 @@
         <div class="fh" style="margin-top:14px">C. KOKURIKULER</div>
         @foreach($semList as $sm)
             <div class="kk">
-                <div>No &nbsp; Deskripsi Nilai Kokurikuler (Semester {{ $sm === 'Ganjil' ? '1' : '2' }})</div>
-                <div>{{ $sm === 'Ganjil' ? '1' : '2' }} &nbsp; {{ $kokurMap[$sm] ?? 'Terlaksana dengan baik sesuai dengan Projek Penguatan Profil Pelajar Pancasila (P5).' }}</div>
+                <div>No &nbsp; Deskripsi Nilai Kokurikuler (Semester {{ $termSemesterNumbers[$sm] ?? $sm }})</div>
+                <div>{{ $termSemesterNumbers[$sm] ?? $sm }} &nbsp; {{ $kokurMap[$sm] ?? 'Terlaksana dengan baik sesuai dengan Projek Penguatan Profil Pelajar Pancasila (P5).' }}</div>
             </div>
         @endforeach
     @endif
@@ -190,7 +195,7 @@
                     <th style="width:30px">No</th>
                     <th>Ekstrakurikuler</th>
                     @foreach($semList as $sm)
-                        <th style="width:100px">Semester {{ $sm === 'Ganjil' ? '1' : '2' }}</th>
+                        <th style="width:100px">Semester {{ $termSemesterNumbers[$sm] ?? $sm }}</th>
                     @endforeach
                 </tr>
             </thead>
@@ -224,7 +229,7 @@
                     <th style="width:30px">No</th>
                     <th>Keterangan</th>
                     @foreach($semList as $sm)
-                        <th style="width:100px">Semester {{ $sm === 'Ganjil' ? '1' : '2' }}</th>
+                        <th style="width:100px">Semester {{ $termSemesterNumbers[$sm] ?? $sm }}</th>
                     @endforeach
                 </tr>
             </thead>
@@ -319,4 +324,3 @@
     @endif
 </div>
 @endif
-

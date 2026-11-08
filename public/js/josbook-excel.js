@@ -85,7 +85,13 @@
         return match ? normAcademicYear(match[1]) : '';
     };
 
-    const normSem = v => (/genap|2/i.test(String(v)) ? 'Genap' : /ganjil|1/i.test(String(v)) ? 'Ganjil' : '');
+    const normSem = v => {
+        const value = String(v ?? '').trim();
+        if (/genap/i.test(value)) return 'Genap';
+        if (/ganjil/i.test(value)) return 'Ganjil';
+        const match = /^(?:semester|smt|sem)?\s*\.?\s*([1-6])$/i.exec(value);
+        return match ? match[1] : '';
+    };
 
     const normN = v => {
         v = String(v ?? '').replace(/[^0-9]/g, '').trim();
@@ -422,10 +428,10 @@
 
     function hsplit(h) {
         const t = String(h).trim();
-        const m = /\b(?:semester|smt|sem)\s*\.?\s*([12])\b|\b(ganjil|genap)\b/i.exec(t);
+        const m = /\b(?:semester|smt|sem)\s*\.?\s*([1-6])\b|\b(ganjil|genap)\b/i.exec(t);
         if (!m) return {b:t, s:''};
         const b = t.replace(m[0],' ').replace(/[\s\-_:()]+$/,'').replace(/^[\s\-_:()]+/,'').trim();
-        return {b:b||t, s:m[2]?(/genap/i.test(m[2])?'Genap':'Ganjil'):(m[1]==='2'?'Genap':'Ganjil')};
+        return {b:b||t, s:m[2]?(/genap/i.test(m[2])?'Genap':'Ganjil'):m[1]};
     }
 
     const fx = h => {
@@ -771,7 +777,7 @@
             t: 'siswa',
             mode: 'semua',
             kelas: 'X-1',
-            sem: 'Genap',
+            sem: 'auto',
             dup: 'skip',
             ta: '2024/2025',
             raws: null,
@@ -797,11 +803,20 @@
         const modeEl = document.querySelector('select[name="mode"]') || document.getElementById('mode');
         if (modeEl && modeEl.value) I.mode = (modeEl.value === 'kelas') ? 'kelas' : 'semua';
 
-        const kelasEl = document.querySelector('input[name="kelas"]') || document.getElementById('kelas');
-        if (kelasEl && kelasEl.value) I.kelas = normK(kelasEl.value) || I.kelas;
+        const kelasEl = document.querySelector('[name="kelas"]') || document.getElementById('kelas');
+        if (kelasEl && kelasEl.value) {
+            if (kelasEl.value === '*') {
+                I.mode = 'semua';
+                I.kelas = '';
+            } else {
+                I.mode = 'kelas';
+                I.kelas = normK(kelasEl.value) || '';
+            }
+        }
     }
 
     function syncDetectedAcademicYear(rows) {
+        if (['nilai', 'hadir', 'ekskul'].includes(S.imp.t)) return;
         const years = [...new Set((rows || []).map(row => normAcademicYear(row.tahun_ajaran || '')).filter(Boolean))];
         if (years.length !== 1) return;
 
@@ -1154,7 +1169,7 @@
 
         const payload = {
             type: I.t,
-            tahun_ajaran: I.ta || '',
+            tahun_ajaran: ['nilai', 'hadir', 'ekskul'].includes(I.t) ? '' : (I.ta || ''),
             semester: I.sem || 'Genap',
             mode: I.mode || 'semua',
             kelas: I.kelas || '',

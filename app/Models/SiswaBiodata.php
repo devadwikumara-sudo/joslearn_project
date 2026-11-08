@@ -23,6 +23,11 @@ class SiswaBiodata extends Model
         return $this->hasMany(SiswaRiwayatKelas::class, 'siswa_id');
     }
 
+    public function riwayatKelasAkademik(): HasMany
+    {
+        return $this->hasMany(SiswaRiwayatKelas::class, 'siswa_id');
+    }
+
     public function nilai(): HasManyThrough
     {
         return $this->hasManyThrough(SiswaNilai::class, SiswaRiwayatKelas::class, 'siswa_id', 'riwayat_kelas_id');

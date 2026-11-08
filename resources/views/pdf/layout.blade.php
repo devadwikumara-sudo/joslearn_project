@@ -441,8 +441,23 @@
             <label>Semester:
                 <select name="sem" onchange="this.form.submit()">
                     <option value="Semua" {{ ($filterSem ?? 'Semua') === 'Semua' ? 'selected' : '' }}>Semua</option>
+                    <option value="1" {{ ($filterSem ?? '') === '1' ? 'selected' : '' }}>Semester 1 · X Ganjil</option>
+                    <option value="2" {{ ($filterSem ?? '') === '2' ? 'selected' : '' }}>Semester 2 · X Genap</option>
+                    <option value="3" {{ ($filterSem ?? '') === '3' ? 'selected' : '' }}>Semester 3 · XI Ganjil</option>
+                    <option value="4" {{ ($filterSem ?? '') === '4' ? 'selected' : '' }}>Semester 4 · XI Genap</option>
+                    <option value="5" {{ ($filterSem ?? '') === '5' ? 'selected' : '' }}>Semester 5 · XII Ganjil</option>
+                    <option value="6" {{ ($filterSem ?? '') === '6' ? 'selected' : '' }}>Semester 6 · XII Genap</option>
                     <option value="Ganjil" {{ ($filterSem ?? '') === 'Ganjil' ? 'selected' : '' }}>Ganjil</option>
                     <option value="Genap" {{ ($filterSem ?? '') === 'Genap' ? 'selected' : '' }}>Genap</option>
+                </select>
+            </label>
+
+            <label>Kelas:
+                <select name="kelas_filter" onchange="this.form.submit()">
+                    <option value="Semua" {{ ($filterKelas ?? 'Semua') === 'Semua' ? 'selected' : '' }}>Semua kelas</option>
+                    @foreach($filterKelasList ?? [] as $className)
+                        <option value="{{ $className }}" {{ ($filterKelas ?? '') === $className ? 'selected' : '' }}>{{ $className }}</option>
+                    @endforeach
                 </select>
             </label>
 
@@ -458,6 +473,9 @@
             <input type="hidden" name="paper" id="form-paper" value="{{ $paper ?? 'F4' }}">
             @if(request()->has('kelas'))
                 <input type="hidden" name="kelas" value="{{ request('kelas') }}">
+            @endif
+            @if(request()->has('ids'))
+                <input type="hidden" name="ids" value="{{ is_array(request('ids')) ? implode(',', request('ids')) : request('ids') }}">
             @endif
         </form>
     </div>
@@ -495,4 +513,3 @@ function applyPreset(v) {
 
 </body>
 </html>
-

@@ -68,6 +68,11 @@ class DataSiswaController extends Controller
                 $this->applyHistoryFilters($historyQuery, $taAktifId, $kelasSelected, $statusFilter);
                 $historyQuery->with('kelas')->orderByDesc('tahun_ajaran_id');
             }])
+                ->with(['riwayatKelasAkademik' => function (Relation $historyQuery): void {
+                    $historyQuery->whereNull('deleted_at')
+                        ->with(['kelas', 'tahunAjaran', 'nilai.mapel', 'kehadiran', 'ekskul'])
+                        ->orderBy('tahun_ajaran_id');
+                }])
                 ->with('berkas')
                 ->latest('id')
                 ->paginate(25)
@@ -268,7 +273,7 @@ class DataSiswaController extends Controller
     {
         return SiswaBiodata::with([
             'riwayatKelas' => function ($query): void {
-                $query->with(['kelas', 'tahunAjaran'])->orderBy('tahun_ajaran_id');
+                $query->with(['kelas', 'tahunAjaran', 'nilai.mapel', 'kehadiran', 'ekskul'])->orderBy('tahun_ajaran_id');
             },
             'berkas',
         ])->findOrFail($id);

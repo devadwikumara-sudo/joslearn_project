@@ -45,7 +45,7 @@
                     'riwayatKelas'   => $rk['riwayatKelas'],
                     'taNama'         => $rk['taNama'],
                     'kktp'           => $kktp ?? 75,
-                    'filterSem'      => $filterSem ?? 'Semua',
+                    'filterSem'      => $reportFilterSem ?? 'Semua',
                     'nilaiMap'       => $rk['nilaiMap'] ?? [],
                     'kokurMap'       => $rk['kokurMap'] ?? [],
                     'ekskulList'     => $rk['ekskulList'] ?? [],
@@ -80,4 +80,3 @@
         </div>
     @endif
 @endsection
-

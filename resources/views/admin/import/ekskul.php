@@ -4,37 +4,33 @@
 
 @section('content')
 <h2>Import Ekstrakurikuler</h2>
-<p class="sub">Unggah file Excel ekstrakurikuler siswa (Pramuka, PMR, Paskibra, Olahraga, Seni, dll). Nama kegiatan dan predikat nilai (Sangat Baik / Baik / Cukup) dideteksi otomatis.</p>
+<p class="sub">Unggah file Excel dari berbagai format semester. Pilih kelas dan semester; sistem mencocokkan tahun ajaran dari riwayat kelas siswa. Nilai semester 1–2 di dalam kelas atau label Ganjil/Genap dikenali untuk kelas X, XI, dan XII.</p>
 
 {{-- Card 1: Unggah file & pengaturan (Sesuai Prototype impPg) --}}
 <div class="card">
     <h3>1. Unggah file &amp; pengaturan</h3>
     <div class="fl">
         <div>
-            <label>Mode</label>
-            <select name="mode" id="mode">
-                <option value="kelas">Satu kelas</option>
-                <option value="semua" selected>Semua kelas (dari kolom "kelas" di Excel)</option>
-            </select>
-        </div>
-        <div>
-            <label>Tahun ajaran</label>
-            <input value="{{ $taAktif ?? '2024/2025' }}" name="tahun_ajaran" id="tahun_ajaran" readonly>
-        </div>
-        <div>
-            <label>Kelas (ketik baru = dibuat otomatis)</label>
-            <input list="dlk" name="kelas" id="kelas" value="{{ $kelasList[0] ?? 'X-1' }}">
-            <datalist id="dlk">
+            <label>Kelas</label>
+            <select name="kelas" id="kelas">
+                <option value="*" selected>Semua kelas (gunakan kolom kelas di Excel)</option>
                 @foreach($kelasList ?? [] as $k)
-                    <option value="{{ $k }}">
+                    <option value="{{ $k }}">{{ $k }}</option>
                 @endforeach
-            </datalist>
+            </select>
         </div>
         <div>
             <label>Semester</label>
             <select name="semester" id="semester">
-                <option value="Ganjil">Semester 1 (Ganjil)</option>
-                <option value="Genap" selected>Semester 2 (Genap)</option>
+                <option value="auto" selected>Deteksi dari kolom Excel</option>
+                <option value="1">Semester 1 / Ganjil (sesuai tingkat kelas)</option>
+                <option value="2">Semester 2 / Genap (sesuai tingkat kelas)</option>
+                <option value="local-ganjil">Ganjil (sesuai tingkat kelas)</option>
+                <option value="local-genap">Genap (sesuai tingkat kelas)</option>
+                <option value="3">Semester global 3 (XI Ganjil)</option>
+                <option value="4">Semester global 4 (XI Genap)</option>
+                <option value="5">Semester global 5 (XII Ganjil)</option>
+                <option value="6">Semester global 6 (XII Genap)</option>
             </select>
         </div>
     </div>
@@ -55,12 +51,13 @@
 
 {{-- Card 4: Data Hasil Impor --}}
 <div class="card" style="margin-top:14px">
-    <h3>Data hasil impor {{ $taAktif ?? '2024/2025' }}</h3>
+    <h3>Data hasil impor seluruh tahun ajaran</h3>
     <div class="tw">
         <table>
             <thead>
                 <tr>
                     <th>Kelas</th>
+                    <th>Tahun ajaran</th>
                     <th>Semester</th>
                     <th>Baris Ekskul</th>
                     <th>Aksi</th>
@@ -70,7 +67,8 @@
                 @forelse($riwayatImport ?? [] as $row)
                 <tr>
                     <td><strong>{{ $row->kelas }}</strong></td>
-                    <td>{{ $row->semester }}</td>
+                    <td>{{ $row->tahun_ajaran }}</td>
+                    <td>{{ $row->semester_number ? 'Semester '.$row->semester_number : $row->semester }}</td>
                     <td><b>{{ $row->baris }}</b> kegiatan</td>
                     <td>
                         <a href="{{ route('admin.data-siswa', ['kelas' => $row->kelas]) }}" class="btn o" style="padding:3px 8px;font-size:12px">Lihat di Data Siswa</a>
@@ -78,8 +76,8 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="4" style="text-align:center;padding:24px;color:var(--mu)">
-                        Belum ada data ekstrakurikuler diimpor pada tahun ajaran ini.
+                    <td colspan="5" style="text-align:center;padding:24px;color:var(--mu)">
+                        Belum ada data ekstrakurikuler yang diimpor.
                     </td>
                 </tr>
                 @endforelse
@@ -97,8 +95,8 @@ function downloadTemplateEkskul() {
     }
     var cols = ['nisn', 'nama', 'kelas', 'sem', 'ekskul', 'predikat'];
     var sample = [
-        ['0081234561', 'Ahmad Faiz', 'X-1', 'Genap', 'Pramuka', 'Sangat Baik'],
-        ['0081234562', 'Bunga Citra', 'X-1', 'Genap', 'PMR', 'Baik']
+        ['0081234561', 'Ahmad Faiz', 'X-1', '2', 'Pramuka', 'Sangat Baik'],
+        ['0081234562', 'Bunga Citra', 'X-1', '2', 'PMR', 'Baik']
     ];
     var w = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(w, XLSX.utils.aoa_to_sheet([cols, ...sample]), 'Ekskul');
@@ -107,9 +105,9 @@ function downloadTemplateEkskul() {
 
 function loadDemoEkskul() {
     var dummy = [
-        { nisn: '0081234561', nama: 'Ahmad Faiz', kelas: 'X-1', sem: 'Genap', ekskul: 'Pramuka Wajib', predikat: 'Sangat Baik' },
-        { nisn: '0081234562', nama: 'Bunga Citra', kelas: 'X-1', sem: 'Genap', ekskul: 'PMR', predikat: 'Baik' },
-        { nisn: '0081234563', nama: 'Dimas Anggara', kelas: 'X-2', sem: 'Genap', ekskul: 'Futsal', predikat: 'Sangat Baik' }
+        { nisn: '0081234561', nama: 'Ahmad Faiz', kelas: 'X-1', sem: '2', ekskul: 'Pramuka Wajib', predikat: 'Sangat Baik' },
+        { nisn: '0081234562', nama: 'Bunga Citra', kelas: 'X-1', sem: '2', ekskul: 'PMR', predikat: 'Baik' },
+        { nisn: '0081234563', nama: 'Dimas Anggara', kelas: 'X-2', sem: '2', ekskul: 'Futsal', predikat: 'Sangat Baik' }
     ];
 
     var ws = XLSX.utils.json_to_sheet(dummy);

@@ -61,11 +61,6 @@ class PdfCetakController extends Controller
                 if ($taId) {
                     $query->where('tahun_ajaran_id', $taId);
                 }
-            } else {
-                $taAktifId = SekolahTahunAjaran::where('sedang_berjalan', 1)->value('id');
-                if ($taAktifId) {
-                    $query->where('tahun_ajaran_id', $taAktifId);
-                }
             }
 
             $ids = $query->pluck('siswa_id')->unique()->toArray();
@@ -110,8 +105,25 @@ class PdfCetakController extends Controller
         $optEkskul = $hasQueryParams ? $request->boolean('ekskul') : true;
         $optNaik = $hasQueryParams ? $request->boolean('naik') : true;
 
-        $filterSem = $request->input('sem', 'Semua');
+        $filterSem = (string) $request->input('sem', 'Semua');
+        if (! in_array($filterSem, ['Semua', 'Ganjil', 'Genap', '1', '2', '3', '4', '5', '6'], true)) {
+            $filterSem = 'Semua';
+        }
+        $filterSemNumber = ctype_digit($filterSem) ? (int) $filterSem : null;
+        $filterSemGrade = match (true) {
+            $filterSemNumber !== null && $filterSemNumber <= 2 => 'X',
+            $filterSemNumber !== null && $filterSemNumber <= 4 => 'XI',
+            $filterSemNumber !== null => 'XII',
+            default => null,
+        };
+        $reportFilterSem = match (true) {
+            $filterSemNumber !== null && $filterSemNumber % 2 === 1 => 'Ganjil',
+            $filterSemNumber !== null => 'Genap',
+            default => $filterSem,
+        };
         $filterTa = $request->input('ta', 'Semua');
+        $filterKelas = (string) $request->input('kelas_filter', 'Semua');
+        $filterKelasList = SekolahKelas::orderBy('nama')->pluck('nama')->toArray();
         $paper = $request->input('paper', 'F4');
 
         // 4. Mapping Next Kelas (Untuk Kenaikan Kelas)
@@ -149,6 +161,19 @@ class PdfCetakController extends Controller
             if ($filterTa !== 'Semua') {
                 $riwayatSorted = $riwayatSorted->filter(function ($r) use ($filterTa) {
                     return ($r->tahunAjaran?->nama ?? '') === $filterTa;
+                });
+            }
+            if ($filterKelas !== 'Semua') {
+                $riwayatSorted = $riwayatSorted->filter(function ($r) use ($filterKelas) {
+                    return ($r->kelas?->nama ?? '') === $filterKelas;
+                });
+            }
+            if ($filterSemGrade !== null) {
+                $riwayatSorted = $riwayatSorted->filter(function ($r) use ($filterSemGrade) {
+                    $className = $r->kelas?->nama ?? '';
+                    $grade = strtoupper((string) ($r->kelas?->tingkat ?? (preg_match('/^(XII|XI|X)(?:-|$)/i', $className, $matches) ? $matches[1] : '')));
+
+                    return $grade === $filterSemGrade;
                 });
             }
 
@@ -279,7 +304,11 @@ class PdfCetakController extends Controller
             'optEkskul',
             'optNaik',
             'filterSem',
+            'reportFilterSem',
+            'filterSemNumber',
             'filterTa',
+            'filterKelas',
+            'filterKelasList',
             'paper',
             'subTitle',
             'showCover',
@@ -289,4 +318,3 @@ class PdfCetakController extends Controller
         ));
     }
 }
-
