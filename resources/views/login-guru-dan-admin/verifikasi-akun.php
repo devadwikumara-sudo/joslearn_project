@@ -61,6 +61,10 @@
                 <button type="submit" class="wb">VERIFIKASI KODE →</button>
             </form>
 
+            <form method="POST" action="{{ route('verifikasi-akun.kirim-ulang') }}" id="resendForm" style="display:none">
+                @csrf
+            </form>
+
             <p class="wfo">
                 Belum menerima kode verifikasi?<br>
                 Kirim ulang kode: <em class="tm" id="timer_text">⏱ Kirim ulang dalam 00:45</em><br>
@@ -118,17 +122,24 @@
         });
 
         // Resend countdown timer
-        let seconds = 45;
+        let seconds = {{ $sisaKirimUlang ?? 45 }};
         const timerEl = document.getElementById('timer_text');
+        const showResendLink = () => {
+            timerEl.innerHTML = '<a href="#" onclick="document.getElementById(\'resendForm\').submit();return false;" style="color:#1967d2;font-weight:700">Kirim Ulang Sekarang</a>';
+        };
+        if (seconds <= 0) {
+            showResendLink();
+        }
         const interval = setInterval(() => {
             seconds--;
             if (seconds <= 0) {
                 clearInterval(interval);
-                timerEl.innerHTML = '<a href="#" onclick="location.reload();return false;" style="color:#1967d2;font-weight:700">Kirim Ulang Sekarang</a>';
+                showResendLink();
             } else {
                 timerEl.textContent = `⏱ Kirim ulang dalam 00:${seconds < 10 ? '0' : ''}${seconds}`;
             }
         }, 1000);
+        if (seconds <= 0) clearInterval(interval);
     </script>
 </body>
 </html>

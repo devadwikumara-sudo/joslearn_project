@@ -1,18 +1,18 @@
 <?php
+
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Auth\Pengguna;
 use App\Models\SiswaBiodata;
+use App\Services\OtpService;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 
@@ -22,10 +22,11 @@ use Illuminate\Support\Str;
  */
 class AuthApiController extends Controller
 {
-    private const OTP_BERLAKU_MENIT = 10;
-    private const OTP_MAKS_PERCOBAAN = 5;
     private const OTP_JEDA_KIRIM_ULANG_DETIK = 60;
+
     private const RESET_TOKEN_BERLAKU_MENIT = 15;
+
+    public function __construct(private OtpService $otpService) {}
 
     /**
      * POST /api/v1/login  (layar Login)
@@ -34,8 +35,8 @@ class AuthApiController extends Controller
     public function login(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'username'       => ['required', 'string'],
-            'password'       => ['required', 'string'],
+            'username' => ['required', 'string'],
+            'password' => ['required', 'string'],
             'nama_perangkat' => ['nullable', 'string', 'max:120'],
         ], [
             'username.required' => 'Email / NISN / Username wajib diisi.',
@@ -79,12 +80,12 @@ class AuthApiController extends Controller
 
         // Catat perangkat untuk layar "Sesi Aktif"
         DB::table('akun_perangkat_login')->insert([
-            'pengguna_id'       => $pengguna->id,
-            'token_id'          => $token->accessToken->id,
-            'nama_perangkat'    => $data['nama_perangkat'] ?? null,
-            'alamat_ip'         => $request->ip(),
+            'pengguna_id' => $pengguna->id,
+            'token_id' => $token->accessToken->id,
+            'nama_perangkat' => $data['nama_perangkat'] ?? null,
+            'alamat_ip' => $request->ip(),
             'terakhir_aktif_at' => now(),
-            'created_at'        => now(),
+            'created_at' => now(),
         ]);
 
         $pengguna->terakhir_login_at = now();
@@ -92,13 +93,13 @@ class AuthApiController extends Controller
 
         return response()->json([
             'pesan' => 'Login berhasil.',
-            'data'  => [
-                'token'                => $token->plainTextToken,
-                'tipe_token'           => 'Bearer',
+            'data' => [
+                'token' => $token->plainTextToken,
+                'tipe_token' => 'Bearer',
                 'wajib_ganti_password' => (bool) $pengguna->wajib_ganti_password,
-                'pengguna'             => [
-                    'nama'  => $pengguna->nama,
-                    'nisn'  => $pengguna->username,
+                'pengguna' => [
+                    'nama' => $pengguna->nama,
+                    'nisn' => $pengguna->username,
                     'email' => $pengguna->email,
                 ],
             ],
@@ -113,21 +114,21 @@ class AuthApiController extends Controller
     public function daftar(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'nama'     => ['required', 'string', 'max:150'],
-            'nisn'     => ['required', 'digits:10'],
-            'email'    => ['required', 'email', 'max:120'],
+            'nama' => ['required', 'string', 'max:150'],
+            'nisn' => ['required', 'digits:10'],
+            'email' => ['required', 'email', 'max:120'],
             'password' => ['required', 'string', 'min:8'],
         ], [
-            'nama.required'     => 'Nama lengkap wajib diisi.',
-            'nisn.required'     => 'NISN wajib diisi.',
-            'nisn.digits'       => 'NISN harus 10 digit angka.',
-            'email.required'    => 'Email wajib diisi.',
-            'email.email'       => 'Format email tidak valid.',
+            'nama.required' => 'Nama lengkap wajib diisi.',
+            'nisn.required' => 'NISN wajib diisi.',
+            'nisn.digits' => 'NISN harus 10 digit angka.',
+            'email.required' => 'Email wajib diisi.',
+            'email.email' => 'Format email tidak valid.',
             'password.required' => 'Password wajib diisi.',
-            'password.min'      => 'Password minimal 8 karakter.',
+            'password.min' => 'Password minimal 8 karakter.',
         ]);
 
-        $nisn  = trim($data['nisn']);
+        $nisn = trim($data['nisn']);
         $email = Str::lower(trim($data['email']));
 
         $siswa = SiswaBiodata::where('nisn', $nisn)->first();
@@ -154,8 +155,8 @@ class AuthApiController extends Controller
         DB::transaction(function () use ($akun, $siswa, $nisn, $email, $data) {
             if ($akun) {
                 // Pendaftaran yang belum diverifikasi: perbarui isiannya
-                $akun->email                 = $email;
-                $akun->password              = Hash::make($data['password']);
+                $akun->email = $email;
+                $akun->password = Hash::make($data['password']);
                 $akun->email_diverifikasi_at = null;
                 $akun->save();
 
@@ -163,12 +164,12 @@ class AuthApiController extends Controller
             }
 
             Pengguna::create([
-                'peran'                => 'siswa',
-                'username'             => $nisn,
-                'email'                => $email,
-                'password'             => Hash::make($data['password']),
-                'aktif'                => false,
-                'siswa_id'             => $siswa->id,
+                'peran' => 'siswa',
+                'username' => $nisn,
+                'email' => $email,
+                'password' => Hash::make($data['password']),
+                'aktif' => false,
+                'siswa_id' => $siswa->id,
                 'wajib_ganti_password' => false,
             ]);
         });
@@ -183,7 +184,7 @@ class AuthApiController extends Controller
 
         return response()->json([
             'pesan' => 'Kode verifikasi telah dikirim ke email Anda.',
-            'data'  => $this->dataOtp($email, $kode),
+            'data' => $this->dataOtp($email, $kode),
         ], 201);
     }
 
@@ -194,39 +195,30 @@ class AuthApiController extends Controller
     public function verifikasiOtp(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'email'  => ['required', 'email'],
-            'kode'   => ['required', 'digits:6'],
+            'email' => ['required', 'email'],
+            'kode' => ['required', 'digits:6'],
             'tujuan' => ['nullable', 'in:daftar,lupa_password'],
         ], [
             'kode.required' => 'Masukkan 6 digit kode verifikasi.',
-            'kode.digits'   => 'Kode verifikasi harus 6 digit angka.',
+            'kode.digits' => 'Kode verifikasi harus 6 digit angka.',
         ]);
 
-        $email  = Str::lower(trim($data['email']));
+        $email = Str::lower(trim($data['email']));
         $tujuan = $data['tujuan'] ?? 'daftar';
 
-        $otp = DB::table('akun_kode_otp')
-            ->where('email', $email)
-            ->where('tujuan', $tujuan)
-            ->whereNull('dipakai_at')
-            ->orderByDesc('id')
-            ->first();
+        $hasil = $this->otpService->verifikasi($email, $tujuan, $data['kode']);
 
-        if (! $otp || Carbon::parse($otp->berlaku_sampai)->isPast()) {
+        if ($hasil === OtpService::TIDAK_VALID) {
             return $this->gagal('Kode verifikasi tidak valid atau sudah kedaluwarsa. Silakan kirim ulang kode.', 422, 'otp_salah');
         }
 
-        if ($otp->percobaan >= self::OTP_MAKS_PERCOBAAN) {
+        if ($hasil === OtpService::TERLALU_BANYAK) {
             return $this->gagal('Terlalu banyak percobaan. Silakan kirim ulang kode baru.', 429, 'otp_terlalu_banyak');
         }
 
-        if (! Hash::check($data['kode'], $otp->kode_hash)) {
-            DB::table('akun_kode_otp')->where('id', $otp->id)->increment('percobaan');
-
+        if ($hasil === OtpService::SALAH) {
             return $this->gagal('Kode verifikasi salah.', 422, 'otp_salah');
         }
-
-        DB::table('akun_kode_otp')->where('id', $otp->id)->update(['dipakai_at' => now()]);
 
         $pengguna = Pengguna::where('email', $email)->where('peran', 'siswa')->first();
 
@@ -235,7 +227,7 @@ class AuthApiController extends Controller
         }
 
         if ($tujuan === 'daftar') {
-            $pengguna->aktif                 = true;
+            $pengguna->aktif = true;
             $pengguna->email_diverifikasi_at = now();
             $pengguna->save();
 
@@ -243,7 +235,7 @@ class AuthApiController extends Controller
 
             return response()->json([
                 'pesan' => 'Register berhasil. Silakan login.',
-                'data'  => [
+                'data' => [
                     'nama' => $pengguna->nama,
                     'nisn' => $pengguna->username,
                 ],
@@ -253,7 +245,7 @@ class AuthApiController extends Controller
         // lupa_password: beri token singkat untuk langkah "buat kata sandi baru"
         return response()->json([
             'pesan' => 'Kode benar. Silakan buat kata sandi baru.',
-            'data'  => ['reset_token' => $this->buatResetToken($pengguna)],
+            'data' => ['reset_token' => $this->buatResetToken($pengguna)],
         ]);
     }
 
@@ -263,26 +255,20 @@ class AuthApiController extends Controller
     public function kirimUlangOtp(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'email'  => ['required', 'email'],
+            'email' => ['required', 'email'],
             'tujuan' => ['nullable', 'in:daftar,lupa_password'],
         ]);
 
-        $email  = Str::lower(trim($data['email']));
+        $email = Str::lower(trim($data['email']));
         $tujuan = $data['tujuan'] ?? 'daftar';
 
-        $terakhir = DB::table('akun_kode_otp')
-            ->where('email', $email)->where('tujuan', $tujuan)
-            ->orderByDesc('id')->value('created_at');
-
-        if ($terakhir) {
-            $sisa = self::OTP_JEDA_KIRIM_ULANG_DETIK - Carbon::parse($terakhir)->diffInSeconds(now(), true);
-            if ($sisa > 0) {
-                return response()->json([
-                    'pesan' => 'Tunggu sebentar sebelum mengirim ulang kode.',
-                    'kode'  => 'tunggu',
-                    'data'  => ['sisa_detik' => (int) ceil($sisa)],
-                ], 429);
-            }
+        $sisa = $this->otpService->detikSampaiKirimUlang($email, $tujuan, self::OTP_JEDA_KIRIM_ULANG_DETIK);
+        if ($sisa > 0) {
+            return response()->json([
+                'pesan' => 'Tunggu sebentar sebelum mengirim ulang kode.',
+                'kode' => 'tunggu',
+                'data' => ['sisa_detik' => $sisa],
+            ], 429);
         }
 
         // Jawaban selalu sama agar email yang terdaftar tidak bisa ditebak
@@ -299,7 +285,7 @@ class AuthApiController extends Controller
 
         return response()->json([
             'pesan' => 'Jika email terdaftar, kode verifikasi baru telah dikirim.',
-            'data'  => $this->dataOtp($email, $kode),
+            'data' => $this->dataOtp($email, $kode),
         ]);
     }
 
@@ -312,7 +298,7 @@ class AuthApiController extends Controller
             'email' => ['required', 'email'],
         ], [
             'email.required' => 'Email wajib diisi.',
-            'email.email'    => 'Format email tidak valid.',
+            'email.email' => 'Format email tidak valid.',
         ]);
 
         $email = Str::lower(trim($data['email']));
@@ -336,7 +322,7 @@ class AuthApiController extends Controller
         // Jawaban selalu sama agar email yang terdaftar tidak bisa ditebak
         return response()->json([
             'pesan' => 'Jika email terdaftar, kode verifikasi telah dikirim.',
-            'data'  => $this->dataOtp($email, $kode),
+            'data' => $this->dataOtp($email, $kode),
         ]);
     }
 
@@ -347,10 +333,10 @@ class AuthApiController extends Controller
     {
         $data = $request->validate([
             'reset_token' => ['required', 'string'],
-            'password'    => ['required', 'string', 'min:8', 'confirmed'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
         ], [
-            'password.required'  => 'Kata sandi baru wajib diisi.',
-            'password.min'       => 'Kata sandi minimal 8 karakter.',
+            'password.required' => 'Kata sandi baru wajib diisi.',
+            'password.min' => 'Kata sandi minimal 8 karakter.',
             'password.confirmed' => 'Konfirmasi kata sandi tidak cocok.',
         ]);
 
@@ -360,7 +346,7 @@ class AuthApiController extends Controller
             return $this->gagal('Sesi reset kata sandi tidak valid atau sudah kedaluwarsa. Ulangi dari awal.', 422, 'reset_kedaluwarsa');
         }
 
-        $pengguna->password             = Hash::make($data['password']);
+        $pengguna->password = Hash::make($data['password']);
         $pengguna->wajib_ganti_password = false;
         $pengguna->save();
 
@@ -392,7 +378,7 @@ class AuthApiController extends Controller
     {
         return response()->json(array_filter([
             'pesan' => $pesan,
-            'kode'  => $kode,
+            'kode' => $kode,
         ]), $status);
     }
 
@@ -409,38 +395,14 @@ class AuthApiController extends Controller
      */
     private function buatDanKirimOtp(string $email, string $tujuan): string
     {
-        $kode = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-
-        DB::table('akun_kode_otp')
-            ->where('email', $email)->where('tujuan', $tujuan)->whereNull('dipakai_at')
-            ->update(['dipakai_at' => now()]);
-
-        DB::table('akun_kode_otp')->insert([
-            'email'          => $email,
-            'tujuan'         => $tujuan,
-            'kode_hash'      => Hash::make($kode),
-            'percobaan'      => 0,
-            'berlaku_sampai' => now()->addMinutes(self::OTP_BERLAKU_MENIT),
-            'created_at'     => now(),
-        ]);
-
-        $keperluan = $tujuan === 'daftar' ? 'verifikasi pendaftaran akun' : 'reset kata sandi';
-
-        Mail::raw(
-            "Kode {$keperluan} JosBook Anda: {$kode}\n\n"
-            .'Kode berlaku '.self::OTP_BERLAKU_MENIT." menit. Jangan bagikan kode ini kepada siapa pun.\n"
-            .'Jika Anda tidak merasa memintanya, abaikan email ini.',
-            fn ($pesan) => $pesan->to($email)->subject('Kode Verifikasi JosBook')
-        );
-
-        return $kode;
+        return $this->otpService->buatDanKirim($email, $tujuan);
     }
 
     private function dataOtp(string $email, ?string $kode): array
     {
         $data = [
-            'email'        => $this->maskEmail($email),
-            'berlaku_menit' => self::OTP_BERLAKU_MENIT,
+            'email' => $this->maskEmail($email),
+            'berlaku_menit' => OtpService::BERLAKU_MENIT,
             'jeda_kirim_ulang_detik' => self::OTP_JEDA_KIRIM_ULANG_DETIK,
         ];
 
@@ -459,8 +421,8 @@ class AuthApiController extends Controller
     private function buatResetToken(Pengguna $pengguna): string
     {
         return Crypt::encryptString(json_encode([
-            'id'   => $pengguna->id,
-            'exp'  => now()->addMinutes(self::RESET_TOKEN_BERLAKU_MENIT)->timestamp,
+            'id' => $pengguna->id,
+            'exp' => now()->addMinutes(self::RESET_TOKEN_BERLAKU_MENIT)->timestamp,
             'sidik' => hash('sha256', $pengguna->password),
         ]));
     }

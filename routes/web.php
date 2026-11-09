@@ -43,6 +43,7 @@ Route::post('/daftar', [AuthController::class, 'daftar'])->name('daftar.post')->
 // 3. Halaman Verifikasi Akun OTP (Verifikasi akun.png)
 Route::get('/verifikasi-akun', [AuthController::class, 'showVerifikasi'])->name('verifikasi-akun');
 Route::post('/verifikasi-akun', [AuthController::class, 'verifikasi'])->name('verifikasi-akun.post');
+Route::post('/verifikasi-akun/kirim-ulang', [AuthController::class, 'kirimUlangOtp'])->name('verifikasi-akun.kirim-ulang');
 
 // 4. Halaman Reset Sandi (Reset sandi.png)
 Route::get('/reset-sandi', [AuthController::class, 'showResetSandi'])->name('reset-sandi')->middleware('guest');
