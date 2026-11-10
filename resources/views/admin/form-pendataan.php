@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', ($edit ? 'Edit Data Siswa' : 'Form Pendataan · Siswa Baru') . ' — JosBook Admin')
+@section('title', ($edit ? 'Edit Data Siswa' : 'Form Pendataan · Siswa Baru') . ' — ' . (auth()->user()?->peran === 'guru' ? 'JosBook Guru' : 'JosBook Admin'))
 
 @section('content')
 @php
@@ -12,6 +12,11 @@
         'ijazah_smp' => ['Ijazah SMP', 'ijazah_smp_ada'],
         'surat_pindah' => ['Surat Pindah', 'surat_pindah_ada'],
     ];
+        $isGuru = auth()->user()?->peran === 'guru';
+        $formAction = $edit
+            ? route($isGuru ? 'guru.data-siswa.update' : 'admin.form-pendataan.update', $edit->id)
+            : route('admin.form-pendataan.store');
+        $cancelUrl = route($isGuru ? 'guru.data-siswa' : 'admin.data-siswa');
 @endphp
 <h2>Form Pendataan · Siswa {{ $edit ? 'Edit' : 'Baru' }}</h2>
 @if($errors->any())
@@ -30,7 +35,7 @@
     @endif
 </p>
 
-<form action="{{ $edit ? route('admin.form-pendataan.update', $edit->id) : route('admin.form-pendataan.store') }}" method="POST" enctype="multipart/form-data">
+<form action="{{ $formAction }}" method="POST" enctype="multipart/form-data">
     @csrf
     @if($edit)
         @method('PUT')
@@ -58,7 +63,7 @@
             <div class="note" style="margin-top:0;margin-bottom:14px;display:flex;gap:14px;align-items:center;flex-wrap:wrap">
                 <div style="width:72px;height:96px;background:#e2e8f0;border-radius:6px;border:1px dashed #94a3b8;display:flex;align-items:center;justify-content:center;overflow:hidden">
                     @if($edit && $edit->foto)
-                        <img id="preview-foto" src="{{ route('admin.data-siswa.foto', $edit->id) }}" style="width:100%;height:100%;object-fit:cover">
+                        <img id="preview-foto" src="{{ route($isGuru ? 'guru.data-siswa.foto' : 'admin.data-siswa.foto', $edit->id) }}" style="width:100%;height:100%;object-fit:cover">
                     @else
                         <img id="preview-foto" style="width:100%;height:100%;object-fit:cover;display:none">
                         <span id="label-foto" style="font-size:11px;color:#64748b;text-align:center">Pas foto<br>3×4</span>
@@ -490,7 +495,7 @@
         {{-- TAB LAMPIRAN BERKAS --}}
         <div id="tab-berkas" class="tab-pane" style="display:none">
             <div class="note">
-                Unggah dokumen PDF, JPG, JPEG, atau PNG (maksimal 5 MB per berkas). Berkas disimpan privat dan hanya dapat diunduh melalui akun admin.
+                Unggah dokumen PDF, JPG, JPEG, atau PNG (maksimal 5 MB per berkas). Berkas disimpan privat dan hanya dapat diunduh melalui akun admin atau guru.
             </div>
             <div class="fl">
                 @foreach($lampiranBerkas as $jenisBerkas => [$labelBerkas, $statusField])
@@ -507,7 +512,7 @@
                         @if($berkasTersimpan)
                             <p class="sub" style="margin:0 0 8px;font-size:11px">
                                 File tersimpan:
-                                <a href="{{ route('admin.data-siswa.berkas', [$edit->id, $jenisBerkas]) }}">{{ $berkasTersimpan->nama_file }}</a>
+                                <a href="{{ route($isGuru ? 'guru.data-siswa.berkas' : 'admin.data-siswa.berkas', [$edit->id, $jenisBerkas]) }}">{{ $berkasTersimpan->nama_file }}</a>
                             </p>
                         @else
                             <p class="sub" style="margin:0 0 8px;font-size:11px">Belum ada file yang diunggah.</p>
@@ -525,7 +530,7 @@
         <div class="bar" style="margin-top:18px;border-top:1px solid #e2e8f0;padding-top:14px">
             <button type="button" class="btn o" id="btn-prev" style="display:none">‹ Sebelumnya</button>
             <span class="sp"></span>
-            <a href="{{ route('admin.data-siswa') }}" class="btn o">Batal</a>
+            <a href="{{ $cancelUrl }}" class="btn o">Batal</a>
             <button type="button" class="btn" id="btn-next">Berikutnya ›</button>
             <button type="submit" class="btn a">{{ $edit ? 'Simpan Perubahan' : 'Simpan Data Siswa' }}</button>
         </div>

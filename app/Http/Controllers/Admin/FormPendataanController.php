@@ -1,21 +1,22 @@
 <?php
+
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Admin\CatatanAktivitas;
 use App\Models\SekolahKelas;
 use App\Models\SekolahTahunAjaran;
-use App\Models\SiswaBiodata;
 use App\Models\SiswaBerkas;
+use App\Models\SiswaBiodata;
 use App\Models\SiswaRiwayatKelas;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
-use Illuminate\Http\UploadedFile;
 use Illuminate\View\View;
 use RuntimeException;
 
@@ -107,7 +108,7 @@ class FormPendataanController extends Controller
             ?? null;
 
         return view('admin.form-pendataan', [
-            'edit'      => null,
+            'edit' => null,
             'kelasList' => $kelasList,
             'tahunAjaranList' => $tahunAjaranList,
             'tahunAjaranTerpilih' => $tahunAjaranTerpilih,
@@ -132,7 +133,7 @@ class FormPendataanController extends Controller
             ?? null;
 
         return view('admin.form-pendataan', [
-            'edit'      => $siswa,
+            'edit' => $siswa,
             'kelasList' => $kelasList,
             'tahunAjaranList' => $tahunAjaranList,
             'tahunAjaranTerpilih' => $tahunAjaranTerpilih,
@@ -199,8 +200,10 @@ class FormPendataanController extends Controller
 
         $this->deleteStoredFiles($replacedAttachmentPaths);
 
+        $routeName = auth()->user()?->peran === 'guru' ? 'guru.data-siswa' : 'admin.data-siswa';
+
         return redirect()
-            ->route('admin.data-siswa', [
+            ->route($routeName, [
                 'kelas' => $kelas->nama,
                 'tahun_ajaran' => $tahunAjaran->id,
             ])
@@ -342,7 +345,7 @@ class FormPendataanController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $data
+     * @param  array<string, mixed>  $data
      */
     private function normalizeDocumentFlags(Request $request, array &$data): void
     {
@@ -352,7 +355,7 @@ class FormPendataanController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $data
+     * @param  array<string, mixed>  $data
      */
     private function storePhoto(Request $request, array &$data, ?string &$fotoPath): void
     {
@@ -364,7 +367,7 @@ class FormPendataanController extends Controller
         $filename = 'foto_'.$data['nisn'].'_'.Str::uuid().'.'.$foto->extension();
         $fotoPath = $foto->storeAs('siswa/foto', $filename, 'local');
         if ($fotoPath === false) {
-            throw new \RuntimeException('Foto siswa tidak dapat disimpan.');
+            throw new RuntimeException('Foto siswa tidak dapat disimpan.');
         }
 
         $data['foto'] = $fotoPath;
@@ -372,8 +375,8 @@ class FormPendataanController extends Controller
     }
 
     /**
-     * @param array<int, string> $uploadedPaths
-     * @param array<int, string> $replacedPaths
+     * @param  array<int, string>  $uploadedPaths
+     * @param  array<int, string>  $replacedPaths
      */
     private function storeAttachments(
         Request $request,
@@ -421,7 +424,7 @@ class FormPendataanController extends Controller
     }
 
     /**
-     * @param array<int, string> $paths
+     * @param  array<int, string>  $paths
      */
     private function deleteStoredFiles(array $paths): void
     {
