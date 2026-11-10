@@ -15,6 +15,7 @@ use App\Models\SiswaKehadiran;
 use App\Models\SiswaNilai;
 use App\Models\SiswaRiwayatKelas;
 use App\Services\AksesGuru;
+use App\Support\Semester;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -40,11 +41,7 @@ class ImportBatchController extends Controller
         $rows = $request->input('rows', []);
         $newClasses = $request->input('new_classes', []);
         $newMapel = $request->input('new_mapel', []);
-        $usesSixSemesterFlow = in_array($type, ['nilai', 'hadir', 'ekskul'], true)
-            && $this->isSixSemesterSelection((string) $semester);
-        if ($usesSixSemesterFlow) {
-            $taName = '';
-        }
+        $isAcademicImport = in_array($type, ['nilai', 'hadir', 'ekskul'], true);
 
         $user = auth()->user();
         if (! $user || ! in_array($user->peran, ['admin', 'guru'], true)) {
@@ -68,7 +65,7 @@ class ImportBatchController extends Controller
             ], 422);
         }
 
-        if (! $usesSixSemesterFlow && $requestedTaName !== '' && $taName === null) {
+        if ($requestedTaName !== '' && $taName === null) {
             return response()->json([
                 'success' => false,
                 'message' => 'Format tahun ajaran tidak valid. Gunakan format seperti 2024/2025.',
@@ -78,25 +75,28 @@ class ImportBatchController extends Controller
         DB::beginTransaction();
         try {
             // 1. Tahun Ajaran
-            if ($usesSixSemesterFlow) {
-                $ta = null;
-            } elseif ($taName !== '') {
-                $ta = $user->peran === 'admin'
+            $createdYearIds = [];
+            $createdHistoryIds = [];
+            if ($taName !== '') {
+                $ta = $isAcademicImport || $user->peran === 'admin'
                     ? SekolahTahunAjaran::firstOrCreate(
                         ['nama' => $taName],
                         ['sedang_berjalan' => 0]
                     )
                     : SekolahTahunAjaran::where('nama', $taName)->first();
+                if ($ta?->wasRecentlyCreated) {
+                    $createdYearIds[$ta->id] = true;
+                }
             } else {
                 $ta = SekolahTahunAjaran::where('sedang_berjalan', 1)->first();
-                if ($user->peran === 'admin') {
+                if ($user->peran === 'admin' && ! $isAcademicImport) {
                     $ta ??= SekolahTahunAjaran::latest('id')->first()
                         ?? SekolahTahunAjaran::create(['nama' => '2024/2025', 'sedang_berjalan' => 1]);
                 }
             }
 
             // 2. Buat kelas baru untuk tipe impor selain biodata siswa.
-            if ($user->peran === 'admin' && $type !== 'siswa' && ! $usesSixSemesterFlow) {
+            if ($user->peran === 'admin' && $type !== 'siswa' && ! $isAcademicImport) {
                 $allClassNames = collect($rows)->pluck('kelas')->merge($newClasses)->unique()->filter()->values();
                 foreach ($allClassNames as $cName) {
                     $cName = $this->normK($cName);
@@ -127,11 +127,11 @@ class ImportBatchController extends Controller
             if ($type === 'siswa') {
                 [$savedCount, $skippedCount, $rowErrors, $unlinkedCount] = $this->saveSiswa($rows, $ta, $mode, $kelasInput);
             } elseif ($type === 'nilai') {
-                [$savedCount, $skippedCount, $rowErrors] = $this->saveNilai($rows, $ta, $semester, $mode, $kelasInput, $user);
+                [$savedCount, $skippedCount, $rowErrors] = $this->saveNilai($rows, $ta, $semester, $mode, $kelasInput, $user, $requestedTaName !== '', $createdYearIds, $createdHistoryIds);
             } elseif ($type === 'hadir') {
-                [$savedCount, $skippedCount, $rowErrors] = $this->saveKehadiran($rows, $ta, $semester, $mode, $kelasInput, $user);
+                [$savedCount, $skippedCount, $rowErrors] = $this->saveKehadiran($rows, $ta, $semester, $mode, $kelasInput, $user, $requestedTaName !== '', $createdYearIds, $createdHistoryIds);
             } elseif ($type === 'ekskul') {
-                [$savedCount, $skippedCount, $rowErrors] = $this->saveEkskul($rows, $ta, $semester, $mode, $kelasInput, $user);
+                [$savedCount, $skippedCount, $rowErrors] = $this->saveEkskul($rows, $ta, $semester, $mode, $kelasInput, $user, $requestedTaName !== '', $createdYearIds, $createdHistoryIds);
             } elseif ($type === 'guru') {
                 [$savedCount, $skippedCount] = $this->saveGuru($rows);
             }
@@ -148,11 +148,18 @@ class ImportBatchController extends Controller
 
             DB::commit();
 
+            $creationSummary = '';
+            if ($isAcademicImport && ($createdYearIds !== [] || $createdHistoryIds !== [])) {
+                $creationSummary = ' (termasuk '.count($createdYearIds).' tahun ajaran baru dan '.count($createdHistoryIds).' riwayat kelas baru)';
+            }
+
             return response()->json([
                 'success' => true,
                 'count' => $savedCount,
                 'skipped' => $skippedCount,
-                'message' => "Berhasil mengimpor {$savedCount} data {$type}".($skippedCount > 0 ? " ({$skippedCount} baris gagal/dilewati)" : '').'.',
+                'created_years' => count($createdYearIds),
+                'created_histories' => count($createdHistoryIds),
+                'message' => "Berhasil mengimpor {$savedCount} data {$type}".($skippedCount > 0 ? " ({$skippedCount} baris gagal/dilewati)" : '').$creationSummary.'.',
                 'errors' => $rowErrors,
                 'class_warning' => $type === 'siswa' && $unlinkedCount > 0
                     ? (! $ta
@@ -289,7 +296,7 @@ class ImportBatchController extends Controller
         );
     }
 
-    private function getOrCreateRiwayatKelas(int $siswaId, int $taId, ?SekolahKelas $kelas): ?SiswaRiwayatKelas
+    private function getOrCreateRiwayatKelas(int $siswaId, int $taId, ?SekolahKelas $kelas): array
     {
         $riwayat = SiswaRiwayatKelas::where('siswa_id', $siswaId)
             ->where('tahun_ajaran_id', $taId)
@@ -297,7 +304,7 @@ class ImportBatchController extends Controller
 
         if (! $riwayat) {
             if (! $kelas) {
-                return null;
+                return ['history' => null, 'created' => false];
             }
 
             $riwayat = SiswaRiwayatKelas::create([
@@ -306,11 +313,12 @@ class ImportBatchController extends Controller
                 'kelas_id' => $kelas->id,
                 'status' => 'Aktif',
             ]);
+            return ['history' => $riwayat, 'created' => true];
         } elseif ($kelas && (int) $riwayat->kelas_id !== (int) $kelas->id) {
-            return null;
+            return ['history' => null, 'created' => false];
         }
 
-        return $riwayat;
+        return ['history' => $riwayat, 'created' => false];
     }
 
     private function normDate($val)
@@ -845,9 +853,18 @@ class ImportBatchController extends Controller
     }
 
     /**
-     * @return array{student: ?SiswaBiodata, history: ?SiswaRiwayatKelas, error: ?array{row: int, reason: string}}
+     * @return array{student: ?SiswaBiodata, history: ?SiswaRiwayatKelas, semester?: string, error: ?array{row: int, reason: string}}
      */
-    private function resolveImportTarget(array $row, int $rowIndex, ?int $taId, string $mode, string $kelasInput, string $semester): array
+    private function resolveImportTarget(
+        array $row,
+        int $rowIndex,
+        ?int $taId,
+        bool $yearIsExplicit,
+        string $mode,
+        string $kelasInput,
+        string $semester,
+        array &$createdHistoryIds
+    ): array
     {
         $rowNumber = max(1, (int) ($row['__excel_row'] ?? $rowIndex + 1));
         $rowClassName = $this->normK($row['kelas'] ?? '');
@@ -871,67 +888,16 @@ class ImportBatchController extends Controller
             ];
         }
 
-        if ($this->isSixSemesterSelection($semester)) {
-            if ($kelas === null) {
-                return [
-                    'student' => null,
-                    'history' => null,
-                    'error' => ['row' => $rowNumber, 'reason' => 'Kelas tidak tersedia pada pilihan atau baris Excel; riwayat semester tidak dapat ditentukan.'],
-                ];
-            }
-
-            $semesterInfo = $this->semesterInfoForRow($row, $semester, $className);
-            if ($semesterInfo['error'] !== null) {
-                return [
-                    'student' => null,
-                    'history' => null,
-                    'error' => ['row' => $rowNumber, 'reason' => $semesterInfo['error']],
-                ];
-            }
-
-            $match = $this->findStudent($row, $taId, $kelas, $semesterInfo['grade']);
-            if ($match['student'] === null) {
-                return [
-                    'student' => null,
-                    'history' => null,
-                    'error' => ['row' => $rowNumber, 'reason' => $match['error'] ?? 'Siswa tidak dapat diidentifikasi.'],
-                ];
-            }
-
-            $histories = SiswaRiwayatKelas::where('siswa_id', $match['student']->id)
-                ->where('kelas_id', $kelas->id)
-                ->when($taId !== null, fn ($query) => $query->where('tahun_ajaran_id', $taId))
-                ->get();
-
-            if ($histories->count() !== 1) {
-                $reason = $histories->isEmpty()
-                    ? "Riwayat kelas {$className} untuk semester {$semesterInfo['number']} tidak ditemukan; baris dilewati agar tahun ajaran tidak ditebak."
-                    : "Riwayat kelas {$className} untuk semester {$semesterInfo['number']} ditemukan lebih dari satu; sertakan tahun ajaran pada baris Excel agar tidak salah memilih.";
-
-                return [
-                    'student' => null,
-                    'history' => null,
-                    'error' => ['row' => $rowNumber, 'reason' => $reason],
-                ];
-            }
-
-            return [
-                'student' => $match['student'],
-                'history' => $histories->first(),
-                'semester' => $semesterInfo['term'],
-                'error' => null,
-            ];
-        }
-
         if ($taId === null) {
             return [
                 'student' => null,
                 'history' => null,
-                'error' => ['row' => $rowNumber, 'reason' => 'Tahun ajaran tidak tersedia untuk format impor lama.'],
+                'error' => ['row' => $rowNumber, 'reason' => 'Tahun ajaran tidak tersedia. Pilih tahun ajaran atau tetapkan tahun ajaran berjalan di Pengaturan.'],
             ];
         }
 
-        $match = $this->findStudent($row, $taId, $kelas);
+        $grade = $kelas === null ? null : Semester::tingkatDariNamaKelas($className);
+        $match = $this->findStudent($row, $taId, $kelas, $grade);
         if ($match['student'] === null) {
             return [
                 'student' => null,
@@ -940,8 +906,57 @@ class ImportBatchController extends Controller
             ];
         }
 
-        $history = $this->getOrCreateRiwayatKelas($match['student']->id, $taId, $kelas);
-        if ($history === null) {
+        if ($kelas === null) {
+            $existingHistories = SiswaRiwayatKelas::where('siswa_id', $match['student']->id)
+                ->where('tahun_ajaran_id', $taId)
+                ->get();
+            if ($existingHistories->count() !== 1) {
+                return [
+                    'student' => null,
+                    'history' => null,
+                    'error' => [
+                        'row' => $rowNumber,
+                        'reason' => 'Kelas tidak tersedia pada pilihan atau baris Excel; riwayat kelas yang cocok tidak dapat ditentukan.',
+                    ],
+                ];
+            }
+
+            $kelas = SekolahKelas::find($existingHistories->first()->kelas_id);
+            if ($kelas === null) {
+                return [
+                    'student' => null,
+                    'history' => null,
+                    'error' => ['row' => $rowNumber, 'reason' => 'Kelas pada riwayat siswa tidak ditemukan pada data kelas sekolah.'],
+                ];
+            }
+            $className = $kelas->nama;
+        }
+
+        $semesterInfo = $this->semesterInfoForRow($row, $semester, $className);
+        if ($semesterInfo['error'] !== null) {
+            return [
+                'student' => null,
+                'history' => null,
+                'error' => ['row' => $rowNumber, 'reason' => $semesterInfo['error']],
+            ];
+        }
+
+        $matchingHistories = SiswaRiwayatKelas::where('siswa_id', $match['student']->id)
+            ->where('kelas_id', $kelas->id)
+            ->get();
+        if (! $yearIsExplicit && $matchingHistories->count() > 1) {
+            return [
+                'student' => null,
+                'history' => null,
+                'error' => [
+                    'row' => $rowNumber,
+                    'reason' => "Riwayat kelas {$className} ditemukan lebih dari satu pada beberapa tahun ajaran; isi kolom tahun_ajaran agar tidak salah memilih.",
+                ],
+            ];
+        }
+
+        $historyResult = $this->getOrCreateRiwayatKelas($match['student']->id, $taId, $kelas);
+        if ($historyResult['history'] === null) {
             return [
                 'student' => null,
                 'history' => null,
@@ -949,20 +964,16 @@ class ImportBatchController extends Controller
             ];
         }
 
+        if ($historyResult['created']) {
+            $createdHistoryIds[$historyResult['history']->id] = true;
+        }
+
         return [
             'student' => $match['student'],
-            'history' => $history,
-            'semester' => ! empty($row['sem'])
-                ? (stripos((string) $row['sem'], 'genap') !== false ? 'Genap' : 'Ganjil')
-                : $semester,
+            'history' => $historyResult['history'],
+            'semester' => $semesterInfo['term'],
             'error' => null,
         ];
-    }
-
-    private function isSixSemesterSelection(string $semester): bool
-    {
-        return $semester === 'auto'
-            || in_array($semester, ['1', '2', '3', '4', '5', '6', 'local-ganjil', 'local-genap'], true);
     }
 
     /**
@@ -970,12 +981,8 @@ class ImportBatchController extends Controller
      */
     private function semesterInfoForRow(array $row, string $selection, string $className): array
     {
-        preg_match('/^(XII|XI|X)(?:-|$)/i', $className, $gradeMatch);
-        $grade = isset($gradeMatch[1]) ? strtoupper($gradeMatch[1]) : null;
-        $gradeSemesterStart = ['X' => 1, 'XI' => 3, 'XII' => 5];
-        $gradeStart = $grade !== null ? ($gradeSemesterStart[$grade] ?? null) : null;
-
-        if ($gradeStart === null) {
+        $grade = Semester::tingkatDariNamaKelas($className);
+        if ($grade === null) {
             return ['number' => null, 'grade' => null, 'term' => null, 'error' => 'Tingkat kelas harus X, XI, atau XII agar dapat dipetakan ke enam semester.'];
         }
 
@@ -987,17 +994,20 @@ class ImportBatchController extends Controller
             ? 'Ganjil'
             : (preg_match('/genap/i', $rawSemester) ? 'Genap' : null);
         $selectedNumber = ctype_digit($selection) ? (int) $selection : null;
-        $selectedTerm = match ($selection) {
-            'local-ganjil' => 'Ganjil',
-            'local-genap' => 'Genap',
+        if ($selectedNumber !== null && ($selectedNumber < 1 || $selectedNumber > 6)) {
+            return ['number' => null, 'grade' => $grade, 'term' => null, 'error' => 'Nomor semester harus antara 1 dan 6.'];
+        }
+        $selectedTerm = match (strtolower($selection)) {
+            'ganjil', 'local-ganjil' => 'Ganjil',
+            'genap', 'local-genap' => 'Genap',
             default => null,
         };
         $rowGlobalNumber = $rowNumber === null
             ? null
-            : ($rowNumber <= 2 ? $gradeStart + $rowNumber - 1 : $rowNumber);
+            : ($rowNumber <= 2 ? Semester::nomor($grade, Semester::jenisDariNomor($rowNumber)) : $rowNumber);
         $selectedGlobalNumber = $selectedNumber === null
             ? null
-            : ($selectedNumber <= 2 ? $gradeStart + $selectedNumber - 1 : $selectedNumber);
+            : ($selectedNumber <= 2 ? Semester::nomor($grade, Semester::jenisDariNomor($selectedNumber)) : $selectedNumber);
 
         if ($rowGlobalNumber !== null && $selectedGlobalNumber !== null && $rowGlobalNumber !== $selectedGlobalNumber) {
             return ['number' => null, 'grade' => $grade, 'term' => null, 'error' => "Semester pada baris Excel ({$rowNumber}) berbeda dari semester yang dipilih ({$selectedNumber}) untuk kelas {$grade}."];
@@ -1010,13 +1020,13 @@ class ImportBatchController extends Controller
         $number = $selectedGlobalNumber ?? $rowGlobalNumber;
         $term = $selectedTerm ?? $rowTerm;
         if ($number === null && $term !== null) {
-            $number = $gradeStart + ($term === 'Genap' ? 1 : 0);
+            $number = Semester::nomor($grade, $term);
         }
         if ($number === null) {
             return ['number' => null, 'grade' => $grade, 'term' => null, 'error' => 'Semester tidak ditentukan. Pilih semester 1–6 atau isi kolom sem pada file Excel.'];
         }
 
-        $numberTerm = $number % 2 === 1 ? 'Ganjil' : 'Genap';
+        $numberTerm = Semester::jenisDariNomor($number);
         if ($rowTerm !== null && $rowTerm !== $numberTerm) {
             return ['number' => $number, 'grade' => $grade, 'term' => null, 'error' => "Jenis semester pada baris Excel ({$rowTerm}) tidak sesuai dengan nomor semester {$number} ({$numberTerm})."];
         }
@@ -1024,11 +1034,7 @@ class ImportBatchController extends Controller
             return ['number' => $number, 'grade' => $grade, 'term' => null, 'error' => "Semester yang dipilih ({$selectedTerm}) tidak sesuai dengan nomor semester pada baris ({$numberTerm})."];
         }
 
-        $numberGrade = match (true) {
-            $number <= 2 => 'X',
-            $number <= 4 => 'XI',
-            default => 'XII',
-        };
+        $numberGrade = Semester::tingkatDariNomor($number);
         $term = $numberTerm;
 
         if ($numberGrade !== $grade) {
@@ -1039,13 +1045,19 @@ class ImportBatchController extends Controller
     }
 
     /**
-     * @return array{year: ?SekolahTahunAjaran, error: ?array{row: int, reason: string}}
+     * @return array{year: ?SekolahTahunAjaran, explicit?: bool, error: ?array{row: int, reason: string}}
      */
-    private function importYearForRow(array $row, int $rowIndex, ?SekolahTahunAjaran $defaultYear, bool $createMissing = true): array
+    private function importYearForRow(
+        array $row,
+        int $rowIndex,
+        ?SekolahTahunAjaran $defaultYear,
+        bool $defaultYearIsExplicit,
+        array &$createdYearIds
+    ): array
     {
         $rawYear = trim((string) ($row['tahun_ajaran'] ?? ''));
         if ($rawYear === '') {
-            return ['year' => $defaultYear, 'error' => null];
+            return ['year' => $defaultYear, 'explicit' => $defaultYearIsExplicit, 'error' => null];
         }
 
         $yearName = $this->normAcademicYear($rawYear);
@@ -1059,24 +1071,18 @@ class ImportBatchController extends Controller
             ];
         }
 
-        $year = $createMissing
-            ? SekolahTahunAjaran::firstOrCreate(['nama' => $yearName], ['sedang_berjalan' => false])
-            : SekolahTahunAjaran::where('nama', $yearName)->first();
-
-        if ($year === null) {
-            return [
-                'year' => null,
-                'error' => [
-                    'row' => max(1, (int) ($row['__excel_row'] ?? $rowIndex + 1)),
-                    'reason' => "Tahun ajaran {$yearName} pada baris belum terdaftar; buat riwayat tahun ajaran terlebih dahulu.",
-                ],
-            ];
+        $year = SekolahTahunAjaran::firstOrCreate(
+            ['nama' => $yearName],
+            ['sedang_berjalan' => false]
+        );
+        if ($year->wasRecentlyCreated) {
+            $createdYearIds[$year->id] = true;
         }
 
-        return ['year' => $year, 'error' => null];
+        return ['year' => $year, 'explicit' => true, 'error' => null];
     }
 
-    private function saveNilai($rows, $ta, $semester, $mode, $kelasInput, Pengguna $user)
+    private function saveNilai($rows, $ta, $semester, $mode, $kelasInput, Pengguna $user, bool $defaultYearIsExplicit, array &$createdYearIds, array &$createdHistoryIds)
     {
         $saved = 0;
         $skipped = 0;
@@ -1099,8 +1105,7 @@ class ImportBatchController extends Controller
                 continue;
             }
 
-            $usesSixSemesterFlow = $this->isSixSemesterSelection((string) $semester);
-            $rowYear = $this->importYearForRow($r, (int) $rowIndex, $ta, $user->peran === 'admin' && ! $usesSixSemesterFlow);
+            $rowYear = $this->importYearForRow($r, (int) $rowIndex, $ta, $defaultYearIsExplicit, $createdYearIds);
             if ($rowYear['error'] !== null) {
                 $skipped++;
                 $errors[] = $rowYear['error'];
@@ -1108,7 +1113,7 @@ class ImportBatchController extends Controller
                 continue;
             }
 
-            $target = $this->resolveImportTarget($r, (int) $rowIndex, $rowYear['year']?->id, $mode, $kelasInput, (string) $semester);
+            $target = $this->resolveImportTarget($r, (int) $rowIndex, $rowYear['year']?->id, $rowYear['explicit'], $mode, $kelasInput, (string) $semester, $createdHistoryIds);
             if ($target['error'] !== null) {
                 $skipped++;
                 $errors[] = $target['error'];
@@ -1175,7 +1180,7 @@ class ImportBatchController extends Controller
         return [$saved, $skipped, $errors];
     }
 
-    private function saveKehadiran($rows, $ta, $semester, $mode, $kelasInput, Pengguna $user)
+    private function saveKehadiran($rows, $ta, $semester, $mode, $kelasInput, Pengguna $user, bool $defaultYearIsExplicit, array &$createdYearIds, array &$createdHistoryIds)
     {
         $saved = 0;
         $skipped = 0;
@@ -1197,8 +1202,7 @@ class ImportBatchController extends Controller
                 continue;
             }
 
-            $usesSixSemesterFlow = $this->isSixSemesterSelection((string) $semester);
-            $rowYear = $this->importYearForRow($r, (int) $rowIndex, $ta, $user->peran === 'admin' && ! $usesSixSemesterFlow);
+            $rowYear = $this->importYearForRow($r, (int) $rowIndex, $ta, $defaultYearIsExplicit, $createdYearIds);
             if ($rowYear['error'] !== null) {
                 $skipped++;
                 $errors[] = $rowYear['error'];
@@ -1206,7 +1210,7 @@ class ImportBatchController extends Controller
                 continue;
             }
 
-            $target = $this->resolveImportTarget($r, (int) $rowIndex, $rowYear['year']?->id, $mode, $kelasInput, (string) $semester);
+            $target = $this->resolveImportTarget($r, (int) $rowIndex, $rowYear['year']?->id, $rowYear['explicit'], $mode, $kelasInput, (string) $semester, $createdHistoryIds);
             if ($target['error'] !== null) {
                 $skipped++;
                 $errors[] = $target['error'];
@@ -1237,7 +1241,7 @@ class ImportBatchController extends Controller
         return [$saved, $skipped, $errors];
     }
 
-    private function saveEkskul($rows, $ta, $semester, $mode, $kelasInput, Pengguna $user)
+    private function saveEkskul($rows, $ta, $semester, $mode, $kelasInput, Pengguna $user, bool $defaultYearIsExplicit, array &$createdYearIds, array &$createdHistoryIds)
     {
         $saved = 0;
         $skipped = 0;
@@ -1259,8 +1263,7 @@ class ImportBatchController extends Controller
                 continue;
             }
 
-            $usesSixSemesterFlow = $this->isSixSemesterSelection((string) $semester);
-            $rowYear = $this->importYearForRow($r, (int) $rowIndex, $ta, $user->peran === 'admin' && ! $usesSixSemesterFlow);
+            $rowYear = $this->importYearForRow($r, (int) $rowIndex, $ta, $defaultYearIsExplicit, $createdYearIds);
             if ($rowYear['error'] !== null) {
                 $skipped++;
                 $errors[] = $rowYear['error'];
@@ -1268,7 +1271,7 @@ class ImportBatchController extends Controller
                 continue;
             }
 
-            $target = $this->resolveImportTarget($r, (int) $rowIndex, $rowYear['year']?->id, $mode, $kelasInput, (string) $semester);
+            $target = $this->resolveImportTarget($r, (int) $rowIndex, $rowYear['year']?->id, $rowYear['explicit'], $mode, $kelasInput, (string) $semester, $createdHistoryIds);
             if ($target['error'] !== null) {
                 $skipped++;
                 $errors[] = $target['error'];

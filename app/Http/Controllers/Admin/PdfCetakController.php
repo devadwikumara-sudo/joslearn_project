@@ -14,6 +14,7 @@ use App\Models\SiswaEkskul;
 use App\Models\SiswaKehadiran;
 use App\Models\SiswaNilai;
 use App\Models\SiswaRiwayatKelas;
+use App\Support\Semester;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -110,17 +111,8 @@ class PdfCetakController extends Controller
             $filterSem = 'Semua';
         }
         $filterSemNumber = ctype_digit($filterSem) ? (int) $filterSem : null;
-        $filterSemGrade = match (true) {
-            $filterSemNumber !== null && $filterSemNumber <= 2 => 'X',
-            $filterSemNumber !== null && $filterSemNumber <= 4 => 'XI',
-            $filterSemNumber !== null => 'XII',
-            default => null,
-        };
-        $reportFilterSem = match (true) {
-            $filterSemNumber !== null && $filterSemNumber % 2 === 1 => 'Ganjil',
-            $filterSemNumber !== null => 'Genap',
-            default => $filterSem,
-        };
+        $filterSemGrade = $filterSemNumber === null ? null : Semester::tingkatDariNomor($filterSemNumber);
+        $reportFilterSem = $filterSemNumber === null ? $filterSem : Semester::jenisDariNomor($filterSemNumber);
         $filterTa = $request->input('ta', 'Semua');
         $filterKelas = (string) $request->input('kelas_filter', 'Semua');
         $filterKelasList = SekolahKelas::orderBy('nama')->pluck('nama')->toArray();
@@ -171,7 +163,7 @@ class PdfCetakController extends Controller
             if ($filterSemGrade !== null) {
                 $riwayatSorted = $riwayatSorted->filter(function ($r) use ($filterSemGrade) {
                     $className = $r->kelas?->nama ?? '';
-                    $grade = strtoupper((string) ($r->kelas?->tingkat ?? (preg_match('/^(XII|XI|X)(?:-|$)/i', $className, $matches) ? $matches[1] : '')));
+                    $grade = strtoupper((string) ($r->kelas?->tingkat ?? Semester::tingkatDariNamaKelas($className) ?? ''));
 
                     return $grade === $filterSemGrade;
                 });

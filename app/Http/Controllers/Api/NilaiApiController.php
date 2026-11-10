@@ -5,6 +5,7 @@ use App\Http\Controllers\Controller;
 use App\Models\SekolahTahunAjaran;
 use App\Models\SiswaBiodata;
 use App\Models\SiswaRiwayatKelas;
+use App\Support\Semester;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -130,6 +131,8 @@ class NilaiApiController extends Controller
      */
     public static function ambilDataSemester(int $riwayatId, string $tingkat, string $semester): array
     {
+        $semester = Semester::jenisDariNomor(Semester::nomor($tingkat, $semester));
+
         $nilai = DB::table('siswa_nilai as n')
             ->join('sekolah_mapel as m', 'm.id', '=', 'n.mapel_id')
             ->leftJoin('sekolah_mapel_per_tingkat as k', function ($join) use ($tingkat) {

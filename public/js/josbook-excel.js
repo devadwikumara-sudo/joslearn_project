@@ -118,6 +118,7 @@
         nisn: 'nisn|nomor induk siswa nasional',
         nis: 'nis|nomor induk|no induk|nomor induk siswa|no induk siswa|nipd',
         nama: 'nama|nama lengkap|nama siswa|nama peserta didik|nama murid|peserta didik|siswa',
+        panggilan: 'nama panggilan|panggilan',
         jk: 'jk|l p|jenis kelamin|gender|kelamin',
         tmp: 'tempat lahir|tmp lahir|kota lahir',
         tgl: 'tanggal lahir|tgl lahir|tgl lhr',
@@ -137,6 +138,13 @@
         agama: 'agama',
         kewarganegaraan: 'kewarganegaraan|warga negara|wn',
         nik: 'nik|no nik|nomor induk kependudukan',
+        lama: 'lama belajar|lama belajar tahun',
+        masuk: 'jenis registrasi|jenis masuk|registrasi',
+        sekolah_pindah: 'sekolah pindahan|pindahan dari sekolah|sekolah asal pindahan',
+        alasan_pindah: 'alasan pindah|alasan mutasi',
+        kelas_masuk: 'kelas diterima|kelas masuk',
+        rombel_masuk: 'rombel diterima|rombel masuk',
+        tgl_masuk: 'tanggal diterima|tanggal masuk|tgl masuk',
         anak_ke: 'anak ke|anak',
         jml_saudara: 'jml saudara|jumlah saudara|saudara',
         yatim: 'yatim|status yatim|keadaan jasmani',
@@ -177,6 +185,7 @@
         ket_ibu: 'keterangan ibu|keadaan ibu',
         wali: 'nama wali|wali',
         agama_wali: 'agama wali',
+        wn_wali: 'kewarganegaraan wali|wn wali',
         pend_wali: 'pendidikan wali',
         kerja_wali: 'pekerjaan wali',
         gaji_wali: 'penghasilan wali|gaji wali',
@@ -188,6 +197,18 @@
         wali_kab: 'kabupaten wali',
         wali_prov: 'provinsi wali',
         wali_pos: 'kode pos wali',
+        al_jalan: 'alamat jalan orang tua|jalan orang tua|alamat orang tua',
+        al_rt: 'rt rw orang tua|rt orang tua',
+        al_desa: 'desa orang tua|kelurahan orang tua',
+        al_kec: 'kecamatan orang tua',
+        al_kab: 'kabupaten orang tua',
+        al_prov: 'provinsi orang tua',
+        al_pos: 'kode pos orang tua',
+        catatan: 'catatan',
+        pend: 'pendidikan',
+        kerja: 'pekerjaan|kerja',
+        gaji: 'penghasilan|gaji',
+        ket: 'keterangan',
         sakit: 'sakit',
         izin: 'izin|ijin',
         alpa: 'alpa|alpha|alfa|tanpa keterangan',
@@ -276,154 +297,370 @@
         return '';
     };
 
-    // ─── Pembaca biodata dari sheet PesertaDidik & Kontrol Induk ──────────────
-    function realRows(w) {
-        const pKey = w.SheetNames.find(s => /peserta\s*didik/i.test(s)) || 'PesertaDidik';
-        const kKey = w.SheetNames.find(s => /kontrol\s*induk/i.test(s)) || 'Kontrol Induk';
+    const FAMILY_HEADERS = {
+        agama: {ayah: 'agama_ayah', ibu: 'agama_ibu', wali: 'agama_wali'},
+        kewarganegaraan: {ayah: 'wn_ayah', ibu: 'wn_ibu', wali: 'wn_wali'},
+        pend: {ayah: 'pend_ayah', ibu: 'pend_ibu', wali: 'pend_wali'},
+        kerja: {ayah: 'kerja_ayah', ibu: 'kerja_ibu', wali: 'kerja_wali'},
+        gaji: {ayah: 'gaji_ayah', ibu: 'gaji_ibu', wali: 'gaji_wali'},
+        hp: {ayah: 'hp_ayah', ibu: 'hp_ibu', wali: 'hp_wali'},
+        ket: {ayah: 'ket_ayah', ibu: 'ket_ibu', wali: ''}
+    };
+    const FAMILY_PARTS = ['ayah', 'ibu', 'wali'];
+    const FAMILY_GROUP_FIELDS = new Set(Object.keys(FAMILY_HEADERS));
+    const STUDENT_REQUIRED_FIELDS = ['nisn', 'nama'];
 
-        const rd = n => (n && w.Sheets[n]) ? XLSX.utils.sheet_to_json(w.Sheets[n], {header: 1, defval: ''}) : [];
-        const km = {};
-        const controlRows = rd(kKey);
-        const controlHeaderIndex = controlRows.slice(0, 10).findIndex(row => {
-            const fields = row.map(fieldOf);
-            return fields.includes('nis')
-                && fields.some(field => ['alasan_keluar', 'status', 'tahun_lulus'].includes(field));
+    function headerStats(row, studentOnly = false) {
+        let score = 0;
+        let identityScore = 0;
+        const fields = [];
+
+        (row || []).forEach(header => {
+            const text = String(header ?? '').trim();
+            if (!text || /^\d+$/.test(text)) {
+                fields.push('');
+                return;
+            }
+
+            const base = hsplit(text).b;
+            const field = studentOnly ? fieldOf(text) : (fx(base) || fx(text) || (mapelOf(base) ? 'mapel' : ''));
+            fields.push(field);
+            if (field) {
+                score++;
+                if (['nama', 'nisn', 'nis', 'kelas', 'nip', 'nuptk', 'ekskul', 'sakit'].includes(field)) {
+                    identityScore++;
+                }
+            }
         });
-        const controlHeaderFields = controlHeaderIndex >= 0
-            ? controlRows[controlHeaderIndex].map(fieldOf)
+
+        return {score, identityScore, fields};
+    }
+
+    function findHeader(aoa, studentOnly = false) {
+        let best = null;
+        for (let rowIndex = 0; rowIndex < Math.min((aoa || []).length, 30); rowIndex++) {
+            const stats = headerStats(aoa[rowIndex], studentOnly);
+            if ((stats.identityScore >= 1 || stats.score >= 2)
+                && (!best || stats.score > best.score
+                    || (stats.score === best.score && stats.identityScore > best.identityScore))) {
+                best = {rowIndex, ...stats};
+            }
+        }
+
+        return best;
+    }
+
+    function studentHeaderMapping(headers, overrides = {}) {
+        const rawFields = (headers || []).map(fieldOf);
+        const rawCounts = rawFields.reduce((counts, field) => {
+            if (field) counts[field] = (counts[field] || 0) + 1;
+            return counts;
+        }, {});
+        const assigned = {};
+        const recognized = [];
+        const uncertain = [];
+        const unknown = [];
+        const groupOccurrences = {};
+        let activeFamily = '';
+
+        headers.forEach((header, index) => {
+            const text = String(header ?? '').trim();
+            if (!text) return;
+
+            const field = Object.prototype.hasOwnProperty.call(overrides, index)
+                ? (overrides[index] || '')
+                : rawFields[index];
+            const normalized = nz(text);
+            const familyMatch = /(^| )(ayah|bapak|father|ibu|mother|wali|guardian)( |$)/.exec(normalized);
+            if (familyMatch) {
+                const person = familyMatch[2];
+                activeFamily = ['bapak', 'father'].includes(person) ? 'ayah'
+                    : ['mother'].includes(person) ? 'ibu'
+                        : ['guardian'].includes(person) ? 'wali' : person;
+            } else if (['ayah', 'ibu', 'wali'].includes(field)) {
+                activeFamily = field;
+            } else if (!FAMILY_GROUP_FIELDS.has(field)) {
+                activeFamily = '';
+            }
+
+            if (!field) {
+                unknown.push({index, header: text});
+                return;
+            }
+
+            let mappedField = field;
+            if (FAMILY_GROUP_FIELDS.has(field)) {
+                const familyFields = FAMILY_HEADERS[field];
+                if (activeFamily && familyFields[activeFamily]) {
+                    mappedField = familyFields[activeFamily];
+                } else if (rawCounts[field] > 1) {
+                    const occurrence = groupOccurrences[field] || 0;
+                    groupOccurrences[field] = occurrence + 1;
+                    const hasBaseField = Object.values(RMAP).includes(field);
+                    const groupOffset = hasBaseField && rawCounts[field] >= 4 ? 1 : 0;
+                    if (groupOffset && occurrence === 0) {
+                        mappedField = field;
+                    } else {
+                        const family = FAMILY_PARTS[occurrence - groupOffset];
+                        mappedField = family ? familyFields[family] : '';
+                    }
+                } else if (!Object.values(RMAP).includes(field)) {
+                    mappedField = '';
+                }
+            }
+
+            if (!mappedField) {
+                uncertain.push({index, header: text, field, reason: 'Kelompok orang tua/wali tidak dapat dipastikan dari judul ini.'});
+                return;
+            }
+
+            if (assigned[mappedField] !== undefined || (rawCounts[field] > 1 && !FAMILY_GROUP_FIELDS.has(field))) {
+                uncertain.push({index, header: text, field: mappedField, reason: 'Judul kolom ganda; pemetaan tidak dapat dipastikan.'});
+                if (assigned[mappedField] !== undefined) {
+                    const previous = assigned[mappedField];
+                    delete assigned[mappedField];
+                    const previousEntryIndex = recognized.findIndex(entry => entry.index === previous);
+                    if (previousEntryIndex >= 0) {
+                        const [previousEntry] = recognized.splice(previousEntryIndex, 1);
+                        uncertain.push({...previousEntry, reason: 'Judul kolom ganda; pemetaan tidak dapat dipastikan.'});
+                    }
+                }
+                return;
+            }
+
+            assigned[mappedField] = index;
+            recognized.push({index, header: text, field: mappedField});
+        });
+
+        const unresolved = uncertain.map(column => column.index);
+        return {
+            fields: Object.fromEntries(Object.entries(assigned).filter(([, index]) => !unresolved.includes(index))),
+            recognized,
+            uncertain,
+            unknown
+        };
+    }
+
+    function bestControlSheet(w, excludedSheet) {
+        const exitFields = ['alasan_keluar', 'tgl_keluar', 'kelas_keluar', 'tujuan', 'no_skl', 'no_ijazah_sma', 'tahun_lulus', 'status'];
+        let best = null;
+        for (const name of w.SheetNames) {
+            if (name === excludedSheet) continue;
+            const rows = XLSX.utils.sheet_to_json(w.Sheets[name], {header: 1, defval: ''});
+            for (let rowIndex = 0; rowIndex < Math.min(rows.length, 30); rowIndex++) {
+                const fields = (rows[rowIndex] || []).map(fieldOf);
+                const exitScore = fields.filter(field => exitFields.includes(field)).length;
+                if (!fields.includes('nis') || exitScore < 1) continue;
+                if (!best || exitScore > best.exitScore) {
+                    best = {name, rows, rowIndex, fields, exitScore, detected: true};
+                }
+            }
+        }
+
+        if (best) return best;
+        const legacyName = w.SheetNames.find(name => /kontrol\s*induk/i.test(name));
+        if (!legacyName) return null;
+
+        return {
+            name: legacyName,
+            rows: XLSX.utils.sheet_to_json(w.Sheets[legacyName], {header: 1, defval: ''}),
+            rowIndex: -1,
+            fields: [],
+            detected: false
+        };
+    }
+
+    // ─── Pembaca biodata berdasarkan judul kolom ──────────────────────────────
+    function realRows(w, columnOverrides = {}) {
+        const sheetRows = w.SheetNames.map(name => ({
+            name,
+            rows: XLSX.utils.sheet_to_json(w.Sheets[name], {header: 1, defval: ''})
+        }));
+        let best = null;
+        for (const sheet of sheetRows) {
+            const header = findHeader(sheet.rows, true);
+            if (header && (!best || header.score > best.header.score
+                || (header.score === best.header.score && header.identityScore > best.header.identityScore))) {
+                best = {...sheet, header};
+            }
+        }
+
+        const legacySheet = best ? null : (sheetRows.find(sheet => /peserta\s*didik/i.test(sheet.name))
+            || sheetRows.find(sheet => !/kontrol\s*induk/i.test(sheet.name))
+            || sheetRows[0]);
+        const selected = best || legacySheet;
+        if (!selected) {
+            return {rows: [], detection: null, error: 'Tidak ada sheet Excel yang dapat dibaca.'};
+        }
+
+        const useHeaders = Boolean(best);
+        const headerRowIndex = useHeaders ? selected.header.rowIndex : 4;
+        const headers = useHeaders ? (selected.rows[headerRowIndex] || []) : [];
+        const mapping = useHeaders ? studentHeaderMapping(headers, columnOverrides) : {fields: {}, recognized: [], uncertain: [], unknown: []};
+        const detection = {
+            sheet: selected.name,
+            sheetCount: w.SheetNames.length,
+            headerRow: headerRowIndex + 1,
+            headerDetected: useHeaders,
+            legacyFallback: !useHeaders,
+            recognized: mapping.recognized,
+            uncertain: mapping.uncertain,
+            unknown: mapping.unknown,
+            columns: headers.map((header, index) => {
+                const recognized = mapping.recognized.find(column => column.index === index);
+                const uncertain = mapping.uncertain.find(column => column.index === index);
+                const unknown = mapping.unknown.find(column => column.index === index);
+                return {
+                    index,
+                    header: String(header ?? ''),
+                    field: recognized?.field || uncertain?.field || '',
+                    status: recognized ? 'recognized' : (uncertain ? 'uncertain' : (unknown ? 'unknown' : '')),
+                    reason: uncertain?.reason || ''
+                };
+            }).filter(column => column.header !== '')
+        };
+        detection.missingRequired = useHeaders
+            ? STUDENT_REQUIRED_FIELDS.filter(field => mapping.fields[field] === undefined)
             : [];
+        detection.requiredMissing = detection.missingRequired.length > 0;
+        const columnFor = (field, fallback = -1) => useHeaders ? (mapping.fields[field] ?? -1) : fallback;
+        const legacyColumns = {nisn: CI('F'), nama: CI('D')};
+        const missing = STUDENT_REQUIRED_FIELDS.filter(field => columnFor(field, legacyColumns[field]) < 0);
+        if (missing.length) {
+            return {
+                rows: [],
+                detection,
+                error: `Kolom wajib tidak ditemukan: ${missing.map(field => field === 'nisn' ? 'NISN' : 'Nama').join(' dan ')}. Periksa judul kolom pada sheet "${selected.name}".`
+            };
+        }
+
+        const control = bestControlSheet(w, selected.name);
+        const controlRows = control?.rows || [];
+        const controlHeaderFields = control?.fields || [];
         const controlHeaderCounts = controlHeaderFields.reduce((counts, field) => {
             if (field) counts[field] = (counts[field] || 0) + 1;
             return counts;
         }, {});
-        const controlColumn = (field, fallback = -1) => controlHeaderCounts[field] === 1
-            ? controlHeaderFields.indexOf(field)
+        const controlColumn = (field, fallback = -1) => control?.detected
+            ? (controlHeaderCounts[field] === 1 ? controlHeaderFields.indexOf(field) : -1)
             : fallback;
         const controlNisIndex = controlColumn('nis', CI('C'));
-        const controlDataRows = controlHeaderIndex >= 0
-            ? controlRows.slice(controlHeaderIndex + 1)
-            : controlRows.slice(5);
-        controlDataRows.forEach(row => {
+        const controlDataStart = control?.detected ? control.rowIndex + 1 : 5;
+        const controlMap = {};
+        controlRows.slice(controlDataStart).forEach(row => {
             const nisValue = row[controlNisIndex];
             if (nisValue !== undefined && nisValue !== '') {
-                km[String(numStr(nisValue)).trim()] = row;
+                controlMap[String(numStr(nisValue)).trim()] = row;
             }
         });
+        if (control?.detected) {
+            detection.controlSheet = control.name;
+            detection.controlHeaderRow = control.rowIndex + 1;
+        }
 
         const out = [];
-        const rows = rd(pKey);
-        if (!rows.length) return out;
+        const nameIndex = columnFor('nama', CI('D'));
+        const nisnIndex = columnFor('nisn', CI('F'));
+        const nisIndex = columnFor('nis', CI('C'));
+        const yearIndex = columnFor('tahun_ajaran');
+        const classIndex = columnFor('kelas');
+        const alumniFields = {
+            status: 'status',
+            tgl_keluar: 'tgl_keluar',
+            kelas_keluar: 'kelas_keluar',
+            alasan_keluar: 'alasan_keluar',
+            tujuan: 'tujuan',
+            no_skl: 'no_skl',
+            no_ijazah_sma: 'no_ijazah_sma',
+            tgl_ijazah_sma: 'tgl_ijazah_sma',
+            no_transkrip: 'no_transkrip',
+            tahun_lulus: 'tahun_lulus',
+            lanjut: 'lanjut'
+        };
 
-        const headers = rows[4] || rows[3] || [];
-        const headerFields = headers.map(fieldOf);
-        const headerCounts = headerFields.reduce((counts, field) => {
-            if (field) counts[field] = (counts[field] || 0) + 1;
-            return counts;
-        }, {});
-        const headerIndex = (field, fallback) => headerCounts[field] === 1
-            ? headerFields.indexOf(field)
-            : fallback;
-        const yearIndex = headerIndex('tahun_ajaran', -1);
-        const classIndex = headerIndex('kelas', -1);
-        const nisIndex = headerIndex('nis', CI('C'));
-        const nisnIndex = headerIndex('nisn', CI('F'));
-        const nameIndex = headerIndex('nama', CI('D'));
-        const groupedFields = new Set([
-            'agama_ayah','agama_ibu','agama_wali',
-            'hp_ayah','hp_ibu','hp_wali',
-            'kerja_ayah','kerja_ibu','kerja_wali'
-        ]);
+        selected.rows.slice(headerRowIndex + 1).forEach((row, offset) => {
+            const rawName = cl(row[nameIndex]);
+            const rawNisn = cl(row[nisnIndex]);
+            const rawNis = cl(row[nisIndex]);
+            if (!rawName || rawName === '-' || (!rawNisn && !rawNis)) return;
 
-        rows.slice(5).forEach((r, offset) => {
-            if (!cl(r[nameIndex]) || (r[nisIndex] === '' && r[nisnIndex] === '')) return;
-            const o = {};
+            const student = {};
             let numericNik = false;
-            for (const [c, k] of Object.entries(RMAP)) {
-                let columnIndex = CI(c);
-                const positionalHeaderField = headerFields[columnIndex];
-                if (positionalHeaderField !== k && positionalHeaderField && !groupedFields.has(k)) {
-                    if (headerCounts[k] === 1) {
-                        columnIndex = headerFields.indexOf(k);
-                    }
+            for (const [column, field] of Object.entries(RMAP)) {
+                const index = columnFor(field, CI(column));
+                let value = index < 0 ? '-' : cl(row[index]);
+                if ((field === 'tgl' || field === 'tgl_masuk' || field === 'tgl_ijazah_smp') && typeof value === 'number') {
+                    value = iso(value);
                 }
-                let v = cl(r[columnIndex]);
-                if ((k === 'tgl' || k === 'tgl_masuk' || k === 'tgl_ijazah_smp') && typeof v === 'number') v = iso(v);
-                if (k === 'nik' && typeof v === 'number' && String(v).replace(/\D/g, '').length === 16) {
+                if (field === 'nik' && typeof value === 'number' && String(value).replace(/\D/g, '').length === 16) {
                     numericNik = true;
                 }
-                if (['nis', 'nisn', 'nik'].includes(k) && typeof v === 'number') v = numStr(v);
-                o[k] = (v === '' || v == null) ? '-' : v;
+                if (['nis', 'nisn', 'nik'].includes(field) && typeof value === 'number') value = numStr(value);
+                student[field] = (value === '' || value == null) ? '-' : value;
             }
-            const alumniFields = {
-                status: 'status',
-                tgl_keluar: 'tgl_keluar',
-                kelas_keluar: 'kelas_keluar',
-                alasan_keluar: 'alasan_keluar',
-                tujuan: 'tujuan',
-                no_skl: 'no_skl',
-                no_ijazah_sma: 'no_ijazah_sma',
-                tgl_ijazah_sma: 'tgl_ijazah_sma',
-                no_transkrip: 'no_transkrip',
-                tahun_lulus: 'tahun_lulus',
-                lanjut: 'lanjut'
-            };
+
             for (const [field, key] of Object.entries(alumniFields)) {
-                const columnIndex = headerIndex(field, -1);
-                if (columnIndex < 0) continue;
-                let value = cl(r[columnIndex]);
+                const index = columnFor(field);
+                if (index < 0) continue;
+                let value = cl(row[index]);
                 if (field.startsWith('tgl_')) value = toIso(value);
                 if (field === 'tahun_lulus') {
                     value = value === '' || value == null || value === '-' ? '' : numStr(value);
                 }
-                o[key] = (value === '' || value == null) && field !== 'tahun_lulus' ? '-' : value;
+                student[key] = (value === '' || value == null) && field !== 'tahun_lulus' ? '-' : value;
             }
-            o.nis = String(o.nis ?? '');
-            o.nisn = normN(String(r[nisnIndex] ?? o.nisn ?? '').trim());
-            const classFromSheet = classIndex >= 0 ? normK(r[classIndex]) : '';
-            const classFromAdmission = normK((o.kelas_masuk || '') + '-' + (o.rombel_masuk || ''));
-            o.kelas = classFromSheet || classFromAdmission;
-            const rawAcademicYear = yearIndex >= 0 ? String(r[yearIndex] ?? '').trim() : '';
-            o.tahun_ajaran = rawAcademicYear
+
+            student.nis = String(student.nis ?? '');
+            student.nisn = normN(String(row[nisnIndex] ?? student.nisn ?? '').trim());
+            const classFromSheet = classIndex >= 0 ? normK(row[classIndex]) : '';
+            const classFromAdmission = normK((student.kelas_masuk || '') + '-' + (student.rombel_masuk || ''));
+            student.kelas = classFromSheet || classFromAdmission;
+            const rawAcademicYear = yearIndex >= 0 ? String(row[yearIndex] ?? '').trim() : '';
+            student.tahun_ajaran = rawAcademicYear
                 ? (normAcademicYear(rawAcademicYear) || rawAcademicYear)
-                : yearBeforeHeader(rows, 4, pKey);
-            if (numericNik) {
-                o.__numeric_nik = true;
-            }
-            o.jk = /^p/i.test(String(o.jk)) ? 'P' : (/^l/i.test(String(o.jk)) ? 'L' : '');
+                : yearBeforeHeader(selected.rows, headerRowIndex, selected.name);
+            if (numericNik) student.__numeric_nik = true;
+            student.jk = /^p/i.test(String(student.jk)) ? 'P' : (/^l/i.test(String(student.jk)) ? 'L' : '');
 
-            // Gabungkan data dari Kontrol Induk berdasarkan NIS
-            const q = km[o.nis];
-            if (q) {
-                for (const [c, k] of Object.entries(KMAP)) {
-                    let v = cl(q[controlColumn(k, CI(c))]);
-                    if (k.startsWith('tgl')) v = toIso(v);
-                    o[k] = (v === '' || v == null) ? '-' : v;
+            const controlRow = controlMap[student.nis];
+            if (controlRow) {
+                for (const [column, field] of Object.entries(KMAP)) {
+                    const valueIndex = controlColumn(field, CI(column));
+                    if (valueIndex < 0) continue;
+                    let value = cl(controlRow[valueIndex]);
+                    if (field.startsWith('tgl')) value = toIso(value);
+                    student[field] = (value === '' || value == null) ? '-' : value;
                 }
-
                 for (const field of ['status', 'tahun_lulus', 'lanjut']) {
-                    const columnIndex = controlColumn(field);
-                    if (columnIndex >= 0) {
-                        const value = cl(q[columnIndex]);
-                        if (value !== '' && value != null && !(field === 'tahun_lulus' && value === '-')) {
-                            o[field] = field === 'tahun_lulus' ? numStr(value) : value;
-                        }
+                    const index = controlColumn(field);
+                    if (index < 0) continue;
+                    const value = cl(controlRow[index]);
+                    if (value !== '' && value != null && !(field === 'tahun_lulus' && value === '-')) {
+                        student[field] = field === 'tahun_lulus' ? numStr(value) : value;
                     }
                 }
             }
-            const graduationText = [o.alasan_keluar, o.status]
+
+            const graduationText = [student.alasan_keluar, student.status]
                 .map(value => String(value ?? '').trim().toLowerCase())
                 .filter(Boolean);
             const isGraduated = graduationText.some(value =>
                 /\blulus\b/.test(value) && !/\b(belum|tidak)\s+lulus\b/.test(value)
-            ) || /^\d{4}$/.test(String(o.tahun_lulus ?? '').trim());
-            o.status = isGraduated ? 'Lulus' : (String(o.status ?? '').trim() || 'Aktif');
-            if (isGraduated && !o.tahun_lulus && /^\d{4}-\d{2}-\d{2}$/.test(String(o.tgl_keluar ?? ''))) {
-                o.tahun_lulus = String(o.tgl_keluar).slice(0, 4);
+            ) || /^\d{4}$/.test(String(student.tahun_lulus ?? '').trim());
+            student.status = isGraduated ? 'Lulus' : (String(student.status ?? '').trim() || 'Aktif');
+            if (isGraduated && !student.tahun_lulus && /^\d{4}-\d{2}-\d{2}$/.test(String(student.tgl_keluar ?? ''))) {
+                student.tahun_lulus = String(student.tgl_keluar).slice(0, 4);
             }
-            o.__excel_row = offset + 6;
-            out.push(o);
+            student.__excel_row = headerRowIndex + offset + 2;
+            out.push(student);
         });
-        return out;
+
+        if (!useHeaders && !out.length) {
+            const error = 'Kolom wajib tidak ditemukan: NISN dan Nama. Judul kolom tidak terdeteksi dan fallback format lama tidak menemukan data pada kolom F (NISN) dan D (Nama).';
+            return {rows: [], detection, error};
+        }
+
+        return {rows: out, detection, error: null};
     }
 
     function hsplit(h) {
@@ -447,17 +684,12 @@
     function analyze(name, aoa, lockType) {
         let best = null;
         for (let r = 0; r < Math.min(aoa.length, 30); r++) {
-            let sc = 0, idf = 0;
-            (aoa[r] || []).forEach(h => {
-                const t = String(h).trim();
-                if (!t || /^\d+$/.test(t)) return;
-                const b = hsplit(t).b, f = fx(b) || fx(t);
-                if (f || mapelOf(b)) {
-                    sc++;
-                    if (['nama', 'nisn', 'nis', 'kelas', 'nip', 'nuptk', 'ekskul', 'sakit'].includes(f)) idf++;
-                }
-            });
-            if ((idf >= 1 || sc >= 2) && (!best || sc > best.sc)) best = {r, sc};
+            const stats = headerStats(aoa[r]);
+            if ((stats.identityScore >= 1 || stats.score >= 2)
+                && (!best || stats.score > best.sc
+                    || (stats.score === best.sc && stats.identityScore > best.idf))) {
+                best = {r, sc: stats.score, idf: stats.identityScore};
+            }
         }
 
         if (!best) {
@@ -733,42 +965,122 @@
     function validateRows(rows, t) {
         const errors = [], warns = [];
         const seenNisn = new Set();
+        const statuses = rows.map((row, idx) => ({
+            status: 'ready',
+            errors: [],
+            warns: [],
+            row: row.__excel_row || idx + 2
+        }));
+        const addError = (idx, id, msg) => {
+            const entry = {no: statuses[idx].row, id, msg, index: idx};
+            errors.push(entry);
+            statuses[idx].status = 'error';
+            statuses[idx].errors.push(msg);
+        };
+        const addWarning = (idx, id, msg) => {
+            const entry = {no: statuses[idx].row, id, msg, index: idx};
+            warns.push(entry);
+            if (statuses[idx].status !== 'error') statuses[idx].status = 'warning';
+            statuses[idx].warns.push(msg);
+        };
+        const classSelect = document.querySelector('[name="kelas"]') || document.getElementById('kelas');
+        const knownClasses = classSelect
+            ? [...classSelect.options].map(option => normK(option.value)).filter(Boolean)
+            : [];
+        const valueFields = new Set([...SC, ...(S.imp.newM || []).map(mapel => mapel.kode), 'nilai', 'nilaicol']);
+        const dateFields = ['tgl', 'tgl_masuk', 'tgl_ijazah_smp', 'tgl_keluar', 'tgl_ijazah_sma'];
+        const validDate = value => {
+            const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value ?? ''));
+            if (!match) return false;
+            const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+            return date.getFullYear() === Number(match[1])
+                && date.getMonth() === Number(match[2]) - 1
+                && date.getDate() === Number(match[3]);
+        };
 
         rows.forEach((r, idx) => {
-            const no = idx + 1;
             const id = r.nama || (r.nisn ? 'NISN: ' + r.nisn : 'Baris ' + (idx + 2));
 
             if (t === 'siswa' || !t) {
                 if (!r.nama && !r.nisn) {
-                    errors.push({no, id: 'Baris ' + (idx + 2), msg: 'Nama dan NISN kosong'});
-                    return;
+                    addError(idx, 'Baris ' + statuses[idx].row, 'Nama dan NISN kosong');
                 }
                 if (!r.nisn) {
-                    errors.push({no, id, msg: 'NISN kosong — baris ini akan dilewati'});
+                    addError(idx, id, 'NISN kosong — baris ini akan dilewati');
                 } else if (!/^\d{10}$/.test(r.nisn)) {
-                    errors.push({no, id, msg: 'NISN tidak tepat 10 digit: "' + r.nisn + '"'});
+                    addError(idx, id, 'NISN bukan 10 digit: "' + r.nisn + '"');
                 } else if (seenNisn.has(r.nisn)) {
-                    warns.push({no, id, msg: 'NISN ganda dalam file: ' + r.nisn});
+                    addWarning(idx, id, 'NISN ganda dalam file: ' + r.nisn);
                 } else {
                     seenNisn.add(r.nisn);
                 }
                 if (!r.nama) {
-                    warns.push({no, id, msg: 'Nama kosong'});
+                    addError(idx, id, 'Nama kosong');
                 }
             } else if (t === 'nilai' || t === 'hadir' || t === 'ekskul') {
                 if (!r.nisn && !r.nama) {
-                    errors.push({no, id: 'Baris ' + (idx + 2), msg: 'Tidak ada NISN atau Nama untuk identifikasi'});
+                    addError(idx, 'Baris ' + statuses[idx].row, 'Tidak ada NISN atau Nama untuk identifikasi');
                 }
                 if (r.nisn && !/^\d{10}$/.test(r.nisn)) {
-                    warns.push({no, id, msg: 'NISN tidak tepat 10 digit: "' + r.nisn + '"'});
+                    addError(idx, id, 'NISN bukan 10 digit: "' + r.nisn + '"');
+                }
+                const rowClass = normK(r.kelas || S.imp.kelas);
+                if (!rowClass) {
+                    addError(idx, id, 'Kelas tidak ditentukan');
+                } else if (knownClasses.length && !knownClasses.includes(rowClass)) {
+                    addError(idx, id, `Kelas tidak dikenal: "${rowClass}"`);
+                } else if (S.imp.mode === 'kelas' && S.imp.kelas && rowClass !== S.imp.kelas) {
+                    addError(idx, id, `Kelas pada baris (${rowClass}) berbeda dari kelas yang dipilih (${S.imp.kelas})`);
+                }
+                const explicitSemester = Number(normSem(r.sem) || (['3', '4', '5', '6'].includes(String(S.imp.sem)) ? S.imp.sem : ''));
+                if (explicitSemester >= 3 && rowClass) {
+                    const grade = /^(XII|XI|X)(?:-|$)/.exec(rowClass)?.[1];
+                    const expectedGrade = explicitSemester <= 2 ? 'X'
+                        : explicitSemester <= 4 ? 'XI' : 'XII';
+                    if (grade && grade !== expectedGrade) {
+                        addError(idx, id, `Semester ${explicitSemester} tidak sesuai dengan tingkat kelas ${grade}`);
+                    }
+                }
+                if (t === 'nilai') {
+                    const values = Object.entries(r).filter(([key, value]) => value !== '' && value != null && valueFields.has(key));
+                    values.forEach(([key, value]) => {
+                        const numeric = Number(String(value).replace(',', '.'));
+                        if (!Number.isFinite(numeric) || numeric < 0 || numeric > 100) {
+                            addError(idx, id, `Nilai ${SN[key] || key} harus angka 0–100`);
+                        }
+                    });
+                    if (!values.length) addError(idx, id, 'Nilai mapel tidak ditemukan');
+                }
+                if (t === 'hadir') {
+                    ['sakit', 'izin', 'alpa'].forEach(key => {
+                        if (r[key] !== '' && r[key] != null && !Number.isFinite(Number(r[key]))) {
+                            addError(idx, id, `${FL[key] || key} harus berupa angka`);
+                        }
+                    });
+                }
+                if (t === 'ekskul' && !String(r.ekskul || '').trim()) {
+                    addError(idx, id, 'Nama ekstrakurikuler kosong');
                 }
             } else if (t === 'guru') {
                 if (!r.nama) {
-                    errors.push({no, id: 'Baris ' + (idx + 2), msg: 'Nama guru kosong'});
+                    addError(idx, 'Baris ' + statuses[idx].row, 'Nama guru kosong');
                 }
             }
+
+            if (r.nik && r.nik !== '-' && String(r.nik).replace(/\D/g, '').length !== 16) {
+                addWarning(idx, id, 'NIK sebaiknya terdiri dari 16 digit');
+            }
+            dateFields.forEach(key => {
+                if (!r[key] || r[key] === '-') return;
+                if (!validDate(r[key])) {
+                    addWarning(idx, id, `${FL[key] || key} bukan tanggal yang valid`);
+                    return;
+                }
+                const date = new Date(`${r[key]}T00:00:00`);
+                if (date > new Date()) addWarning(idx, id, `${FL[key] || key} berada di masa depan`);
+            });
         });
-        return {errors, warns};
+        return {errors, warns, statuses};
     }
 
     // ─── State Import ───────────────────────────────────────────────────────────
@@ -782,11 +1094,18 @@
             ta: '2024/2025',
             raws: null,
             rows: null,
+            detection: null,
+            studentColumnOverrides: {},
+            mappingIssues: [],
+            statuses: [],
+            warningsConfirmed: false,
+            fileName: '',
             newM: [],
             errors: [],
             warns: []
         }
     };
+    let studentWorkbook = null;
     window.JosBookState = S;
 
     function readFormOptions() {
@@ -796,6 +1115,8 @@
 
         const semEl = document.querySelector('select[name="semester"]') || document.getElementById('semester');
         if (semEl && semEl.value) I.sem = semEl.value;
+        const monthEl = document.querySelector('select[name="bulan"]') || document.getElementById('bulan');
+        if (monthEl && monthEl.value) I.sem = Number(monthEl.value) >= 7 ? '1' : '2';
 
         const dupEl = document.querySelector('select[name="duplikat"]') || document.getElementById('duplikat');
         if (dupEl && dupEl.value) I.dup = dupEl.value;
@@ -804,10 +1125,13 @@
         if (modeEl && modeEl.value) I.mode = (modeEl.value === 'kelas') ? 'kelas' : 'semua';
 
         const kelasEl = document.querySelector('[name="kelas"]') || document.getElementById('kelas');
-        if (kelasEl && kelasEl.value) {
+        if (kelasEl) {
             if (kelasEl.value === '*') {
                 I.mode = 'semua';
                 I.kelas = '';
+            } else if (modeEl && modeEl.value === 'semua') {
+                I.mode = 'semua';
+                I.kelas = normK(kelasEl.value) || '';
             } else {
                 I.mode = 'kelas';
                 I.kelas = normK(kelasEl.value) || '';
@@ -826,21 +1150,42 @@
         if (taEl) taEl.value = years[0];
     }
 
+    const escapeHtml = value => String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+
+    function mappingIssues(I) {
+        if (I.t === 'siswa') {
+            return (I.detection?.missingRequired || []).map(field =>
+                `Kolom wajib ${field === 'nisn' ? 'NISN' : 'Nama'} belum dipetakan.`
+            );
+        }
+
+        const mapped = (I.raws || []).flatMap(sheet => Object.values(sheet.map || {}));
+        const hasIdentity = mapped.includes('nisn') || mapped.includes('nama');
+        const issues = [];
+        if (!hasIdentity) issues.push('Kolom identitas wajib dipetakan: NISN atau Nama.');
+        if (I.t === 'nilai' && !mapped.some(key => key.startsWith('m:') || key === 'new')
+            && !(mapped.includes('mapelcol') && mapped.includes('nilaicol'))) {
+            issues.push('Kolom nilai mapel belum terdeteksi atau dipetakan.');
+        }
+        if (I.t === 'hadir' && !mapped.some(key => ['sakit', 'izin', 'alpa', 'kokur'].includes(key))) {
+            issues.push('Kolom kehadiran belum terdeteksi atau dipetakan.');
+        }
+        if (I.t === 'ekskul' && !mapped.includes('ekskul')) {
+            issues.push('Kolom nama ekstrakurikuler belum terdeteksi atau dipetakan.');
+        }
+        return issues;
+    }
+
     // ─── Render Panel Pratinjau & Pemetaan Kolom ────────────────────────────────
     function renderPreviewUI() {
         const I = S.imp;
         const container = document.getElementById('josbook-import-preview-area');
         if (!container) return;
-
-        if (!I.rows || !I.rows.length) {
-            container.innerHTML = `
-                <div class="card" style="margin-top:14px">
-                    <div class="note" style="background:#fbe5e1;border-color:#efc6bf;color:#8b2a1e">
-                        ⚠️ File berhasil dibaca namun tidak ada baris data yang cocok. Periksa baris judul atau gunakan panel pemetaan kolom di bawah.
-                    </div>
-                </div>`;
-            return;
-        }
 
         const t = I.t;
         const tLabel = {
@@ -851,40 +1196,79 @@
             guru: 'Data Guru'
         };
 
-        const totalRows = I.rows.length;
-        const uniqueClasses = [...new Set(I.rows.map(r => normK(r.kelas || '')).filter(Boolean))];
-        const uniqueAcademicYears = [...new Set(I.rows.map(r => normAcademicYear(r.tahun_ajaran || '')).filter(Boolean))];
-        const {errors, warns} = validateRows(I.rows, t);
+        const rows = I.rows || [];
+        const totalRows = rows.length;
+        const uniqueClasses = [...new Set(rows.map(r => normK(r.kelas || '')).filter(Boolean))];
+        const uniqueAcademicYears = [...new Set(rows.map(r => normAcademicYear(r.tahun_ajaran || '')).filter(Boolean))];
+        const {errors, warns, statuses} = validateRows(rows, t);
         I.errors = errors;
         I.warns = warns;
+        I.statuses = statuses;
+        I.mappingIssues = mappingIssues(I);
+        const readyCount = statuses.filter(row => row.status === 'ready').length;
+        const warningCount = statuses.filter(row => row.status === 'warning').length;
+        const errorCount = statuses.filter(row => row.status === 'error').length;
+        const distinctStudents = new Set(rows.map(row => row.nisn || row.nama).filter(Boolean)).size;
+        const subjectCount = new Set(rows.flatMap(row => [
+            ...Object.keys(row).filter(key => SC.includes(key) || (I.newM || []).some(mapel => mapel.kode === key)),
+            ...(row.mapelcol ? [String(row.mapelcol).trim().toLowerCase()] : [])
+        ])).size;
 
         // Breakdown per kelas
         const classBreakdown = {};
-        I.rows.forEach(r => {
+        rows.forEach(r => {
             const k = I.mode === 'semua' ? (normK(r.kelas) || '(Belum Ada Kelas)') : I.kelas;
             classBreakdown[k] = (classBreakdown[k] || 0) + 1;
         });
 
         // 1. Deteksi Otomatis & Pemetaan Kolom (detBox Sesuai Prototype)
         let detHtml = '';
-        if (!I.raws) {
-            // Khusus format database sekolah (PesertaDidik + Kontrol Induk): semua kolom sudah terpetakan penuh
+        if (t === 'siswa' && I.detection) {
+            const detected = I.detection;
+            const studentFields = [...new Set([...Object.values(RMAP), ...Object.values(KMAP)])];
+            const mappingNeedsAttention = detected.uncertain.length > 0
+                || detected.unknown.length > 0
+                || (detected.missingRequired || []).length > 0;
             detHtml = `
             <div class="card" style="margin-top:14px">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
                     <h3 style="margin:0">2. Hasil Deteksi Otomatis</h3>
-                    <span class="bd ok" style="font-size:12px;padding:4px 10px">Terdeteksi: Data Siswa (Peserta Didik + Kontrol Induk)</span>
+                    <span class="bd ok" style="font-size:12px;padding:4px 10px">Terdeteksi: Data Siswa</span>
                 </div>
                 <div class="bar" style="flex-wrap:wrap;gap:6px">
-                    <span class="bd ok">Sheet “Peserta Didik” &amp; “Kontrol Induk” terbaca 100% lengkap</span>
-                    <span class="bd ok">Total: <b>${I.rows.length} siswa</b></span>
+                    <span class="bd">Sheet “${escapeHtml(detected.sheet)}” · judul baris ${detected.headerRow}</span>
+                    <span class="bd">${detected.sheetCount} sheet</span>
+                    <span class="bd ok">${distinctStudents} siswa</span>
                     ${uniqueClasses.length ? `<span class="bd ok">Kelas: <b>${uniqueClasses.join(', ')}</b></span>` : ''}
                     ${uniqueAcademicYears.length ? `<span class="bd ok">Tahun ajaran: <b>${uniqueAcademicYears.join(', ')}</b></span>` : ''}
                 </div>
+                <details ${mappingNeedsAttention ? 'open' : ''} style="margin-top:12px;padding-top:12px;border-top:1px solid #e2e8f0">
+                    <summary style="cursor:pointer;font-weight:600;font-size:13px;color:var(--pr, #2563eb)">🔍 Lihat / Ubah Pemetaan Kolom Excel</summary>
+                    <p class="sub" style="margin:6px 0 10px;font-size:12px">Kolom yang tidak dikenali dapat dipetakan di sini. Kolom wajib: NISN dan Nama.</p>
+                    ${I.mappingIssues.map(issue => `<p class="bd e">${escapeHtml(issue)}</p>`).join('')}
+                    <div class="tw" style="max-height:260px;overflow:auto">
+                        <table><thead><tr><th>Kolom di Excel</th><th>Status deteksi</th><th>Dibaca sebagai</th></tr></thead><tbody>
+                            ${detected.columns.map(column => `
+                                <tr>
+                                    <td>${escapeHtml(column.header)}</td>
+                                    <td><span class="bd ${column.status === 'recognized' ? 'ok' : 'w'}">${column.status === 'recognized' ? 'Dikenali' : escapeHtml(column.reason || 'Perlu pemetaan')}</span></td>
+                                    <td><select style="width:100%;font-size:12px;padding:4px" onchange="window.changeStudentColumnMap(${column.index}, this.value)">
+                                        <option value="">— abaikan —</option>
+                                        ${studentFields.map(field => `<option value="${escapeHtml(field)}" ${(column.field || '') === field ? 'selected' : ''}>${escapeHtml(FL[field] || field)}</option>`).join('')}
+                                    </select></td>
+                                </tr>`).join('')}
+                        </tbody></table>
+                    </div>
+                </details>
             </div>`;
-        } else {
+        } else if (I.raws) {
             const opts = FOPT(t);
             const ignoredCols = (I.raws || []).reduce((acc, z) => acc + (z.heads || []).filter((h, i) => h && !z.map[i]).length, 0);
+            const uncertainCols = (I.raws || []).reduce((acc, z) => acc + (z.uncertain || []).length, 0);
+            const mappingNeedsAttention = ignoredCols > 0 || uncertainCols > 0 || I.mappingIssues.length > 0;
+            const subjectSummary = subjectCount ? `<span class="bd"> ${subjectCount} mapel</span>` : '';
+            const studentSummary = totalRows ? `<span class="bd">${distinctStudents} siswa</span>` : '';
+            const selectedSheet = I.detection?.sheet || (I.raws || []).map(z => z.name).join(', ');
 
             detHtml = `
             <div class="card" style="margin-top:14px">
@@ -893,15 +1277,22 @@
                     <span class="bd ok" style="font-size:12px;padding:4px 10px">Terdeteksi: ${tLabel[t] || t}</span>
                 </div>
                 <div class="bar" style="flex-wrap:wrap;gap:6px">
-                    ${(I.raws||[]).map(z => `<span class="bd">Sheet “<b>${z.name}</b>” · baris ${z.hr+1}${z.kelas ? ' · ' + z.kelas : ''}</span>`).join('')}
+                    <span class="bd ok">Terdeteksi: ${tLabel[t] || escapeHtml(t)}</span>
+                    <span class="bd">${I.detection?.sheetCount || (I.raws || []).length} sheet</span>
+                    ${selectedSheet ? `<span class="bd">Sheet “${escapeHtml(selectedSheet)}”${I.detection?.headerRow ? ` · judul baris ${I.detection.headerRow}` : ''}</span>` : ''}
+                    ${studentSummary}
+                    ${subjectSummary}
+                    ${(I.newM || []).length ? `<span class="bd w">${I.newM.length} mapel baru</span>` : ''}
+                    ${ignoredCols ? `<span class="bd w">${ignoredCols} kolom diabaikan</span>` : ''}
+                    ${(I.raws || []).map(z => `<span class="bd">Sheet “${escapeHtml(z.name)}” · judul baris ${z.hr + 1}${z.kelas ? ` · ${escapeHtml(z.kelas)}` : ''}</span>`).join('')}
+                    ${I.fileName ? `<span class="bd">${escapeHtml(I.fileName)}</span>` : ''}
                     ${uniqueClasses.length ? `<span class="bd ok">Kelas: <b>${uniqueClasses.join(', ')}</b></span>` : ''}
                     ${uniqueAcademicYears.length ? `<span class="bd ok">Tahun ajaran: <b>${uniqueAcademicYears.join(', ')}</b></span>` : ''}
-                    ${(I.newM||[]).length ? `<span class="bd w">⚠️ Mapel Baru (${I.newM.length}): <b>${I.newM.map(m=>m.nama).join(', ')}</b></span>` : ''}
                     ${(I.newX||[]).length ? `<span class="bd ok">Kolom Baru (${I.newX.length}): <b>${I.newX.map(x=>x.l).join(', ')}</b></span>` : ''}
-                    ${ignoredCols > 0 ? `<span class="bd w">${ignoredCols} kolom diabaikan</span>` : ''}
                 </div>
+                ${I.mappingIssues.map(issue => `<p class="bd e" style="margin-top:8px">${escapeHtml(issue)}</p>`).join('')}
 
-                <details ${ignoredCols > 0 ? 'open' : ''} style="margin-top:12px;padding-top:12px;border-top:1px solid #e2e8f0">
+                <details ${mappingNeedsAttention ? 'open' : ''} style="margin-top:12px;padding-top:12px;border-top:1px solid #e2e8f0">
                     <summary style="cursor:pointer;font-weight:600;font-size:13px;color:var(--pr, #2563eb)">
                         🔍 Lihat / Ubah Pemetaan Kolom Excel
                     </summary>
@@ -910,7 +1301,7 @@
                     </p>
                     ${(I.raws||[]).map((z, si) => `
                         <div style="margin-bottom:12px">
-                            <strong style="font-size:12px;color:#475569">Sheet “${z.name}”</strong>
+                            <strong style="font-size:12px;color:#475569">Sheet “${escapeHtml(z.name)}” · judul baris ${z.hr + 1}</strong>
                             <div class="tw" style="margin-top:6px;max-height:220px;overflow-y:auto">
                                 <table>
                                     <thead>
@@ -927,8 +1318,8 @@
                                             const currentMap = z.map[i] || '';
                                             return `
                                                 <tr>
-                                                    <td><strong>${h}</strong></td>
-                                                    <td style="color:#64748b;font-size:12px">${sampleVal.slice(0, 35)}</td>
+                                                    <td><strong>${escapeHtml(h)}</strong></td>
+                                                    <td style="color:#64748b;font-size:12px">${escapeHtml(sampleVal.slice(0, 35))}</td>
                                                     <td>
                                                         <select class="cmap-select" style="width:100%;font-size:12px;padding:4px" onchange="window.changeColMap(${si}, ${i}, this.value)">
                                                             <option value="">— abaikan —</option>
@@ -953,63 +1344,67 @@
             <div class="card" style="margin-top:14px;border-left:3px solid ${errors.length ? '#c0392b' : '#e67e22'}">
                 <h3 style="margin:0 0 8px;font-size:13px">⚠️ Laporan Validasi (${errors.length} error, ${warns.length} peringatan)</h3>
                 <div style="max-height:160px;overflow-y:auto">
-                    ${errors.map(e => `<div class="bar" style="font-size:12px;padding:4px 0;border-bottom:1px solid #f5e0de"><span class="bd e" style="min-width:50px">Error</span> <b>Baris ${e.no}</b> · ${e.id} — ${e.msg}</div>`).join('')}
-                    ${warns.map(w => `<div class="bar" style="font-size:12px;padding:4px 0;border-bottom:1px solid #fdf3e1"><span class="bd w" style="min-width:70px">Peringatan</span> <b>Baris ${w.no}</b> · ${w.id} — ${w.msg}</div>`).join('')}
+                    ${errors.map(e => `<div class="bar" style="font-size:12px;padding:4px 0;border-bottom:1px solid #f5e0de"><span class="bd e" style="min-width:50px">Error</span> <b>Baris ${e.no}</b> · ${escapeHtml(e.id)} — ${escapeHtml(e.msg)}</div>`).join('')}
+                    ${warns.map(w => `<div class="bar" style="font-size:12px;padding:4px 0;border-bottom:1px solid #fdf3e1"><span class="bd w" style="min-width:70px">Peringatan</span> <b>Baris ${w.no}</b> · ${escapeHtml(w.id)} — ${escapeHtml(w.msg)}</div>`).join('')}
                 </div>
                 <div class="bar" style="margin-top:10px">
-                    <button type="button" class="btn" style="font-size:12px;padding:5px 10px" onclick="downloadValidationReport()">⬇ Unduh Laporan CSV</button>
+                    ${errors.length ? `<button type="button" class="btn" style="font-size:12px;padding:5px 10px" onclick="downloadValidationReport()">⬇ Unduh laporan error (CSV)</button>` : ''}
                 </div>
             </div>`;
         }
 
         // 3. Pratinjau Tabel & Tombol Eksekusi
-        const sampleRow = I.rows[0] || {};
-        const allKeys = Object.keys(sampleRow);
+        const allKeys = [...new Set(rows.flatMap(row => Object.keys(row).filter(key => !key.startsWith('__'))))];
         const priorityKeys = ['nisn','nis','nama','kelas','tahun_ajaran','jk','tgl','ayah','ibu','sakit','izin','alpa','ekskul','predikat'];
         const previewKeys = priorityKeys.filter(k => allKeys.includes(k))
             .concat(allKeys.filter(k => !priorityKeys.includes(k)))
-            .slice(0, 8);
-        const previewRows = I.rows.slice(0, 5);
+            .filter((key, index, list) => list.indexOf(key) === index);
+        const previewRows = rows;
+        const statusByRow = statuses;
+        const warningsAccepted = Boolean(I.warningsConfirmed);
 
         let prevHtml = `
             <div class="card" style="margin-top:14px">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-                    <h3 style="margin:0">3. Pratinjau · ${totalRows} Baris</h3>
+                    <h3 style="margin:0">3. Pratinjau · ${totalRows} baris</h3>
                     <div style="display:flex;gap:8px">
-                        <span class="bd ok">✔ ${totalRows - errors.length} Siap</span>
-                        ${errors.length ? `<span class="bd e">❌ ${errors.length} Dilewati</span>` : ''}
-                        ${warns.length ? `<span class="bd w">⚠️ ${warns.length} Peringatan</span>` : ''}
+                        <span class="bd ok">✔ ${readyCount} Siap</span>
+                        ${warningCount ? `<span class="bd w">⚠️ ${warningCount} Peringatan</span>` : ''}
+                        ${errorCount ? `<span class="bd e">❌ ${errorCount} Error</span>` : ''}
                     </div>
                 </div>
+                ${!totalRows ? `<p class="bd e">Belum ada baris yang dapat dipratinjau. ${escapeHtml(I.mappingIssues[0] || 'Periksa format file atau pemetaan kolom.')}</p>` : ''}
 
                 <div class="bar" style="flex-wrap:wrap;gap:6px;margin-bottom:12px">
-                    ${Object.entries(classBreakdown).map(([k, n]) => `<span class="bd ${k === '(Belum Ada Kelas)' ? 'e' : 'ok'}">${k}: <b>${n}</b> siswa</span>`).join('')}
+                    ${Object.entries(classBreakdown).map(([k, n]) => `<span class="bd ${k === '(Belum Ada Kelas)' ? 'e' : 'ok'}">${escapeHtml(k)}: <b>${n}</b> baris</span>`).join('')}
                 </div>
 
                 <div class="tw"><table>
                     <thead>
                         <tr>
                             <th>#</th>
-                            ${previewKeys.map(k => `<th>${FL[k] || SN[k] || k.toUpperCase()}</th>`).join('')}
+                            <th>Status</th>
+                            ${previewKeys.map(k => `<th>${escapeHtml(FL[k] || SN[k] || k.toUpperCase())}</th>`).join('')}
                         </tr>
                     </thead>
                     <tbody>
                         ${previewRows.map((r, i) => `
-                            <tr>
-                                <td>${i + 1}</td>
-                                ${previewKeys.map(k => `<td>${r[k] !== undefined && r[k] !== null && r[k] !== '' ? String(r[k]) : '<span style="color:#a0aec0">-</span>'}</td>`).join('')}
+                            <tr style="background:${statusByRow[i].status === 'error' ? '#fff1f0' : statusByRow[i].status === 'warning' ? '#fffbeb' : '#f0fdf4'}">
+                                <td>${i + 1} <small>(Excel ${statusByRow[i].row})</small></td>
+                                <td><span class="bd ${statusByRow[i].status === 'error' ? 'e' : statusByRow[i].status === 'warning' ? 'w' : 'ok'}">${statusByRow[i].status === 'error' ? 'Error' : statusByRow[i].status === 'warning' ? 'Peringatan' : 'Siap'}</span>${[...statusByRow[i].errors, ...statusByRow[i].warns].map(message => `<div style="font-size:11px;margin-top:3px">${escapeHtml(message)}</div>`).join('')}</td>
+                                ${previewKeys.map(k => `<td contenteditable="true" data-row="${i}" data-field="${escapeHtml(k)}" onblur="window.editImportCell(this)" style="min-width:80px">${r[k] !== undefined && r[k] !== null && r[k] !== '' ? escapeHtml(r[k]) : ''}</td>`).join('')}
                             </tr>`).join('')}
                     </tbody>
                 </table></div>
-                ${totalRows > 5 ? `<p class="sub" style="margin:10px 0 0;font-size:12px">... dan ${totalRows - 5} baris lainnya.</p>` : ''}
 
+                ${warningCount ? `<label style="display:flex;gap:8px;align-items:center;margin-top:12px;font-size:12px"><input type="checkbox" ${warningsAccepted ? 'checked' : ''} onchange="window.confirmImportWarnings(this.checked)"> Saya telah memeriksa peringatan dan tetap ingin mengimpor baris peringatan.</label>` : ''}
                 <div class="bar" style="margin-top:16px;padding-top:14px;border-top:1px solid #e2e8f0">
                     <button type="button" class="btn o" onclick="resetImportPreview()">Batal / Ganti File</button>
                     <span class="sp"></span>
-                    ${(totalRows - errors.length) <= 0 ?
+                    ${(readyCount + warningCount) <= 0 || I.mappingIssues.length ?
                         `<span class="bd e">Tidak ada baris valid untuk diimpor</span>` :
-                        `<button type="button" id="btn-do-import" class="btn a" style="font-size:12px;padding:6px 12px" onclick="executeBatchImport()">
-                            ⬇ Impor ${totalRows - errors.length} Baris ${tLabel[t] || t} ke Database
+                        `<button type="button" id="btn-do-import" class="btn a" style="font-size:12px;padding:6px 12px" ${warningCount && !warningsAccepted ? 'disabled' : ''} onclick="executeBatchImport()">
+                            ⬇ Impor ${readyCount + warningCount} Baris ${tLabel[t] || t}
                         </button>`
                     }
                 </div>
@@ -1024,17 +1419,60 @@
         if (!I.raws || !I.raws[sheetIdx]) return;
         I.raws[sheetIdx].map[colIdx] = newMapping;
         I.rows = buildRows(I);
+        I.warningsConfirmed = false;
         if (I.rows.some(q => q.kelas)) I.mode = 'semua';
+        renderPreviewUI();
+    };
+
+    window.changeStudentColumnMap = function(columnIndex, field) {
+        const I = S.imp;
+        if (!studentWorkbook || !I.detection) return;
+        I.studentColumnOverrides[columnIndex] = field;
+
+        const result = realRows(studentWorkbook, I.studentColumnOverrides);
+        I.detection = result.detection;
+        I.rows = result.rows;
+        I.mappingIssues = mappingIssues(I);
+        I.warningsConfirmed = false;
+        renderPreviewUI();
+    };
+
+    window.editImportCell = function(cell) {
+        const I = S.imp;
+        const rowIndex = Number(cell?.dataset?.row);
+        const field = cell?.dataset?.field;
+        if (!Number.isInteger(rowIndex) || !field || !I.rows?.[rowIndex]) return;
+
+        const row = I.rows[rowIndex];
+        let value = String(cell.textContent ?? '').trim();
+        if (['sakit', 'izin', 'alpa', ...SC, ...(I.newM || []).map(mapel => mapel.kode), 'nilai', 'nilaicol'].includes(field)
+            && value !== '') {
+            value = value.replace(',', '.');
+        }
+        if (field === 'nisn' || field === 'nis' || field === 'nik' || field === 'hp') {
+            value = value.replace(/\D/g, '');
+        } else if (field === 'kelas') {
+            value = normK(value);
+        } else if (field === 'sem') {
+            value = normSem(value);
+        } else if (field === 'tahun_ajaran') {
+            value = normAcademicYear(value) || value;
+        }
+
+        row[field] = value;
+        I.warningsConfirmed = false;
+        renderPreviewUI();
+    };
+
+    window.confirmImportWarnings = function(confirmed) {
+        S.imp.warningsConfirmed = Boolean(confirmed);
         renderPreviewUI();
     };
 
     // ─── Download Laporan Validasi CSV ──────────────────────────────────────────
     window.downloadValidationReport = function() {
         const I = S.imp;
-        const rows = [
-            ...(I.errors || []).map(e => ['Error', e.no, e.id, e.msg]),
-            ...(I.warns || []).map(w => ['Peringatan', w.no, w.id, w.msg])
-        ];
+        const rows = (I.errors || []).map(e => ['Error', e.no, e.id, e.msg]);
         const csv = [['Jenis', 'Baris', 'Identitas', 'Pesan'], ...rows]
             .map(r => r.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(',')).join('\n');
         const blob = new Blob(['\uFEFF' + csv], {type: 'text/csv;charset=utf-8'});
@@ -1069,22 +1507,24 @@
             const I = S.imp;
             // KUNCI TIPE: Tipe selalu sesuai dengan halaman import yang sedang dibuka
             I.t = expectedType || 'siswa';
+            I.detection = null;
+            I.fileName = f.name || '';
+            I.studentColumnOverrides = {};
+            I.warningsConfirmed = false;
+            I.newM = [];
+            I.newX = [];
 
-            // 1. Cek apakah ini file database sekolah dengan sheet PesertaDidik yang cocok
-            const pSheetKey = w.SheetNames.find(s => /peserta\s*didik/i.test(s));
-            if (pSheetKey && I.t === 'siswa') {
-                const rows = realRows(w);
-                if (rows && rows.length > 0) {
-                    I.raws = null;
-                    I.rows = rows;
-                    I.mode = 'semua';
-                    I.newM = [];
-                    I.newX = [];
-                    syncDetectedAcademicYear(I.rows);
-                    renderPreviewUI();
-                    if (window.toast) window.toast(I.rows.length + ' siswa terbaca dari ' + pSheetKey + (w.Sheets['Kontrol Induk'] ? ' + Kontrol Induk' : ''));
-                    return;
-                }
+            if (I.t === 'siswa') {
+                studentWorkbook = w;
+                const result = realRows(w, I.studentColumnOverrides);
+                I.detection = result.detection;
+                I.raws = null;
+                I.rows = result.rows;
+                I.mappingIssues = mappingIssues(I);
+                syncDetectedAcademicYear(I.rows);
+                renderPreviewUI();
+                if (window.toast && result.detection) window.toast(I.rows.length + ' siswa terbaca dari sheet ' + result.detection.sheet);
+                return;
             }
 
             // 2. Analisis Fleksibel — semua sheet (skip Kontrol Induk untuk siswa)
@@ -1118,12 +1558,28 @@
             use.forEach(z => assignX(z, I.t));
 
             I.raws = use;
+            const detectedColumns = use.flatMap(sheet => (sheet.heads || []).map((header, index) => ({
+                sheet: sheet.name,
+                index,
+                header: String(header ?? ''),
+                field: sheet.map?.[index] || '',
+                status: sheet.map?.[index] ? 'recognized' : (header ? 'unknown' : '')
+            })).filter(column => column.header !== ''));
+            I.detection = {
+                sheetCount: w.SheetNames.length,
+                sheets: use.map(sheet => ({name: sheet.name, headerRow: sheet.hr + 1})),
+                columns: detectedColumns,
+                recognized: detectedColumns.filter(column => column.status === 'recognized'),
+                uncertain: [],
+                unknown: detectedColumns.filter(column => column.status === 'unknown')
+            };
             I.rows = buildRows(I);
+            I.mappingIssues = mappingIssues(I);
             syncDetectedAcademicYear(I.rows);
-            if (I.rows.some(q => q.kelas)) I.mode = 'semua';
+            if (I.mode !== 'kelas' && I.rows.some(q => q.kelas)) I.mode = 'semua';
 
             renderPreviewUI();
-            if (window.toast) window.toast('Terdeteksi ' + I.rows.length + ' baris dari ' + use.length + ' sheet');
+            if (window.toast) window.toast('Terdeteksi ' + I.rows.length + ' baris dari ' + w.SheetNames.length + ' sheet');
         };
         r.readAsArrayBuffer(f);
     };
@@ -1131,8 +1587,15 @@
     window.resetImportPreview = function() {
         S.imp.rows = null;
         S.imp.raws = null;
+        S.imp.detection = null;
+        S.imp.studentColumnOverrides = {};
+        S.imp.mappingIssues = [];
+        S.imp.statuses = [];
+        S.imp.warningsConfirmed = false;
+        S.imp.fileName = '';
         S.imp.errors = [];
         S.imp.warns = [];
+        studentWorkbook = null;
         const c = document.getElementById('josbook-import-preview-area');
         if (c) c.innerHTML = '';
         document.querySelectorAll('input[type="file"]').forEach(i => { i.value = ''; });
@@ -1143,7 +1606,23 @@
         const I = S.imp;
         readFormOptions();
 
-        let rowsToSend = I.rows || [];
+        if (I.mappingIssues?.length) {
+            alert('Perbaiki pemetaan kolom sebelum mengimpor: ' + I.mappingIssues.join(' '));
+            return;
+        }
+        if (I.warns?.length && !I.warningsConfirmed) {
+            alert('Konfirmasikan peringatan sebelum mengimpor.');
+            return;
+        }
+
+        const invalidRows = new Set((I.statuses || [])
+            .map((status, index) => status.status === 'error' ? index : -1)
+            .filter(index => index >= 0));
+        const rowsToSend = (I.rows || []).filter((row, index) => !invalidRows.has(index));
+        if (!rowsToSend.length) {
+            alert('Tidak ada baris yang valid untuk diimpor.');
+            return;
+        }
 
         const btn = document.getElementById('btn-do-import');
         if (btn) {
@@ -1157,6 +1636,12 @@
         const endpoint = endpointMeta ? endpointMeta.getAttribute('content') : '';
         const appBaseMeta = document.querySelector('meta[name="app-base-url"]');
         const appBaseUrl = appBaseMeta ? appBaseMeta.getAttribute('content').replace(/\/+$/, '') : '';
+        const importRolePath = endpoint.includes('/guru/') ? 'guru' : 'admin';
+        const importPage = {
+            nilai: importRolePath === 'guru' ? 'import-nilai' : 'import/nilai',
+            hadir: importRolePath === 'guru' ? 'import-ketidakhadiran' : 'import/kehadiran',
+            ekskul: importRolePath === 'guru' ? 'import-ekskul' : 'import/ekskul'
+        };
 
         if (!endpoint) {
             alert('Alamat layanan import tidak tersedia. Muat ulang halaman lalu coba lagi.');
@@ -1169,19 +1654,19 @@
 
         const payload = {
             type: I.t,
-            tahun_ajaran: ['nilai', 'hadir', 'ekskul'].includes(I.t) ? '' : (I.ta || ''),
+            tahun_ajaran: I.ta || '',
             semester: I.sem || 'Genap',
             mode: I.mode || 'semua',
             kelas: I.kelas || '',
             dup: I.dup || 'skip',
             rows: rowsToSend,
             new_classes: [...new Set(rowsToSend.map(r => normK(r.kelas || '')).filter(Boolean))],
-            new_mapel: I.newM || []
+            new_mapel: (I.newM || []).filter(mapel => rowsToSend.some(row => row[mapel.kode] !== '' && row[mapel.kode] != null))
         };
 
         const targetKelas = I.mode === 'kelas' ? I.kelas : (rowsToSend[0] ? normK(rowsToSend[0].kelas) : '');
 
-        fetch(endpoint, {
+        return fetch(endpoint, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1228,11 +1713,11 @@
                                     <a href="${appBaseUrl}/admin/alumni?aj=${encodeURIComponent('Alumni (Lulus)')}" class="btn o" style="padding:6px 10px;font-size:12px;text-decoration:none">Lihat Alumni &amp; Kontrol Induk</a>
                                     <a href="${appBaseUrl}/admin/pelacakan-alumni" class="btn o" style="padding:6px 10px;font-size:12px;text-decoration:none">Periksa Pelacakan Alumni</a>
                                 ` : I.t === 'nilai' ? `
-                                    <a href="${appBaseUrl}/admin/import/nilai" class="btn a" style="padding:6px 12px;font-size:12px;text-decoration:none;font-weight:600">🔄 Selesai &amp; Muat Ulang Data Nilai</a>
+                                    <a href="${appBaseUrl}/${importRolePath}/${importPage.nilai}" class="btn a" style="padding:6px 12px;font-size:12px;text-decoration:none;font-weight:600">🔄 Selesai &amp; Muat Ulang Data Nilai</a>
                                 ` : I.t === 'hadir' ? `
-                                    <a href="${appBaseUrl}/admin/import/kehadiran" class="btn a" style="padding:6px 12px;font-size:12px;text-decoration:none;font-weight:600">🔄 Selesai &amp; Muat Ulang Data Kehadiran</a>
+                                    <a href="${appBaseUrl}/${importRolePath}/${importPage.hadir}" class="btn a" style="padding:6px 12px;font-size:12px;text-decoration:none;font-weight:600">🔄 Selesai &amp; Muat Ulang Data Kehadiran</a>
                                 ` : `
-                                    <a href="${appBaseUrl}/admin/import/ekskul" class="btn a" style="padding:6px 12px;font-size:12px;text-decoration:none;font-weight:600">🔄 Selesai &amp; Muat Ulang Data Ekskul</a>
+                                    <a href="${appBaseUrl}/${importRolePath}/${importPage.ekskul}" class="btn a" style="padding:6px 12px;font-size:12px;text-decoration:none;font-weight:600">🔄 Selesai &amp; Muat Ulang Data Ekskul</a>
                                 `}
                                 <button type="button" class="btn o" onclick="resetImportPreview()">⬆ Import File Lain</button>
                             </div>

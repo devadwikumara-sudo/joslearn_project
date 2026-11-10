@@ -1,0 +1,22 @@
+{
+  "sheetName": "Data Utama",
+  "headers": [
+    "NAMA AYAH",
+    "AGAMA",
+    "PEKERJAAN",
+    "NAMA IBU",
+    "AGAMA",
+    "PEKERJAAN",
+    "NAMA WALI",
+    "AGAMA",
+    "PEKERJAAN",
+    "NISN",
+    "NAMA LENGKAP",
+    "NIS",
+    "KELAS"
+  ],
+  "records": [
+    ["Ayah A", "Islam", "Petani", "Ibu A", "Kristen", "Guru", "Wali A", "Hindu", "Dokter", "0000000001", "Siswa Uji A", "NIS-001", "X-1"],
+    ["Ayah B", "Islam", "Pedagang", "Ibu B", "Kristen", "Perawat", "Wali B", "Hindu", "PNS", "0000000002", "Siswa Uji B", "NIS-002", "X-2"]
+  ]
+}

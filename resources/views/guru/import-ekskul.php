@@ -12,7 +12,7 @@
         <div class="note">
             Format: <b>.xlsx / .xls</b> — Kolom: <b>NISN, Nama Siswa, Nama Ekskul, Nilai/Predikat, Keterangan</b>
         </div>
-        <form method="POST" action="{{ route('guru.import-ekskul.store') }}" enctype="multipart/form-data">
+        <form method="POST" action="{{ route('guru.import-ekskul.store') }}" enctype="multipart/form-data" onsubmit="return false">
             @csrf
             <div style="display:grid;gap:12px;margin-bottom:14px">
                 <div>
@@ -44,13 +44,13 @@
             </div>
             <div style="border:2px dashed var(--ln);border-radius:12px;padding:24px;text-align:center;margin-bottom:14px">
                 <div style="font-size:32px;margin-bottom:8px">🏃</div>
-                <input type="file" name="file" id="fileEkskul" accept=".xlsx,.xls" style="display:none" required
-                    onchange="document.getElementById('namaEkskul').textContent='📄 '+this.files[0].name">
+                <input type="file" name="file" id="fileEkskul" accept=".xlsx,.xls,.csv" style="display:none"
+                    onchange="document.getElementById('namaEkskul').textContent='📄 '+this.files[0].name; smartFile(event, 'ekskul')">
                 <button type="button" class="btn o" onclick="document.getElementById('fileEkskul').click()">Pilih File Excel</button>
                 <div id="namaEkskul" style="margin-top:8px;font-size:12px;color:var(--mu)"></div>
             </div>
             <div style="display:flex;gap:8px;justify-content:flex-end">
-                <button type="submit" class="btn">⬆ Import Ekskul</button>
+                <button type="button" class="btn" onclick="window.executeBatchImport()">⬆ Import Ekskul</button>
             </div>
         </form>
     </div>
@@ -70,5 +70,5 @@
         @endforelse
     </div>
 </div>
+<div id="josbook-import-preview-area"></div>
 @endsection
-
