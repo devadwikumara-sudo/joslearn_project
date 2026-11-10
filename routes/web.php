@@ -203,6 +203,14 @@ Route::prefix('guru')->name('guru.')->middleware(['auth', 'role.web'])->group(fu
 
     // Data Siswa (data siswa.png - guru)
     Route::get('/data-siswa', [DataSiswaGuruController::class, 'index'])->name('data-siswa');
+    Route::get('/data-siswa/export', [DataSiswaGuruController::class, 'export'])->name('data-siswa.export');
+    Route::get('/data-siswa/pdf-semua', [DataSiswaGuruController::class, 'pdfAll'])->name('data-siswa.pdf-all');
+    Route::post('/data-siswa/pdf-terpilih', [DataSiswaGuruController::class, 'pdfSelected'])->name('data-siswa.pdf-selected');
+    Route::get('/data-siswa/{id}/pdf', [PdfCetakController::class, 'single'])->name('data-siswa.pdf');
+    Route::get('/data-siswa/{id}/edit', [FormPendataanController::class, 'edit'])->name('data-siswa.edit');
+    Route::put('/data-siswa/{id}', [FormPendataanController::class, 'update'])->name('data-siswa.update');
+    Route::get('/data-siswa/{id}/foto', [DataSiswaController::class, 'foto'])->name('data-siswa.foto');
+    Route::get('/data-siswa/{id}/berkas/{jenis}', [DataSiswaController::class, 'berkas'])->name('data-siswa.berkas');
     Route::get('/data-siswa/{id}', [DataSiswaGuruController::class, 'show'])->name('data-siswa.show');
 
     // Import Fleksibel API (Universal Batch Save - Guru)

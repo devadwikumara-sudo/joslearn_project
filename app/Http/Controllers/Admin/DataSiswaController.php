@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Admin\CatatanAktivitas;
 use App\Models\SekolahKelas;
 use App\Models\SekolahTahunAjaran;
 use App\Models\SiswaBiodata;
@@ -45,46 +46,26 @@ class DataSiswaController extends Controller
         $kelasList = SekolahKelas::orderBy('nama')->pluck('nama')->toArray();
         sort($kelasList, SORT_NATURAL);
 
-        $kelasCounts = array_fill_keys($kelasList, 0);
-        $countsQuery = DB::table('siswa_riwayat_kelas as riwayat')
-            ->join('sekolah_kelas as kelas', 'kelas.id', '=', 'riwayat.kelas_id')
-            ->whereNull('riwayat.deleted_at')
-            ->where('riwayat.status', 'Aktif')
-            ->select('kelas.nama')
-            ->selectRaw('COUNT(DISTINCT riwayat.siswa_id) as total')
-            ->groupBy('kelas.id', 'kelas.nama');
-        if ($taAktifId !== null) {
-            $countsQuery->where('riwayat.tahun_ajaran_id', $taAktifId);
-        }
-        $countsByClass = $countsQuery->pluck('total', 'kelas.nama');
-        foreach ($countsByClass as $className => $count) {
-            $kelasCounts[$className] = $count;
-        }
-
-        $siswaList = null;
-        if ($kelasSelected !== '' || $search !== '' || $statusFilter !== '' || $kelasList === []) {
-            $query = $this->studentScopeQuery($taAktifId, $kelasSelected, $statusFilter, $search);
-            $siswaList = $query->with(['riwayatKelas' => function (Relation $historyQuery) use ($taAktifId, $kelasSelected, $statusFilter): void {
-                $this->applyHistoryFilters($historyQuery, $taAktifId, $kelasSelected, $statusFilter);
-                $historyQuery->with('kelas')->orderByDesc('tahun_ajaran_id');
+        $query = $this->studentScopeQuery($taAktifId, $kelasSelected, $statusFilter, $search);
+        $siswaList = $query->with(['riwayatKelas' => function (Relation $historyQuery) use ($taAktifId, $kelasSelected, $statusFilter): void {
+            $this->applyHistoryFilters($historyQuery, $taAktifId, $kelasSelected, $statusFilter);
+            $historyQuery->with('kelas')->orderByDesc('tahun_ajaran_id');
+        }])
+            ->with(['riwayatKelasAkademik' => function (Relation $historyQuery): void {
+                $historyQuery->whereNull('deleted_at')
+                    ->with(['kelas', 'tahunAjaran', 'nilai.mapel', 'kehadiran', 'ekskul'])
+                    ->orderBy('tahun_ajaran_id');
             }])
-                ->with(['riwayatKelasAkademik' => function (Relation $historyQuery): void {
-                    $historyQuery->whereNull('deleted_at')
-                        ->with(['kelas', 'tahunAjaran', 'nilai.mapel', 'kehadiran', 'ekskul'])
-                        ->orderBy('tahun_ajaran_id');
-                }])
-                ->with('berkas')
-                ->latest('id')
-                ->paginate(25)
-                ->withQueryString();
-        }
+            ->with('berkas')
+            ->latest('id')
+            ->paginate(25)
+            ->withQueryString();
 
         return view('admin.data-siswa', compact(
             'taAktif',
             'tahunAjaranList',
             'tahunAjaranTerpilihId',
             'kelasList',
-            'kelasCounts',
             'kelasSelected',
             'search',
             'statusFilter',
@@ -321,6 +302,8 @@ class DataSiswaController extends Controller
             'kelas' => ['nullable', 'string', 'max:64'],
             'st' => ['nullable', 'in:Aktif,Pindah keluar,Keluar,Lulus'],
             'q' => ['nullable', 'string', 'max:150'],
+            'siswa_ids' => ['sometimes', 'array', 'min:1'],
+            'siswa_ids.*' => ['required', 'integer', 'distinct', 'exists:siswa_biodata,id'],
             'target_tahun_ajaran' => ['required', 'integer', 'exists:sekolah_tahun_ajaran,id'],
             'target_kelas' => ['required', 'string', 'exists:sekolah_kelas,nama'],
             'target_status' => ['nullable', 'in:Aktif,Pindah keluar,Keluar,Lulus'],
@@ -337,7 +320,12 @@ class DataSiswaController extends Controller
         $targetClassId = (int) SekolahKelas::where('nama', $validated['target_kelas'])->value('id');
         $targetStatus = $validated['target_status'] ?? null;
 
-        $students = $this->studentScopeQuery($sourceYearId, $sourceClass, $sourceStatus, $search)
+        $studentsQuery = $this->studentScopeQuery($sourceYearId, $sourceClass, $sourceStatus, $search);
+        if (isset($validated['siswa_ids'])) {
+            $studentsQuery->whereIn('id', $validated['siswa_ids']);
+        }
+
+        $students = $studentsQuery
             ->with(['riwayatKelas' => function (Relation $historyQuery) use ($sourceYearId, $sourceClass, $sourceStatus): void {
                 $this->applyHistoryFilters($historyQuery, $sourceYearId, $sourceClass, $sourceStatus);
             }])
@@ -347,7 +335,9 @@ class DataSiswaController extends Controller
             return back()->with('error', 'Tidak ada siswa yang cocok dengan filter untuk diedit.');
         }
 
-        DB::transaction(function () use ($students, $targetYearId, $targetClassId, $targetStatus): void {
+        $targetYear = SekolahTahunAjaran::findOrFail($targetYearId);
+
+        DB::transaction(function () use ($students, $targetYearId, $targetClassId, $targetStatus, $targetYear, $validated, $request): void {
             foreach ($students as $student) {
                 $sourceHistory = $student->riwayatKelas->first();
                 if (! $sourceHistory) {
@@ -365,9 +355,16 @@ class DataSiswaController extends Controller
                     ]
                 );
             }
-        });
 
-        $targetYear = SekolahTahunAjaran::findOrFail($targetYearId);
+            CatatanAktivitas::create([
+                'pengguna_id' => auth()->id(),
+                'peran' => auth()->user()->peran,
+                'aksi' => 'pindah_kelas_massal',
+                'keterangan' => "Memindahkan {$students->count()} siswa ke kelas {$validated['target_kelas']} tahun ajaran {$targetYear->nama}.",
+                'objek_tipe' => 'siswa',
+                'alamat_ip' => $request->ip(),
+            ]);
+        });
 
         return back()->with(
             'success',
@@ -383,6 +380,8 @@ class DataSiswaController extends Controller
             'st' => ['nullable', 'in:Aktif,Pindah keluar,Keluar,Lulus'],
             'q' => ['nullable', 'string', 'max:150'],
             'konfirmasi' => ['required', 'in:hapus'],
+            'siswa_ids' => ['sometimes', 'array', 'min:1'],
+            'siswa_ids.*' => ['required', 'integer', 'distinct', 'exists:siswa_biodata,id'],
         ]);
 
         $selectedYear = $validated['tahun_ajaran'];
@@ -398,7 +397,7 @@ class DataSiswaController extends Controller
         if ($selectedClass !== '' && $selectedClass !== '*' && ! SekolahKelas::where('nama', $selectedClass)->exists()) {
             return back()->with('error', 'Filter kelas tidak valid.');
         }
-        if ($yearId === null && ($selectedClass === '' || $selectedClass === '*')) {
+        if ($yearId === null && ($selectedClass === '' || $selectedClass === '*') && ! isset($validated['siswa_ids'])) {
             return back()->with('error', 'Pilih tahun ajaran tertentu atau kelas tertentu agar penghapusan massal memiliki batas yang jelas.');
         }
 
@@ -408,14 +407,28 @@ class DataSiswaController extends Controller
             $validated['st'] ?? '',
             trim($validated['q'] ?? '')
         );
+        if (isset($validated['siswa_ids'])) {
+            $query->whereIn('id', $validated['siswa_ids']);
+        }
         $deletedCount = 0;
-        DB::transaction(function () use ($query, &$deletedCount): void {
+        DB::transaction(function () use ($query, &$deletedCount, $request): void {
             $query->orderBy('id')->chunkById(200, function ($students) use (&$deletedCount): void {
                 foreach ($students as $student) {
                     $student->delete();
                     $deletedCount++;
                 }
             });
+
+            if ($deletedCount > 0) {
+                CatatanAktivitas::create([
+                    'pengguna_id' => auth()->id(),
+                    'peran' => auth()->user()->peran,
+                    'aksi' => 'hapus_siswa_massal',
+                    'keterangan' => "Memindahkan {$deletedCount} data siswa ke Tempat Sampah melalui aksi massal.",
+                    'objek_tipe' => 'siswa',
+                    'alamat_ip' => $request->ip(),
+                ]);
+            }
         });
 
         if ($deletedCount === 0) {
