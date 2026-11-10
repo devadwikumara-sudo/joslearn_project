@@ -6,6 +6,16 @@
 <h2>Data Guru</h2>
 <p class="sub">{{ $totalGuru ?? 0 }} guru · {{ $totalGuruMapel ?? 0 }} guru mapel · {{ $totalWaliKelas ?? 0 }} wali kelas</p>
 
+@if(session('sandi_sementara'))
+<div class="note ok">
+    Sandi sementara untuk <b>{{ session('sandi_sementara.username') }}</b> (hanya ditampilkan kali ini):
+    <code>{{ session('sandi_sementara.password') }}</code>. Berikan kepada guru secara aman.
+</div>
+@endif
+@if(session('error'))
+<div class="note err">{{ session('error') }}</div>
+@endif
+
 <div class="note">
     Guru mapel hanya bisa mengedit nilai mapelnya di kelas yang diajar. Wali kelas bisa menaikkan kelas siswa di kelasnya sendiri dan mengelola kehadiran &amp; ekskul kelasnya. Satu guru boleh punya kedua peran.
 </div>
@@ -66,6 +76,17 @@
                     <td>{{ $waliKelasNama }}</td>
                     <td>{{ $g->nomor_hp ?? '-' }}</td>
                     <td style="white-space:nowrap">
+                        @if($g->akun)
+                            <form action="{{ route('admin.data-guru.reset-sandi', $g->id) }}" method="POST" style="display:inline" onsubmit="return confirm('Reset sandi akun {{ $g->nama }}?')">
+                                @csrf
+                                <button type="submit" class="btn o" style="padding:3px 8px;font-size:12px">Reset sandi</button>
+                            </form>
+                        @else
+                            <form action="{{ route('admin.data-guru.buat-akun', $g->id) }}" method="POST" style="display:inline" onsubmit="return confirm('Buat akun untuk {{ $g->nama }}?')">
+                                @csrf
+                                <button type="submit" class="btn a" style="padding:3px 8px;font-size:12px">Buat akun</button>
+                            </form>
+                        @endif
                         <button type="button" class="btn o" style="padding:3px 8px;font-size:12px" onclick="editGuruData({{ json_encode($g) }})">Edit</button>
                         <form action="{{ route('admin.data-guru.destroy', $g->id) }}" method="POST" style="display:inline" onsubmit="return confirm('Hapus guru {{ $g->nama }}?')">
                             @csrf

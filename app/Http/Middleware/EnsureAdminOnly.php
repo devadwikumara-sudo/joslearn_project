@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Middleware;
 
 use Closure;
@@ -8,13 +9,16 @@ use Symfony\Component\HttpFoundation\Response;
 
 class EnsureAdminOnly
 {
+    public function __construct(private EnsureUserIsAdminOrGuru $webAccess) {}
+
     public function handle(Request $request, Closure $next): Response
     {
-        if (! Auth::check() || Auth::user()->peran !== 'admin') {
-            abort(403, 'Akses hanya untuk administrator.');
-        }
+        return $this->webAccess->handle($request, function (Request $request) use ($next): Response {
+            if (Auth::user()->peran !== 'admin') {
+                abort(403, 'Akses hanya untuk administrator.');
+            }
 
-        return $next($request);
+            return $next($request);
+        });
     }
 }
-

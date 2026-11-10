@@ -43,6 +43,18 @@
         @endforelse
     </div>
 
+    <div class="card">
+        <h3>Wali Kelas</h3>
+        @forelse($kelasWali as $kelas)
+        <div class="row">
+            <b>{{ $kelas->nama }}</b>
+            <a href="{{ route('guru.kenaikan-kelas', ['kelas' => $kelas->nama]) }}" class="btn o" style="padding:4px 10px;font-size:11px">Kenaikan kelas</a>
+        </div>
+        @empty
+        <p style="color:var(--mu);font-size:12px;text-align:center;padding:20px">Anda tidak memiliki kelas wali pada tahun ajaran berjalan.</p>
+        @endforelse
+    </div>
+
     {{-- Tugas dan Pengingat --}}
     <div class="card">
         <h3>Pengingat</h3>
@@ -81,4 +93,3 @@
     </div>
 </div>
 @endsection
-

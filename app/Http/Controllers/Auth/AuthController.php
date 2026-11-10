@@ -12,7 +12,9 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
@@ -48,27 +50,30 @@ class AuthController extends Controller
         $input = trim($request->username);
         $password = $request->password;
         $remember = $request->boolean('remember');
+        $rateLimitKey = 'login-web:'.Str::lower($input).'|'.$request->ip();
 
-        // Cari berdasarkan username atau email di tabel akun_pengguna
+        if (RateLimiter::tooManyAttempts($rateLimitKey, 5)) {
+            return back()->withInput($request->only('username'))->withErrors([
+                'username' => 'Username atau kata sandi salah',
+            ]);
+        }
+
         $pengguna = Pengguna::where('username', $input)
             ->orWhere('email', $input)
             ->first();
 
-        if (! $pengguna) {
+        $autentikasiBerhasil = $pengguna
+            && Auth::attempt(['username' => $pengguna->username, 'password' => $password], $remember);
+
+        if (! $autentikasiBerhasil) {
+            RateLimiter::hit($rateLimitKey, 60);
+
             return back()->withInput($request->only('username'))->withErrors([
-                'username' => 'Akun dengan kredensial tersebut tidak ditemukan di database.',
+                'username' => 'Username atau kata sandi salah',
             ]);
         }
 
-        // Cek autentikasi kata sandi
-        $credentials = ['username' => $pengguna->username, 'password' => $password];
-
-        if (! Auth::attempt($credentials, $remember)) {
-            return back()->withInput($request->only('username'))->withErrors([
-                'password' => 'Kata sandi yang dimasukkan salah.',
-            ]);
-        }
-
+        RateLimiter::clear($rateLimitKey);
         $user = Auth::user();
 
         // Cek status aktif akun
@@ -139,10 +144,15 @@ class AuthController extends Controller
      */
     public function daftar(Request $request)
     {
+        $identitasRules = ['required', 'string', 'max:50'];
+        if ($request->input('peran') === 'admin') {
+            $identitasRules[] = 'unique:akun_pengguna,username';
+        }
+
         $request->validate([
             'nama' => ['required', 'string', 'max:150'],
             'email' => ['required', 'email', 'max:120', 'unique:akun_pengguna,email'],
-            'identitas' => ['required', 'string', 'max:50', 'unique:akun_pengguna,username'],
+            'identitas' => $identitasRules,
             'peran' => ['required', 'in:admin,guru'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ], [
@@ -157,18 +167,47 @@ class AuthController extends Controller
             'password.confirmed' => 'Konfirmasi kata sandi tidak cocok.',
         ]);
 
+        if ($request->peran === 'admin') {
+            $kodeRahasia = config('auth.admin_registration_code');
+            $kodeDiberikan = $request->input('admin_registration_code');
+            $kodeCocok = is_string($kodeRahasia)
+                && $kodeRahasia !== ''
+                && is_string($kodeDiberikan)
+                && hash_equals($kodeRahasia, $kodeDiberikan);
+
+            if (! $kodeCocok) {
+                $pesan = is_string($kodeRahasia) && $kodeRahasia !== ''
+                    ? 'Kode pendaftaran administrator tidak valid.'
+                    : 'Pendaftaran administrator belum tersedia karena kode rahasia belum dikonfigurasi.';
+
+                return back()
+                    ->withInput($request->except('admin_registration_code'))
+                    ->withErrors(['admin_registration_code' => $pesan]);
+            }
+        }
+
         $email = Str::lower(trim($request->email));
         $pengguna = DB::transaction(function () use ($request, $email) {
             $guruId = null;
 
-            // Jika peran adalah Guru, buat / tautkan biodata guru
             if ($request->peran === 'guru') {
-                $guru = GuruBiodata::create([
-                    'nama' => trim($request->nama),
-                    'nip' => trim($request->identitas),
-                    'email' => $email,
-                    'status_kepegawaian' => 'Guru',
-                ]);
+                $nip = trim($request->identitas);
+                $guru = GuruBiodata::where('nip', $nip)->lockForUpdate()->first();
+                if (! $guru) {
+                    throw ValidationException::withMessages([
+                        'identitas' => 'NIP belum terdaftar, hubungi admin',
+                    ]);
+                }
+
+                $akunSudahAda = Pengguna::where(function ($query) use ($guru, $nip) {
+                    $query->where('guru_id', $guru->id)->orWhere('username', $nip);
+                })->exists();
+                if ($akunSudahAda) {
+                    throw ValidationException::withMessages([
+                        'identitas' => 'NIP ini sudah memiliki akun.',
+                    ]);
+                }
+
                 $guruId = $guru->id;
             }
 

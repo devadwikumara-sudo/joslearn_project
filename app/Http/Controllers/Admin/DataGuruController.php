@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Admin\CatatanAktivitas;
+use App\Models\Auth\Pengguna;
 use App\Models\Guru\GuruBiodata;
 use App\Models\SekolahKelas;
 use App\Models\SekolahMapel;
@@ -11,6 +12,8 @@ use App\Models\SekolahTahunAjaran;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class DataGuruController extends Controller
@@ -24,6 +27,7 @@ class DataGuruController extends Controller
 
         $guruList = GuruBiodata::whereNull('deleted_at')
             ->with([
+                'akun',
                 'waliKelas' => fn ($query) => $query->where('tahun_ajaran_id', $taAktifId)->with('kelas'),
                 'mengajar' => fn ($query) => $query->where('tahun_ajaran_id', $taAktifId)->with(['mapel', 'kelas']),
             ])
@@ -101,6 +105,14 @@ class DataGuruController extends Controller
                     ['tahun_ajaran_id' => $taId, 'kelas_id' => $kObj->id],
                     ['guru_id' => $guru->id, 'updated_at' => now()]
                 );
+                DB::table('siswa_riwayat_kelas')
+                    ->where('tahun_ajaran_id', $taId)
+                    ->where('kelas_id', $kObj->id)
+                    ->update([
+                        'wali_guru_id' => $guru->id,
+                        'nama_wali_kelas' => $guru->nama,
+                        'nip_wali_kelas' => $guru->nip,
+                    ]);
             }
 
             // Guru Mapel
@@ -206,5 +218,98 @@ class DataGuruController extends Controller
         $guru->delete();
 
         return redirect()->route('admin.data-guru')->with('success', "Guru {$nama} berhasil dipindahkan ke Tempat Sampah.");
+    }
+
+    public function buatAkun(int $id, Request $request)
+    {
+        $guru = GuruBiodata::whereNull('deleted_at')->findOrFail($id);
+        if (! $guru->nip) {
+            return back()->with('error', 'Guru harus memiliki NIP untuk dibuatkan akun.');
+        }
+
+        if ($guru->akun()->exists() || Pengguna::where('username', $guru->nip)->exists()) {
+            return back()->with('error', 'Guru ini sudah memiliki akun.');
+        }
+
+        if ($guru->email && Pengguna::where('email', $guru->email)->exists()) {
+            return back()->with('error', 'Email guru sudah digunakan oleh akun lain.');
+        }
+
+        $sandiSementara = Str::password(16);
+
+        DB::transaction(function () use ($guru, $request, $sandiSementara): void {
+            $guruTerkunci = GuruBiodata::whereNull('deleted_at')->lockForUpdate()->findOrFail($guru->id);
+            if ($guruTerkunci->akun()->exists() || Pengguna::where('username', $guruTerkunci->nip)->exists()) {
+                abort(409, 'Guru ini sudah memiliki akun.');
+            }
+            if ($guruTerkunci->email && Pengguna::where('email', $guruTerkunci->email)->exists()) {
+                abort(409, 'Email guru sudah digunakan oleh akun lain.');
+            }
+
+            Pengguna::create([
+                'peran' => 'guru',
+                'username' => $guruTerkunci->nip,
+                'email' => $guruTerkunci->email,
+                'password' => Hash::make($sandiSementara),
+                'aktif' => true,
+                'guru_id' => $guruTerkunci->id,
+                'wajib_ganti_password' => true,
+            ]);
+
+            CatatanAktivitas::create([
+                'pengguna_id' => auth()->id(),
+                'peran' => auth()->user()->peran,
+                'aksi' => 'buat_akun_guru',
+                'keterangan' => "Membuat akun guru untuk {$guruTerkunci->nama} (NIP: {$guruTerkunci->nip}).",
+                'objek_tipe' => 'guru',
+                'objek_id' => $guruTerkunci->id,
+                'alamat_ip' => $request->ip(),
+            ]);
+
+        });
+
+        session()->flash('sandi_sementara', [
+            'username' => $guru->nip,
+            'password' => $sandiSementara,
+        ]);
+
+        return redirect()->route('admin.data-guru')->with('success', "Akun untuk {$guru->nama} berhasil dibuat.");
+    }
+
+    public function resetSandi(int $id, Request $request)
+    {
+        $guru = GuruBiodata::whereNull('deleted_at')->findOrFail($id);
+        $akun = $guru->akun;
+        if (! $akun) {
+            return back()->with('error', 'Guru ini belum memiliki akun.');
+        }
+
+        $sandiSementara = Str::password(16);
+
+        $akunTerkunci = DB::transaction(function () use ($guru, $akun, $request, $sandiSementara): Pengguna {
+            $akunTerkunci = Pengguna::where('guru_id', $guru->id)->whereKey($akun->id)->lockForUpdate()->firstOrFail();
+            $akunTerkunci->password = Hash::make($sandiSementara);
+            $akunTerkunci->wajib_ganti_password = true;
+            $akunTerkunci->save();
+
+            CatatanAktivitas::create([
+                'pengguna_id' => auth()->id(),
+                'peran' => auth()->user()->peran,
+                'aksi' => 'reset_sandi_guru',
+                'keterangan' => "Mereset sandi akun guru {$guru->nama} (NIP: {$guru->nip}).",
+                'objek_tipe' => 'guru',
+                'objek_id' => $guru->id,
+                'alamat_ip' => $request->ip(),
+            ]);
+
+            return $akunTerkunci;
+        });
+
+        session()->flash('sandi_sementara', [
+            'username' => $akunTerkunci->username,
+            'password' => $sandiSementara,
+        ]);
+
+        return redirect()->route('admin.data-guru')->with('success', "Sandi akun {$guru->nama} berhasil direset.");
     }
 }

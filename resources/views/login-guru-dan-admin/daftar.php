@@ -70,6 +70,13 @@
                     <input id="d_i" class="no-icon" name="identitas" type="text" placeholder="19820415" value="{{ old('identitas') }}" required>
                 </div>
 
+                <div id="admin_code_group" style="{{ old('peran', 'admin') === 'admin' ? '' : 'display:none' }}">
+                    <label for="admin_registration_code">Kode Pendaftaran Admin</label>
+                    <div class="wf">
+                        <input id="admin_registration_code" class="no-icon" name="admin_registration_code" type="password" autocomplete="off" {{ old('peran', 'admin') === 'admin' ? 'required' : '' }}>
+                    </div>
+                </div>
+
                 <label for="d_p">Password</label>
                 <div class="wf">
                     <input id="d_p" class="no-icon" name="password" type="password" placeholder="••••••••••••" required>
@@ -101,15 +108,22 @@
             const tabGuru = document.getElementById('tab_guru');
             const labelIdentitas = document.getElementById('label_identitas');
             const inputIdentitas = document.getElementById('d_i');
+            const adminCodeGroup = document.getElementById('admin_code_group');
+            const adminCode = document.getElementById('admin_registration_code');
 
             if (role === 'admin') {
                 tabAdmin.classList.add('on');
                 tabGuru.classList.remove('on');
+                adminCodeGroup.style.display = '';
+                adminCode.required = true;
                 labelIdentitas.innerText = 'Nomor Identitas / NIP';
                 inputIdentitas.placeholder = '19820415';
             } else {
                 tabGuru.classList.add('on');
                 tabAdmin.classList.remove('on');
+                adminCodeGroup.style.display = 'none';
+                adminCode.required = false;
+                adminCode.value = '';
                 labelIdentitas.innerText = 'Nomor Identitas / NIP Guru';
                 inputIdentitas.placeholder = 'Masukkan NIP Guru';
             }

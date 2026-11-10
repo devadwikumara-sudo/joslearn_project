@@ -2,8 +2,10 @@
 
 namespace App\Models\Guru;
 
+use App\Models\Auth\Pengguna;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class GuruBiodata extends Model
@@ -13,6 +15,11 @@ class GuruBiodata extends Model
     protected $table = 'guru_biodata';
 
     protected $guarded = ['id'];
+
+    public function akun(): HasOne
+    {
+        return $this->hasOne(Pengguna::class, 'guru_id');
+    }
 
     public function waliKelas(): HasMany
     {

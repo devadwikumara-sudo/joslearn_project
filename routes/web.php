@@ -109,6 +109,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin.only'])->grou
     // Data Guru (data guru.png)
     Route::get('/data-guru', [DataGuruController::class, 'index'])->name('data-guru');
     Route::post('/data-guru', [DataGuruController::class, 'store'])->name('data-guru.store');
+    Route::post('/data-guru/{id}/buat-akun', [DataGuruController::class, 'buatAkun'])->name('data-guru.buat-akun');
+    Route::post('/data-guru/{id}/reset-sandi', [DataGuruController::class, 'resetSandi'])->name('data-guru.reset-sandi');
     Route::get('/data-guru/{id}/edit', [DataGuruController::class, 'edit'])->name('data-guru.edit');
     Route::put('/data-guru/{id}', [DataGuruController::class, 'update'])->name('data-guru.update');
     Route::delete('/data-guru/{id}', [DataGuruController::class, 'destroy'])->name('data-guru.destroy');
@@ -223,6 +225,11 @@ Route::prefix('guru')->name('guru.')->middleware(['auth', 'role.web'])->group(fu
     // Input Nilai Mapel (input nilai mapel.png - guru)
     Route::get('/input-nilai-mapel', [InputNilaiMapelController::class, 'index'])->name('input-nilai-mapel');
     Route::post('/input-nilai-mapel', [InputNilaiMapelController::class, 'store'])->name('input-nilai-mapel.store');
+
+    // Kenaikan kelas wali
+    Route::get('/kenaikan-kelas', [KenaikanKelasController::class, 'index'])->name('kenaikan-kelas');
+    Route::post('/kenaikan-kelas/proses', [KenaikanKelasController::class, 'proses'])->name('kenaikan-kelas.proses');
+    Route::post('/kenaikan-kelas/{id}/batalkan', [KenaikanKelasController::class, 'batalkan'])->name('kenaikan-kelas.batalkan');
 });
 
 // ─── DASHBOARD LAMA (backward compat redirect) ───────────────────────────────

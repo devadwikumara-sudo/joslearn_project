@@ -20,6 +20,8 @@ return [
         'passwords' => env('AUTH_PASSWORD_BROKER', 'users'),
     ],
 
+    'admin_registration_code' => env('ADMIN_REGISTRATION_CODE'),
+
     /*
     |--------------------------------------------------------------------------
     | Authentication Guards

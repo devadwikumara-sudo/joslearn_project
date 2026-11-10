@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Kenaikan Kelas — JosBook Admin')
+@section('title', 'Kenaikan Kelas — JosBook')
 
 @section('content')
 <h2>Kenaikan Kelas</h2>
@@ -16,7 +16,7 @@
             {{ $riwayatKenaikanTerakhir->jumlah_siswa }} siswa diproses pada {{ $riwayatKenaikanTerakhir->created_at }}.
         </div>
         <span class="sp"></span>
-        <form action="{{ route('admin.kenaikan-kelas.batalkan', $riwayatKenaikanTerakhir->id) }}" method="POST" onsubmit="return confirm('Apakah Anda yakin ingin membatalkan kenaikan kelas ini? Data riwayat siswa akan dikembalikan ke kondisi sebelum diproses.')">
+        <form action="{{ route($routePrefix . '.kenaikan-kelas.batalkan', $riwayatKenaikanTerakhir->id) }}" method="POST" onsubmit="return confirm('Apakah Anda yakin ingin membatalkan kenaikan kelas ini? Data riwayat siswa akan dikembalikan ke kondisi sebelum diproses.')">
             @csrf
             <button type="submit" class="btn x">Batalkan kenaikan terakhir</button>
         </form>
@@ -24,7 +24,7 @@
 </div>
 @endif
 
-<form action="{{ route('admin.kenaikan-kelas.proses') }}" method="POST">
+<form action="{{ route($routePrefix . '.kenaikan-kelas.proses') }}" method="POST">
     @csrf
     <input type="hidden" name="ta_aktif" value="{{ $taAktif }}">
     <input type="hidden" name="ta_berikutnya" value="{{ $taBerikutnya }}">
@@ -34,8 +34,8 @@
         <div class="bar">
             <div>
                 <label>Kelas asal</label>
-                <select onchange="location.href='{{ route('admin.kenaikan-kelas') }}?kelas='+this.value">
-                    @foreach($kelasList as $k)
+                <select onchange="location.href='{{ route($routePrefix . '.kenaikan-kelas') }}?kelas='+this.value">
+                    @foreach($kelasAsalList as $k)
                         <option value="{{ $k }}" {{ $kelasAsal === $k ? 'selected' : '' }}>{{ $k }}</option>
                     @endforeach
                 </select>
