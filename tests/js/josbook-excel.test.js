@@ -171,6 +171,7 @@ test('reads student records across four sheet and header variations', async () =
     }
 });
 
+<<<<<<< HEAD
 test('ignores Petunjuk sheets and recognizes the active Excel template headers', async () => {
     const templates = [
         {
@@ -236,6 +237,8 @@ test('ignores Petunjuk sheets and recognizes the active Excel template headers',
     }
 });
 
+=======
+>>>>>>> 497b07e27e50c1c03a318e4e1e5f3c83921f699c
 test('maps repeated parent and guardian headings by family group', async () => {
     const fixture = JSON.parse(readFileSync(resolve(directory, '../Fixtures', fixtures[2]), 'utf8'));
     const {state} = await importWorkbook(workbookFromFixture(fixture));

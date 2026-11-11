@@ -38,7 +38,11 @@
     <div class="bar" style="margin-top:14px">
         <input type="file" accept=".xlsx,.xls,.csv" id="excel-file-input" onchange="smartFile(event, 'ekskul')">
         <button type="button" class="btn" onclick="loadDemoEkskul()">Pakai data contoh</button>
+<<<<<<< HEAD
         <a href="{{ route('admin.import.ekskul.template') }}" class="btn">⬇ Template Excel</a>
+=======
+        <button type="button" class="btn" onclick="downloadTemplateEkskul()">⬇ Template Excel</button>
+>>>>>>> 497b07e27e50c1c03a318e4e1e5f3c83921f699c
     </div>
 
     <p class="sub" style="margin:8px 0 0;font-size:12px">
@@ -88,6 +92,24 @@
 
 @push('scripts')
 <script>
+<<<<<<< HEAD
+=======
+function downloadTemplateEkskul() {
+    if (!window.XLSX) {
+        alert('Library SheetJS belum selesai termuat.');
+        return;
+    }
+    var cols = ['nisn', 'nama', 'kelas', 'sem', 'ekskul', 'predikat'];
+    var sample = [
+        ['0081234561', 'Ahmad Faiz', 'X-1', '2', 'Pramuka', 'Sangat Baik'],
+        ['0081234562', 'Bunga Citra', 'X-1', '2', 'PMR', 'Baik']
+    ];
+    var w = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(w, XLSX.utils.aoa_to_sheet([cols, ...sample]), 'Ekskul');
+    XLSX.writeFile(w, 'template-ekskul.xlsx');
+}
+
+>>>>>>> 497b07e27e50c1c03a318e4e1e5f3c83921f699c
 function loadDemoEkskul() {
     var dummy = [
         { nisn: '0081234561', nama: 'Ahmad Faiz', kelas: 'X-1', sem: '2', ekskul: 'Pramuka Wajib', predikat: 'Sangat Baik' },

@@ -41,7 +41,11 @@
 
     <div class="bar" style="margin-top:14px">
         <input type="file" accept=".xlsx,.xls,.csv" id="excel-file-input" onchange="smartFile(event, 'siswa')">
+<<<<<<< HEAD
         <a href="{{ route('admin.import.siswa.template') }}" class="btn">⬇ Template Excel</a>
+=======
+        <button type="button" class="btn" onclick="downloadTemplate('siswa')">⬇ Template Excel</button>
+>>>>>>> 497b07e27e50c1c03a318e4e1e5f3c83921f699c
     </div>
 
     <p class="sub" style="margin:8px 0 0;font-size:12px">
@@ -87,4 +91,34 @@
     </div>
 </div>
 
+<<<<<<< HEAD
+=======
+@push('scripts')
+<script>
+function downloadTemplate(t) {
+    if (!window.XLSX) {
+        alert('Library SheetJS belum selesai termuat.');
+        return;
+    }
+    var cols = [
+        'nisn','nis','nama','panggilan','jk','tmp','tgl','agama','kewarganegaraan','nik',
+        'anak_ke','jml_saudara','yatim','bahasa','kelas','alamat','rt_rw','kelurahan',
+        'kecamatan','kab','prov','kodepos','hp','tinggal','jarak','gol_darah','penyakit',
+        'kelainan','tinggi','berat','asal','tgl_ijazah_smp','no_ijazah_smp','lama','masuk',
+        'sekolah_pindah','alasan_pindah','kelas_masuk','rombel_masuk','tgl_masuk',
+        'ayah','agama_ayah','wn_ayah','pend_ayah','kerja_ayah','gaji_ayah','hp_ayah','ket_ayah',
+        'ibu','agama_ibu','wn_ibu','pend_ibu','kerja_ibu','gaji_ibu','hp_ibu','ket_ibu',
+        'al_jalan','al_rt','al_desa','al_kec','al_kab','al_prov','al_pos',
+        'wali','agama_wali','wn_wali','pend_wali','kerja_wali','gaji_wali','hp_wali',
+        'wali_jalan','wali_rt','wali_desa','wali_kec','wali_kab','wali_prov','wali_pos',
+        'status','tgl_keluar','kelas_keluar','alasan_keluar','tujuan','nopes','no_skl',
+        'no_ijazah_sma','tgl_ijazah_sma','no_transkrip','tahun_lulus','lanjut','catatan'
+    ];
+    var w = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(w, XLSX.utils.aoa_to_sheet([cols]), 'PesertaDidik');
+    XLSX.writeFile(w, 'template-' + t + '.xlsx');
+}
+</script>
+@endpush
+>>>>>>> 497b07e27e50c1c03a318e4e1e5f3c83921f699c
 @endsection

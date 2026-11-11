@@ -543,7 +543,11 @@
 
     // ─── Pembaca biodata berdasarkan judul kolom ──────────────────────────────
     function realRows(w, columnOverrides = {}) {
+<<<<<<< HEAD
         const sheetRows = w.SheetNames.filter(name => !/^(?:kontrol\s*induk|petunjuk)$/i.test(String(name).trim())).map(name => ({
+=======
+        const sheetRows = w.SheetNames.map(name => ({
+>>>>>>> 497b07e27e50c1c03a318e4e1e5f3c83921f699c
             name,
             rows: readRows(w.Sheets[name])
         }));
@@ -1726,7 +1730,13 @@
 
             // 2. Analisis Fleksibel — semua sheet (skip Kontrol Induk untuk siswa)
             const rd = n => readRows(w.Sheets[n]);
+<<<<<<< HEAD
             const sheetNames = w.SheetNames.filter(name => !/^(?:kontrol\s*induk|petunjuk)$/i.test(String(name).trim()));
+=======
+            const sheetNames = I.t === 'siswa'
+                ? w.SheetNames.filter(name => !/kontrol\s*induk/i.test(name))
+                : w.SheetNames;
+>>>>>>> 497b07e27e50c1c03a318e4e1e5f3c83921f699c
             const allAnalyzed = sheetNames.map(n => analyze(n, rd(n), I.t)).filter(Boolean);
 
             let use = allAnalyzed;

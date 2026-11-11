@@ -219,11 +219,15 @@
                             <button type="submit" class="btn x">🗑</button>
                         </form>
                         <template class="alumni-profile-template">
+<<<<<<< HEAD
                             @include('admin.siswa-detail-content', [
                                 'siswa' => $s,
                                 'includeGraduationDetails' => false,
                                 'canManageAcademicRecords' => false,
                             ])
+=======
+                            @include('admin.siswa-detail-content', ['siswa' => $s, 'includeGraduationDetails' => false])
+>>>>>>> 497b07e27e50c1c03a318e4e1e5f3c83921f699c
                         </template>
                     </td>
                 </tr>

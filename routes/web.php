@@ -1,7 +1,10 @@
 <?php
 
 use App\Http\Controllers\Admin\AlumniController;
+<<<<<<< HEAD
 use App\Http\Controllers\Admin\AcademicRecordController;
+=======
+>>>>>>> 497b07e27e50c1c03a318e4e1e5f3c83921f699c
 use App\Http\Controllers\Admin\CekKualitasDataController;
 use App\Http\Controllers\Admin\DashboardAdminController;
 use App\Http\Controllers\Admin\DataGuruController;
@@ -12,7 +15,10 @@ use App\Http\Controllers\Admin\ImportEkskulAdminController;
 use App\Http\Controllers\Admin\ImportGuruController;
 use App\Http\Controllers\Admin\ImportKehadiranAdminController;
 use App\Http\Controllers\Admin\ImportNilaiAdminController;
+<<<<<<< HEAD
 use App\Http\Controllers\Admin\ImportTemplateController;
+=======
+>>>>>>> 497b07e27e50c1c03a318e4e1e5f3c83921f699c
 use App\Http\Controllers\Admin\KenaikanKelasController;
 use App\Http\Controllers\Admin\LaporanController;
 use App\Http\Controllers\Admin\LogAktivitasController;
@@ -125,27 +131,42 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin.only'])->grou
 
     // Import Siswa
     Route::get('/import/siswa', [DataSiswaController::class, 'importView'])->name('import.siswa');
+<<<<<<< HEAD
     Route::get('/import/siswa/template', [ImportTemplateController::class, 'download'])->defaults('jenis', 'siswa')->name('import.siswa.template');
     Route::get('/import/guru/template', [ImportTemplateController::class, 'download'])->defaults('jenis', 'guru')->name('import.guru.template');
+=======
+>>>>>>> 497b07e27e50c1c03a318e4e1e5f3c83921f699c
 
     // Import Nilai (import nilai.png)
     Route::get('/import/nilai', [ImportNilaiAdminController::class, 'index'])->name('import.nilai');
     Route::post('/import/nilai', [ImportNilaiAdminController::class, 'store'])->name('import.nilai.store');
     Route::post('/import/nilai/upload', [ImportNilaiAdminController::class, 'store'])->name('import.nilai.upload');
+<<<<<<< HEAD
     Route::get('/import/nilai/template', [ImportTemplateController::class, 'download'])->defaults('jenis', 'nilai')->name('import.nilai.template');
+=======
+    Route::get('/import/nilai/template', [ImportNilaiAdminController::class, 'template'])->name('import.nilai.template');
+>>>>>>> 497b07e27e50c1c03a318e4e1e5f3c83921f699c
     Route::post('/import/nilai/confirm', [ImportNilaiAdminController::class, 'confirm'])->name('import.nilai.confirm');
 
     // Import Ekskul (import ekskul.png)
     Route::get('/import/ekskul', [ImportEkskulAdminController::class, 'index'])->name('import.ekskul');
     Route::post('/import/ekskul', [ImportEkskulAdminController::class, 'store'])->name('import.ekskul.store');
     Route::post('/import/ekskul/upload', [ImportEkskulAdminController::class, 'store'])->name('import.ekskul.upload');
+<<<<<<< HEAD
     Route::get('/import/ekskul/template', [ImportTemplateController::class, 'download'])->defaults('jenis', 'ekskul')->name('import.ekskul.template');
+=======
+    Route::get('/import/ekskul/template', [ImportEkskulAdminController::class, 'template'])->name('import.ekskul.template');
+>>>>>>> 497b07e27e50c1c03a318e4e1e5f3c83921f699c
 
     // Import Kehadiran (import kehadiran.png)
     Route::get('/import/kehadiran', [ImportKehadiranAdminController::class, 'index'])->name('import.kehadiran');
     Route::post('/import/kehadiran', [ImportKehadiranAdminController::class, 'store'])->name('import.kehadiran.store');
     Route::post('/import/kehadiran/upload', [ImportKehadiranAdminController::class, 'store'])->name('import.kehadiran.upload');
+<<<<<<< HEAD
     Route::get('/import/kehadiran/template', [ImportTemplateController::class, 'download'])->defaults('jenis', 'kehadiran')->name('import.kehadiran.template');
+=======
+    Route::get('/import/kehadiran/template', [ImportKehadiranAdminController::class, 'template'])->name('import.kehadiran.template');
+>>>>>>> 497b07e27e50c1c03a318e4e1e5f3c83921f699c
 
     // Kenaikan Kelas (kenaikan kelas.png)
     Route::get('/kenaikan-kelas', [KenaikanKelasController::class, 'index'])->name('kenaikan-kelas');
@@ -250,6 +271,7 @@ Route::prefix('guru')->name('guru.')->middleware(['auth', 'role.web'])->group(fu
     Route::post('/kenaikan-kelas/{id}/batalkan', [KenaikanKelasController::class, 'batalkan'])->name('kenaikan-kelas.batalkan');
 });
 
+<<<<<<< HEAD
 Route::middleware(['auth', 'role.web'])
     ->prefix('data-siswa/{siswa}/rekam-akademik')
     ->name('siswa.akademik.')
@@ -260,6 +282,8 @@ Route::middleware(['auth', 'role.web'])
         Route::delete('/{jenis}/{record}', [AcademicRecordController::class, 'destroy'])->name('destroy');
     });
 
+=======
+>>>>>>> 497b07e27e50c1c03a318e4e1e5f3c83921f699c
 // ─── DASHBOARD LAMA (backward compat redirect) ───────────────────────────────
 Route::middleware(['auth', 'role.web'])->group(function () {
     Route::get('/dashboard', function () {

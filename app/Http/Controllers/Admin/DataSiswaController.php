@@ -5,7 +5,10 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Admin\CatatanAktivitas;
 use App\Models\SekolahKelas;
+<<<<<<< HEAD
 use App\Models\SekolahMapel;
+=======
+>>>>>>> 497b07e27e50c1c03a318e4e1e5f3c83921f699c
 use App\Models\SekolahTahunAjaran;
 use App\Models\SiswaBiodata;
 use App\Models\SiswaRiwayatKelas;
@@ -61,7 +64,10 @@ class DataSiswaController extends Controller
             ->latest('id')
             ->paginate(25)
             ->withQueryString();
+<<<<<<< HEAD
         $academicMapelOptions = SekolahMapel::query()->orderBy('nama')->get(['id', 'nama', 'kode']);
+=======
+>>>>>>> 497b07e27e50c1c03a318e4e1e5f3c83921f699c
 
         return view('admin.data-siswa', compact(
             'taAktif',
@@ -72,8 +78,12 @@ class DataSiswaController extends Controller
             'search',
             'statusFilter',
             'siswaList',
+<<<<<<< HEAD
             'taAktifDefaultId',
             'academicMapelOptions'
+=======
+            'taAktifDefaultId'
+>>>>>>> 497b07e27e50c1c03a318e4e1e5f3c83921f699c
         ));
     }
 
@@ -249,9 +259,14 @@ class DataSiswaController extends Controller
     public function show(int $id): View
     {
         $siswa = $this->studentWithDetails($id);
+<<<<<<< HEAD
         $academicMapelOptions = SekolahMapel::query()->orderBy('nama')->get(['id', 'nama', 'kode']);
 
         return view('admin.siswa-detail', compact('siswa', 'academicMapelOptions'));
+=======
+
+        return view('admin.siswa-detail', compact('siswa'));
+>>>>>>> 497b07e27e50c1c03a318e4e1e5f3c83921f699c
     }
 
     private function studentWithDetails(int $id): SiswaBiodata

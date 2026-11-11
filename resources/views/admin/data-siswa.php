@@ -175,12 +175,16 @@
                             onclick="openStudentDetail(this)"
                         >Lihat</button>
                         <template class="student-detail-template">
+<<<<<<< HEAD
                             @include('admin.siswa-detail-content', [
                                 'siswa' => $s,
                                 'includeGraduationDetails' => true,
                                 'canManageAcademicRecords' => true,
                                 'academicMapelOptions' => $academicMapelOptions,
                             ])
+=======
+                            @include('admin.siswa-detail-content', ['siswa' => $s, 'includeGraduationDetails' => true])
+>>>>>>> 497b07e27e50c1c03a318e4e1e5f3c83921f699c
                         </template>
                         <a href="{{ route('admin.data-siswa.pdf', $s->id) }}" class="btn a" style="padding:3px 8px;font-size:12px">⬇ PDF</a>
                         <a href="{{ route('admin.form-pendataan.edit', $s->id) }}" class="btn o" style="padding:3px 8px;font-size:12px">Edit</a>

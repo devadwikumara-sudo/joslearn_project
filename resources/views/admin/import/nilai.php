@@ -38,7 +38,11 @@
     <div class="bar" style="margin-top:14px">
         <input type="file" accept=".xlsx,.xls,.csv" id="excel-file-input" onchange="smartFile(event, 'nilai')">
         <button type="button" class="btn" onclick="loadDemoNilai()">Pakai data contoh</button>
+<<<<<<< HEAD
         <a href="{{ route('admin.import.nilai.template') }}" class="btn">⬇ Template Excel</a>
+=======
+        <button type="button" class="btn" onclick="downloadTemplateNilai()">⬇ Template Excel</button>
+>>>>>>> 497b07e27e50c1c03a318e4e1e5f3c83921f699c
     </div>
 
     <p class="sub" style="margin:8px 0 0;font-size:12px">
@@ -88,6 +92,24 @@
 
 @push('scripts')
 <script>
+<<<<<<< HEAD
+=======
+function downloadTemplateNilai() {
+    if (!window.XLSX) {
+        alert('Library SheetJS belum selesai termuat.');
+        return;
+    }
+    var cols = ['nisn', 'nama', 'kelas', 'sem', 'agm', 'pnc', 'ind', 'mtk', 'big', 'pjk', 'sbd', 'inf', 'sej'];
+    var sample = [
+        ['0081234561', 'Ahmad Faiz', 'X-1', '2', 85, 88, 90, 82, 80, 85, 84, 88, 86],
+        ['0081234562', 'Bunga Citra', 'X-1', '2', 90, 86, 92, 88, 85, 80, 88, 90, 87]
+    ];
+    var w = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(w, XLSX.utils.aoa_to_sheet([cols, ...sample]), 'Nilai');
+    XLSX.writeFile(w, 'template-nilai.xlsx');
+}
+
+>>>>>>> 497b07e27e50c1c03a318e4e1e5f3c83921f699c
 function loadDemoNilai() {
     var dummy = [
         { nisn: '0081234561', nama: 'Ahmad Faiz', kelas: 'X-1', sem: '2', mtk: 85, ind: 88, big: 82, pnc: 90, pjk: 80 },

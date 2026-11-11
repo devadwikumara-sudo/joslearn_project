@@ -10,7 +10,10 @@ use App\Models\SiswaEkskul;
 use App\Models\SiswaKehadiran;
 use App\Models\SiswaNilai;
 use App\Models\SiswaRiwayatKelas;
+<<<<<<< HEAD
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+=======
+>>>>>>> 497b07e27e50c1c03a318e4e1e5f3c83921f699c
 use Tests\TestCase;
 
 class StudentAcademicHistoryPopupTest extends TestCase
@@ -69,6 +72,7 @@ class StudentAcademicHistoryPopupTest extends TestCase
         $this->assertStringContainsString('Matematika: 88', $html);
         $this->assertStringContainsString('Sakit 1, Izin 2, Alpa 0', $html);
         $this->assertStringContainsString('Pramuka: Baik', $html);
+<<<<<<< HEAD
         $this->assertStringNotContainsString('data-academic-open', $html);
     }
 
@@ -120,5 +124,7 @@ class StudentAcademicHistoryPopupTest extends TestCase
         $this->assertStringContainsString('/data-siswa/3/rekam-akademik/nilai/99', $html);
         $this->assertStringContainsString('/data-siswa/3/rekam-akademik/kehadiran/100', $html);
         $this->assertStringContainsString('/data-siswa/3/rekam-akademik/ekskul/101', $html);
+=======
+>>>>>>> 497b07e27e50c1c03a318e4e1e5f3c83921f699c
     }
 }

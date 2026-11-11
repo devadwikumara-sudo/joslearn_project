@@ -7,7 +7,10 @@ use App\Models\Guru\GuruBiodata;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+<<<<<<< HEAD
 use PhpOffice\PhpSpreadsheet\IOFactory;
+=======
+>>>>>>> 497b07e27e50c1c03a318e4e1e5f3c83921f699c
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Tests\TestCase;
 
@@ -19,7 +22,10 @@ class ImportStudentMatchingTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+<<<<<<< HEAD
         config(['app.key' => 'base64:'.base64_encode(str_repeat('j', 32))]);
+=======
+>>>>>>> 497b07e27e50c1c03a318e4e1e5f3c83921f699c
 
         foreach ([
             'import_baris',
@@ -1300,6 +1306,7 @@ class ImportStudentMatchingTest extends TestCase
         $this->assertSame(1, DB::table('catatan_aktivitas')->where('objek_id', $batchId)->count());
     }
 
+<<<<<<< HEAD
     public function test_downloaded_grade_template_can_be_filled_and_imported_through_the_batch_endpoint(): void
     {
         $download = $this->actingAs($this->admin)->get(route('admin.import.nilai.template'));
@@ -1338,6 +1345,8 @@ class ImportStudentMatchingTest extends TestCase
         ]);
     }
 
+=======
+>>>>>>> 497b07e27e50c1c03a318e4e1e5f3c83921f699c
     /**
      * @param  array<int, array<string, mixed>>  $rows
      */
