@@ -171,6 +171,71 @@ test('reads student records across four sheet and header variations', async () =
     }
 });
 
+test('ignores Petunjuk sheets and recognizes the active Excel template headers', async () => {
+    const templates = [
+        {
+            type: 'siswa',
+            headers: [
+                'NISN', 'NIS', 'Nama', 'Kelas', 'Tahun Ajaran', 'Jenis Kelamin',
+                'Tempat Lahir', 'Tanggal Lahir', 'Agama', 'NIK', 'Kewarganegaraan',
+                'Alamat', 'RT/RW', 'Kelurahan', 'Kecamatan', 'Kabupaten', 'Provinsi',
+                'Kode Pos', 'Nomor HP', 'Tinggal', 'Jarak ke Sekolah', 'Golongan Darah',
+                'Penyakit', 'Kelainan Fisik', 'Tinggi Badan', 'Berat Badan', 'Sekolah Asal',
+                'Nama Ayah', 'Pendidikan Ayah', 'Pekerjaan Ayah', 'Penghasilan Ayah', 'HP Ayah',
+                'Nama Ibu', 'Pendidikan Ibu', 'Pekerjaan Ibu', 'Penghasilan Ibu', 'HP Ibu',
+                'Nama Wali', 'Status Siswa'
+            ]
+        },
+        {
+            type: 'guru',
+            headers: ['Nama', 'NIP', 'NUPTK', 'NIK', 'Jenis Kelamin', 'Tempat Lahir', 'Tanggal Lahir', 'Pendidikan', 'Status Kepegawaian', 'Mulai Bertugas', 'Nomor HP', 'Alamat'],
+            row: ['Guru Uji', '198000000000000001', '', '', 'L', '', '', '', 'PNS', 2020, '', '']
+        },
+        {
+            type: 'nilai',
+            headers: ['NISN', 'Nama', 'Kelas', 'Semester', 'Mata Pelajaran', 'Nilai Akhir'],
+            row: ['0000000001', 'Siswa Uji', 'X-1', 'Ganjil', 'Matematika', 88]
+        },
+        {
+            type: 'hadir',
+            headers: ['NISN', 'Nama', 'Kelas', 'Semester', 'Sakit (hari)', 'Izin (hari)', 'Alpa (hari)', 'Kokurikuler'],
+            row: ['0000000001', 'Siswa Uji', 'X-1', 'Ganjil', 1, 0, 0, 'Catatan sintetis']
+        },
+        {
+            type: 'ekskul',
+            headers: ['NISN', 'Nama', 'Kelas', 'Semester', 'Nama Ekskul', 'Predikat'],
+            row: ['0000000001', 'Siswa Uji', 'X-1', 'Ganjil', 'Pramuka', 'Baik']
+        }
+    ];
+
+    for (const template of templates) {
+        const row = template.row || Array(template.headers.length).fill('');
+        if (template.type === 'siswa') {
+            row[0] = '0000000001';
+            row[1] = 'NIS-001';
+            row[2] = 'Siswa Uji';
+            row[3] = 'X-1';
+        }
+        const workbook = {
+            SheetNames: ['Data', 'Petunjuk'],
+            Sheets: {
+                Data: [template.headers, row],
+                Petunjuk: [['Petunjuk penggunaan'], ['Tidak ada baris contoh.']]
+            }
+        };
+        const {state, alerts} = await importWorkbook(workbook, template.type);
+
+        assert.deepEqual(alerts, [], template.type);
+        assert.equal(state.rows.length, 1, template.type);
+        assert.deepEqual(state.detection.unknown, [], template.type);
+        if (template.type === 'siswa') {
+            assert.equal(state.detection.sheet, 'Data');
+        } else {
+            assert.deepEqual(state.detection.sheets.map(sheet => sheet.name), ['Data'], template.type);
+        }
+    }
+});
+
 test('maps repeated parent and guardian headings by family group', async () => {
     const fixture = JSON.parse(readFileSync(resolve(directory, '../Fixtures', fixtures[2]), 'utf8'));
     const {state} = await importWorkbook(workbookFromFixture(fixture));

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Admin\CatatanAktivitas;
 use App\Models\SekolahKelas;
+use App\Models\SekolahMapel;
 use App\Models\SekolahTahunAjaran;
 use App\Models\SiswaBiodata;
 use App\Models\SiswaRiwayatKelas;
@@ -60,6 +61,7 @@ class DataSiswaController extends Controller
             ->latest('id')
             ->paginate(25)
             ->withQueryString();
+        $academicMapelOptions = SekolahMapel::query()->orderBy('nama')->get(['id', 'nama', 'kode']);
 
         return view('admin.data-siswa', compact(
             'taAktif',
@@ -70,7 +72,8 @@ class DataSiswaController extends Controller
             'search',
             'statusFilter',
             'siswaList',
-            'taAktifDefaultId'
+            'taAktifDefaultId',
+            'academicMapelOptions'
         ));
     }
 
@@ -246,8 +249,9 @@ class DataSiswaController extends Controller
     public function show(int $id): View
     {
         $siswa = $this->studentWithDetails($id);
+        $academicMapelOptions = SekolahMapel::query()->orderBy('nama')->get(['id', 'nama', 'kode']);
 
-        return view('admin.siswa-detail', compact('siswa'));
+        return view('admin.siswa-detail', compact('siswa', 'academicMapelOptions'));
     }
 
     private function studentWithDetails(int $id): SiswaBiodata

@@ -38,7 +38,7 @@
     <div class="bar" style="margin-top:14px">
         <input type="file" accept=".xlsx,.xls,.csv" id="excel-file-input" onchange="smartFile(event, 'hadir')">
         <button type="button" class="btn" onclick="loadDemoHadir()">Pakai data contoh</button>
-        <button type="button" class="btn" onclick="downloadTemplateHadir()">⬇ Template Excel</button>
+        <a href="{{ route('admin.import.kehadiran.template') }}" class="btn">⬇ Template Excel</a>
     </div>
 
     <p class="sub" style="margin:8px 0 0;font-size:12px">
@@ -88,21 +88,6 @@
 
 @push('scripts')
 <script>
-function downloadTemplateHadir() {
-    if (!window.XLSX) {
-        alert('Library SheetJS belum selesai termuat.');
-        return;
-    }
-    var cols = ['nisn', 'nama', 'kelas', 'sem', 'sakit', 'izin', 'alpa', 'kokur'];
-    var sample = [
-        ['0081234561', 'Ahmad Faiz', 'X-1', '2', 1, 0, 0, 'Sangat baik dalam kegiatan P5'],
-        ['0081234562', 'Bunga Citra', 'X-1', '2', 0, 1, 0, 'Aktif dan kreatif dalam pameran karya']
-    ];
-    var w = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(w, XLSX.utils.aoa_to_sheet([cols, ...sample]), 'Kehadiran');
-    XLSX.writeFile(w, 'template-kehadiran.xlsx');
-}
-
 function loadDemoHadir() {
     var dummy = [
         { nisn: '0081234561', nama: 'Ahmad Faiz', kelas: 'X-1', sem: '2', sakit: 1, izin: 0, alpa: 0, kokur: 'Menunjukkan komitmen tinggi dalam proyek penguatan profil pelajar pancasila.' },

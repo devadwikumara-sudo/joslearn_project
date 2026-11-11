@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\AlumniController;
+use App\Http\Controllers\Admin\AcademicRecordController;
 use App\Http\Controllers\Admin\CekKualitasDataController;
 use App\Http\Controllers\Admin\DashboardAdminController;
 use App\Http\Controllers\Admin\DataGuruController;
@@ -11,6 +12,7 @@ use App\Http\Controllers\Admin\ImportEkskulAdminController;
 use App\Http\Controllers\Admin\ImportGuruController;
 use App\Http\Controllers\Admin\ImportKehadiranAdminController;
 use App\Http\Controllers\Admin\ImportNilaiAdminController;
+use App\Http\Controllers\Admin\ImportTemplateController;
 use App\Http\Controllers\Admin\KenaikanKelasController;
 use App\Http\Controllers\Admin\LaporanController;
 use App\Http\Controllers\Admin\LogAktivitasController;
@@ -123,25 +125,27 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin.only'])->grou
 
     // Import Siswa
     Route::get('/import/siswa', [DataSiswaController::class, 'importView'])->name('import.siswa');
+    Route::get('/import/siswa/template', [ImportTemplateController::class, 'download'])->defaults('jenis', 'siswa')->name('import.siswa.template');
+    Route::get('/import/guru/template', [ImportTemplateController::class, 'download'])->defaults('jenis', 'guru')->name('import.guru.template');
 
     // Import Nilai (import nilai.png)
     Route::get('/import/nilai', [ImportNilaiAdminController::class, 'index'])->name('import.nilai');
     Route::post('/import/nilai', [ImportNilaiAdminController::class, 'store'])->name('import.nilai.store');
     Route::post('/import/nilai/upload', [ImportNilaiAdminController::class, 'store'])->name('import.nilai.upload');
-    Route::get('/import/nilai/template', [ImportNilaiAdminController::class, 'template'])->name('import.nilai.template');
+    Route::get('/import/nilai/template', [ImportTemplateController::class, 'download'])->defaults('jenis', 'nilai')->name('import.nilai.template');
     Route::post('/import/nilai/confirm', [ImportNilaiAdminController::class, 'confirm'])->name('import.nilai.confirm');
 
     // Import Ekskul (import ekskul.png)
     Route::get('/import/ekskul', [ImportEkskulAdminController::class, 'index'])->name('import.ekskul');
     Route::post('/import/ekskul', [ImportEkskulAdminController::class, 'store'])->name('import.ekskul.store');
     Route::post('/import/ekskul/upload', [ImportEkskulAdminController::class, 'store'])->name('import.ekskul.upload');
-    Route::get('/import/ekskul/template', [ImportEkskulAdminController::class, 'template'])->name('import.ekskul.template');
+    Route::get('/import/ekskul/template', [ImportTemplateController::class, 'download'])->defaults('jenis', 'ekskul')->name('import.ekskul.template');
 
     // Import Kehadiran (import kehadiran.png)
     Route::get('/import/kehadiran', [ImportKehadiranAdminController::class, 'index'])->name('import.kehadiran');
     Route::post('/import/kehadiran', [ImportKehadiranAdminController::class, 'store'])->name('import.kehadiran.store');
     Route::post('/import/kehadiran/upload', [ImportKehadiranAdminController::class, 'store'])->name('import.kehadiran.upload');
-    Route::get('/import/kehadiran/template', [ImportKehadiranAdminController::class, 'template'])->name('import.kehadiran.template');
+    Route::get('/import/kehadiran/template', [ImportTemplateController::class, 'download'])->defaults('jenis', 'kehadiran')->name('import.kehadiran.template');
 
     // Kenaikan Kelas (kenaikan kelas.png)
     Route::get('/kenaikan-kelas', [KenaikanKelasController::class, 'index'])->name('kenaikan-kelas');
@@ -245,6 +249,16 @@ Route::prefix('guru')->name('guru.')->middleware(['auth', 'role.web'])->group(fu
     Route::post('/kenaikan-kelas/proses', [KenaikanKelasController::class, 'proses'])->name('kenaikan-kelas.proses');
     Route::post('/kenaikan-kelas/{id}/batalkan', [KenaikanKelasController::class, 'batalkan'])->name('kenaikan-kelas.batalkan');
 });
+
+Route::middleware(['auth', 'role.web'])
+    ->prefix('data-siswa/{siswa}/rekam-akademik')
+    ->name('siswa.akademik.')
+    ->where(['jenis' => 'nilai|kehadiran|ekskul'])
+    ->group(function (): void {
+        Route::post('/{jenis}', [AcademicRecordController::class, 'store'])->name('store');
+        Route::put('/{jenis}/{record}', [AcademicRecordController::class, 'update'])->name('update');
+        Route::delete('/{jenis}/{record}', [AcademicRecordController::class, 'destroy'])->name('destroy');
+    });
 
 // ─── DASHBOARD LAMA (backward compat redirect) ───────────────────────────────
 Route::middleware(['auth', 'role.web'])->group(function () {

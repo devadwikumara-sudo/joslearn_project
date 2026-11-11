@@ -46,4 +46,9 @@
         </table>
     </div>
 </div>
+
+@include('partials.siswa-akademik-content', [
+    'canManageAcademicRecords' => false,
+    'academicManagePermissions' => $academicManagePermissions,
+])
 @endsection

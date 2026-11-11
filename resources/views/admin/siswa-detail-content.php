@@ -152,72 +152,11 @@
         </div>
     </section>
 
-    <section class="student-profile-section">
-        <h4>Nilai, Kehadiran, dan Ekstrakurikuler per Semester</h4>
-        @if($academicHistories->isEmpty())
-            <p class="student-profile-empty">Belum ada riwayat akademik.</p>
-        @else
-            <div style="overflow-x:auto">
-                <table style="width:100%;border-collapse:collapse;font-size:12px">
-                    <thead>
-                        <tr>
-                            <th style="text-align:left;padding:8px;border-bottom:1px solid #dbe3ec">Tahun ajaran / kelas / semester</th>
-                            <th style="text-align:left;padding:8px;border-bottom:1px solid #dbe3ec">Nilai</th>
-                            <th style="text-align:left;padding:8px;border-bottom:1px solid #dbe3ec">Kehadiran</th>
-                            <th style="text-align:left;padding:8px;border-bottom:1px solid #dbe3ec">Ekstrakurikuler</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach($academicHistories as $history)
-                            @php
-                                $historyClass = $history->kelas?->nama ?? '-';
-                                $historyGrade = strtoupper((string) ($history->kelas?->tingkat ?? (preg_match('/^(XII|XI|X)(?:-|$)/i', $historyClass, $gradeMatch) ? $gradeMatch[1] : '')));
-                                $semesterStart = ['X' => 1, 'XI' => 3, 'XII' => 5][$historyGrade] ?? null;
-                            @endphp
-                            @foreach(['Ganjil', 'Genap'] as $term)
-                                @php
-                                    $globalSemester = $semesterStart === null ? null : $semesterStart + ($term === 'Genap' ? 1 : 0);
-                                    $termGrades = $history->nilai->where('semester', $term);
-                                    $termAttendance = $history->kehadiran->firstWhere('semester', $term);
-                                    $termActivities = $history->ekskul->where('semester', $term);
-                                @endphp
-                                <tr>
-                                    <td style="vertical-align:top;padding:8px;border-bottom:1px solid #eef2f6">
-                                        <b>{{ $history->tahunAjaran?->nama ?? 'Tahun ajaran tidak tersedia' }}</b><br>
-                                        {{ $historyClass }} · {{ $globalSemester ? 'Semester '.$globalSemester : $term }}
-                                    </td>
-                                    <td style="vertical-align:top;padding:8px;border-bottom:1px solid #eef2f6">
-                                        @forelse($termGrades as $gradeRow)
-                                            {{ $gradeRow->mapel?->nama ?? strtoupper($gradeRow->mapel?->kode ?? 'Mapel') }}: {{ $gradeRow->nilai_angka }}<br>
-                                        @empty
-                                            -
-                                        @endforelse
-                                    </td>
-                                    <td style="vertical-align:top;padding:8px;border-bottom:1px solid #eef2f6">
-                                        @if($termAttendance)
-                                            Sakit {{ $termAttendance->sakit }}, Izin {{ $termAttendance->izin }}, Alpa {{ $termAttendance->alpa }}
-                                            @if($termAttendance->kokurikuler)
-                                                <br>{{ $termAttendance->kokurikuler }}
-                                            @endif
-                                        @else
-                                            -
-                                        @endif
-                                    </td>
-                                    <td style="vertical-align:top;padding:8px;border-bottom:1px solid #eef2f6">
-                                        @forelse($termActivities as $activity)
-                                            {{ $activity->nama_kegiatan }}: {{ $activity->predikat ?: '-' }}<br>
-                                        @empty
-                                            -
-                                        @endforelse
-                                    </td>
-                                </tr>
-                            @endforeach
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-        @endif
-    </section>
+    @include('partials.siswa-akademik-content', [
+        'canManageAcademicRecords' => $canManageAcademicRecords ?? false,
+        'academicManagePermissions' => $academicManagePermissions ?? [],
+        'academicMapelOptions' => $academicMapelOptions ?? collect(),
+    ])
 
     @foreach($sections as $sectionTitle => $fields)
         <section class="student-profile-section">

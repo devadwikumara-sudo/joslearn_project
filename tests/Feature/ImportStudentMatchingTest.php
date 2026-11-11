@@ -7,6 +7,7 @@ use App\Models\Guru\GuruBiodata;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Tests\TestCase;
 
@@ -18,6 +19,7 @@ class ImportStudentMatchingTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        config(['app.key' => 'base64:'.base64_encode(str_repeat('j', 32))]);
 
         foreach ([
             'import_baris',
@@ -1296,6 +1298,44 @@ class ImportStudentMatchingTest extends TestCase
         $this->assertSame(450, DB::table('import_baris')->where('unggahan_id', $batchId)->count());
         $this->assertSame(1, DB::table('import_unggahan')->where('id', $batchId)->count());
         $this->assertSame(1, DB::table('catatan_aktivitas')->where('objek_id', $batchId)->count());
+    }
+
+    public function test_downloaded_grade_template_can_be_filled_and_imported_through_the_batch_endpoint(): void
+    {
+        $download = $this->actingAs($this->admin)->get(route('admin.import.nilai.template'));
+        $download->assertOk();
+
+        $path = tempnam(sys_get_temp_dir(), 'josbook-template-');
+        $this->assertNotFalse($path);
+
+        try {
+            $workbook = IOFactory::load($download->baseResponse->getFile()->getPathname());
+            $worksheet = $workbook->getSheetByName('Data');
+            $worksheet->fromArray([['0000000002', 'Nama Sama', 'X-1', 'Ganjil', 'Matematika', 88]], null, 'A2');
+            IOFactory::createWriter($workbook, 'Xlsx')->save($path);
+            $workbook->disconnectWorksheets();
+
+            $filledWorkbook = IOFactory::load($path);
+            $row = $filledWorkbook->getSheetByName('Data')->rangeToArray('A2:F2')[0];
+            $filledWorkbook->disconnectWorksheets();
+        } finally {
+            if (is_file($path)) {
+                unlink($path);
+            }
+        }
+
+        $response = $this->import('nilai', [array_combine(
+            ['nisn', 'nama', 'kelas', 'sem', 'mapelcol', 'nilaicol'],
+            $row
+        )]);
+
+        $response->assertOk()->assertJsonPath('count', 1)->assertJsonPath('skipped', 0);
+        $this->assertDatabaseHas('siswa_nilai', [
+            'riwayat_kelas_id' => 2,
+            'semester' => 'Ganjil',
+            'mapel_id' => 1,
+            'nilai_angka' => 88,
+        ]);
     }
 
     /**

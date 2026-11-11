@@ -39,6 +39,10 @@
 </div>
 
 <div style="margin-top:14px">
-    @include('admin.siswa-detail-content', ['includeGraduationDetails' => true])
+    @include('admin.siswa-detail-content', [
+        'includeGraduationDetails' => true,
+        'canManageAcademicRecords' => true,
+        'academicMapelOptions' => $academicMapelOptions,
+    ])
 </div>
 @endsection

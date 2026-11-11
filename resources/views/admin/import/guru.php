@@ -25,7 +25,7 @@
 
     <div class="bar" style="margin-top:14px">
         <input type="file" accept=".xlsx,.xls,.csv" id="excel-file-input" onchange="smartFile(event, 'guru')">
-        <button type="button" class="btn" onclick="downloadTemplate('guru')">↓ Template Excel</button>
+        <a href="{{ route('admin.import.guru.template') }}" class="btn">↓ Template Excel</a>
     </div>
 
     <p class="sub" style="margin:8px 0 0;font-size:12px">
