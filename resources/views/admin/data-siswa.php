@@ -29,6 +29,25 @@
 
 @section('content')
 <h2>Data Siswa</h2>
+@if(session('success'))
+    <div class="note ok" role="status">{{ session('success') }}</div>
+@endif
+@if(session('error'))
+    <div class="note err" role="alert">{{ session('error') }}</div>
+@endif
+@if(session('bulk_move_results'))
+    <div class="card" style="margin-top:12px" aria-label="Hasil pindah kelas">
+        <b>Hasil pindah kelas per siswa</b>
+        <ul style="margin:8px 0 0;padding-left:22px">
+            @foreach(session('bulk_move_results') as $result)
+                <li>
+                    <span class="bd {{ $result['berhasil'] ? 'ok' : 'e' }}">{{ $result['berhasil'] ? 'Berhasil' : 'Ditolak' }}</span>
+                    <b>{{ $result['nama'] }}</b>: {{ $result['pesan'] }}
+                </li>
+            @endforeach
+        </ul>
+    </div>
+@endif
 <p class="sub">
     @if(count($kelasList) === 0)
         Belum ada kelas master; biodata tanpa riwayat kelas ditampilkan sebagai belum ditetapkan.
@@ -175,16 +194,12 @@
                             onclick="openStudentDetail(this)"
                         >Lihat</button>
                         <template class="student-detail-template">
-<<<<<<< HEAD
                             @include('admin.siswa-detail-content', [
                                 'siswa' => $s,
                                 'includeGraduationDetails' => true,
                                 'canManageAcademicRecords' => true,
                                 'academicMapelOptions' => $academicMapelOptions,
                             ])
-=======
-                            @include('admin.siswa-detail-content', ['siswa' => $s, 'includeGraduationDetails' => true])
->>>>>>> 497b07e27e50c1c03a318e4e1e5f3c83921f699c
                         </template>
                         <a href="{{ route('admin.data-siswa.pdf', $s->id) }}" class="btn a" style="padding:3px 8px;font-size:12px">⬇ PDF</a>
                         <a href="{{ route('admin.form-pendataan.edit', $s->id) }}" class="btn o" style="padding:3px 8px;font-size:12px">Edit</a>
@@ -220,7 +235,7 @@
                 @if($tahunAjaranTerpilihId === '*' || !$tahunAjaranTerpilihId)
                     <p class="note">Pilih satu tahun ajaran pada filter sebelum memindahkan siswa.</p>
                 @else
-                    <p class="bulk-move-copy" style="margin-bottom:14px">Pilih kotak di tabel untuk memindahkan siswa tertentu. Tanpa pilihan, tombol sekunder memindahkan seluruh hasil filter.</p>
+                    <p class="bulk-move-copy" style="margin-bottom:14px">Kelas siswa pada tahun ajaran terpilih akan diubah. Pilih kotak di tabel untuk memindahkan siswa tertentu; tanpa pilihan, tombol sekunder memindahkan seluruh hasil filter.</p>
                     <form id="bulk-update-form" method="POST" action="{{ route('admin.data-siswa.bulk-update') }}" onsubmit="return confirmBulkUpdate(this, {{ $siswaList->total() }})">
                         @csrf
                         <input type="hidden" name="tahun_ajaran" value="{{ $tahunAjaranTerpilihId }}">
@@ -229,14 +244,6 @@
                         <input type="hidden" name="q" value="{{ $search }}">
                         <div id="selected-move-ids"></div>
                         <div style="display:grid;gap:12px">
-                            <label>Tahun ajaran tujuan
-                                <select name="target_tahun_ajaran" style="width:100%" required>
-                                    <option value="">Pilih tahun ajaran</option>
-                                    @foreach($tahunAjaranList as $tahunAjaran)
-                                        <option value="{{ $tahunAjaran->id }}" {{ (string) $tahunAjaranTerpilihId === (string) $tahunAjaran->id ? 'selected' : '' }}>{{ $tahunAjaran->nama }}</option>
-                                    @endforeach
-                                </select>
-                            </label>
                             <label>Kelas tujuan
                                 <select name="target_kelas" style="width:100%" required>
                                     <option value="">Pilih kelas</option>

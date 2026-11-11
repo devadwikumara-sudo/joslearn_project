@@ -5,13 +5,11 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Admin\CatatanAktivitas;
 use App\Models\SekolahKelas;
-<<<<<<< HEAD
 use App\Models\SekolahMapel;
-=======
->>>>>>> 497b07e27e50c1c03a318e4e1e5f3c83921f699c
 use App\Models\SekolahTahunAjaran;
 use App\Models\SiswaBiodata;
 use App\Models\SiswaRiwayatKelas;
+use App\Support\Semester;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -64,10 +62,7 @@ class DataSiswaController extends Controller
             ->latest('id')
             ->paginate(25)
             ->withQueryString();
-<<<<<<< HEAD
         $academicMapelOptions = SekolahMapel::query()->orderBy('nama')->get(['id', 'nama', 'kode']);
-=======
->>>>>>> 497b07e27e50c1c03a318e4e1e5f3c83921f699c
 
         return view('admin.data-siswa', compact(
             'taAktif',
@@ -78,12 +73,8 @@ class DataSiswaController extends Controller
             'search',
             'statusFilter',
             'siswaList',
-<<<<<<< HEAD
             'taAktifDefaultId',
             'academicMapelOptions'
-=======
-            'taAktifDefaultId'
->>>>>>> 497b07e27e50c1c03a318e4e1e5f3c83921f699c
         ));
     }
 
@@ -259,14 +250,9 @@ class DataSiswaController extends Controller
     public function show(int $id): View
     {
         $siswa = $this->studentWithDetails($id);
-<<<<<<< HEAD
         $academicMapelOptions = SekolahMapel::query()->orderBy('nama')->get(['id', 'nama', 'kode']);
 
         return view('admin.siswa-detail', compact('siswa', 'academicMapelOptions'));
-=======
-
-        return view('admin.siswa-detail', compact('siswa'));
->>>>>>> 497b07e27e50c1c03a318e4e1e5f3c83921f699c
     }
 
     private function studentWithDetails(int $id): SiswaBiodata
@@ -323,7 +309,6 @@ class DataSiswaController extends Controller
             'q' => ['nullable', 'string', 'max:150'],
             'siswa_ids' => ['sometimes', 'array', 'min:1'],
             'siswa_ids.*' => ['required', 'integer', 'distinct', 'exists:siswa_biodata,id'],
-            'target_tahun_ajaran' => ['required', 'integer', 'exists:sekolah_tahun_ajaran,id'],
             'target_kelas' => ['required', 'string', 'exists:sekolah_kelas,nama'],
             'target_status' => ['nullable', 'in:Aktif,Pindah keluar,Keluar,Lulus'],
         ]);
@@ -335,8 +320,7 @@ class DataSiswaController extends Controller
         }
         $sourceStatus = $validated['st'] ?? '';
         $search = trim($validated['q'] ?? '');
-        $targetYearId = (int) $validated['target_tahun_ajaran'];
-        $targetClassId = (int) SekolahKelas::where('nama', $validated['target_kelas'])->value('id');
+        $targetClass = SekolahKelas::where('nama', $validated['target_kelas'])->firstOrFail();
         $targetStatus = $validated['target_status'] ?? null;
 
         $studentsQuery = $this->studentScopeQuery($sourceYearId, $sourceClass, $sourceStatus, $search);
@@ -348,47 +332,131 @@ class DataSiswaController extends Controller
             ->with(['riwayatKelas' => function (Relation $historyQuery) use ($sourceYearId, $sourceClass, $sourceStatus): void {
                 $this->applyHistoryFilters($historyQuery, $sourceYearId, $sourceClass, $sourceStatus);
             }])
-            ->get();
+            ->get()
+            ->keyBy('id');
+        $studentIds = isset($validated['siswa_ids'])
+            ? $validated['siswa_ids']
+            : $students->keys()->all();
 
-        if ($students->isEmpty()) {
+        if ($studentIds === []) {
             return back()->with('error', 'Tidak ada siswa yang cocok dengan filter untuk diedit.');
         }
 
-        $targetYear = SekolahTahunAjaran::findOrFail($targetYearId);
+        $studentNames = SiswaBiodata::whereIn('id', $studentIds)
+            ->pluck('nama_lengkap', 'id');
+        $results = [];
+        $year = SekolahTahunAjaran::findOrFail($sourceYearId);
 
-        DB::transaction(function () use ($students, $targetYearId, $targetClassId, $targetStatus, $targetYear, $validated, $request): void {
-            foreach ($students as $student) {
-                $sourceHistory = $student->riwayatKelas->first();
-                if (! $sourceHistory) {
+        DB::transaction(function () use ($studentIds, $students, $studentNames, $sourceYearId, $targetClass, $targetStatus, $year, $request, &$results): void {
+            foreach ($studentIds as $studentId) {
+                $student = $students->get($studentId);
+                $studentName = $studentNames->get($studentId, "Siswa #{$studentId}");
+
+                if (! $student) {
+                    $results[] = [
+                        'nama' => $studentName,
+                        'berhasil' => false,
+                        'pesan' => 'Tidak sesuai dengan filter tahun ajaran, kelas, status, atau pencarian.',
+                    ];
+
                     continue;
                 }
 
-                SiswaRiwayatKelas::updateOrCreate(
-                    [
-                        'siswa_id' => $student->id,
-                        'tahun_ajaran_id' => $targetYearId,
-                    ],
-                    [
-                        'kelas_id' => $targetClassId,
-                        'status' => $targetStatus ?? $sourceHistory->status,
-                    ]
-                );
-            }
+                $histories = SiswaRiwayatKelas::query()
+                    ->where('siswa_id', $studentId)
+                    ->where('tahun_ajaran_id', $sourceYearId)
+                    ->lockForUpdate()
+                    ->get();
 
-            CatatanAktivitas::create([
-                'pengguna_id' => auth()->id(),
-                'peran' => auth()->user()->peran,
-                'aksi' => 'pindah_kelas_massal',
-                'keterangan' => "Memindahkan {$students->count()} siswa ke kelas {$validated['target_kelas']} tahun ajaran {$targetYear->nama}.",
-                'objek_tipe' => 'siswa',
-                'alamat_ip' => $request->ip(),
-            ]);
+                if ($histories->count() !== 1) {
+                    $results[] = [
+                        'nama' => $studentName,
+                        'berhasil' => false,
+                        'pesan' => $histories->isEmpty()
+                            ? 'Riwayat kelas aktif pada tahun ajaran terpilih tidak ditemukan.'
+                            : 'Riwayat kelas aktif ganda pada tahun ajaran terpilih; kelas tidak diubah.',
+                    ];
+
+                    continue;
+                }
+
+                $history = $histories->first();
+                $sourceKelas = SekolahKelas::find($history->kelas_id);
+                if (! $sourceKelas) {
+                    $results[] = [
+                        'nama' => $studentName,
+                        'berhasil' => false,
+                        'pesan' => 'Kelas asal pada riwayat siswa tidak ditemukan.',
+                    ];
+
+                    continue;
+                }
+
+                $gradeSemesters = DB::table('siswa_nilai')
+                    ->where('riwayat_kelas_id', $history->id)
+                    ->distinct()
+                    ->pluck('semester');
+                $incompatibleSemester = $gradeSemesters->first(function (string $semester) use ($sourceKelas, $targetClass): bool {
+                    if (! in_array($semester, ['Ganjil', 'Genap'], true)) {
+                        return true;
+                    }
+
+                    $gradeLevel = Semester::tingkatDariNomor(Semester::nomor($sourceKelas->tingkat, $semester));
+
+                    return $gradeLevel !== $targetClass->tingkat;
+                });
+
+                if ($incompatibleSemester !== null) {
+                    $results[] = [
+                        'nama' => $studentName,
+                        'berhasil' => false,
+                        'pesan' => "Kelas tujuan tingkat {$targetClass->tingkat} tidak sesuai dengan tingkat nilai semester {$incompatibleSemester}.",
+                    ];
+
+                    continue;
+                }
+
+                $previousClassName = $sourceKelas->nama;
+                $wasChanged = $history->kelas_id !== $targetClass->id
+                    || ($targetStatus !== null && $history->status !== $targetStatus);
+
+                if ($wasChanged) {
+                    $history->kelas_id = $targetClass->id;
+                    if ($targetStatus !== null) {
+                        $history->status = $targetStatus;
+                    }
+                    $history->save();
+
+                    CatatanAktivitas::create([
+                        'pengguna_id' => auth()->id(),
+                        'peran' => auth()->user()->peran,
+                        'aksi' => 'pindah_kelas_massal',
+                        'keterangan' => "Memindahkan {$studentName} dari kelas {$previousClassName} ke {$targetClass->nama} tahun ajaran {$year->nama}.",
+                        'objek_tipe' => 'siswa',
+                        'objek_id' => $studentId,
+                        'alamat_ip' => $request->ip(),
+                    ]);
+                }
+
+                $results[] = [
+                    'nama' => $studentName,
+                    'berhasil' => true,
+                    'pesan' => $wasChanged
+                        ? "Berhasil dipindahkan dari {$previousClassName} ke {$targetClass->nama}."
+                        : "Sudah berada di kelas {$targetClass->nama}; tidak ada perubahan.",
+                ];
+            }
         });
 
-        return back()->with(
-            'success',
-            "{$students->count()} siswa berhasil diperbarui ke kelas {$validated['target_kelas']} tahun ajaran {$targetYear->nama}."
-        );
+        $successCount = collect($results)->where('berhasil', true)->count();
+        $failedCount = count($results) - $successCount;
+        $response = back()->with('bulk_move_results', $results);
+
+        if ($failedCount > 0 && $successCount === 0) {
+            return $response->with('error', "Tidak ada siswa yang dipindahkan; {$failedCount} siswa ditolak.");
+        }
+
+        return $response->with('success', "{$successCount} siswa berhasil diproses; {$failedCount} siswa ditolak. Tahun ajaran {$year->nama}.");
     }
 
     public function bulkDestroy(Request $request): RedirectResponse
