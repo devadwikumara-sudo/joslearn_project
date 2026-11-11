@@ -1,0 +1,14 @@
+{
+  "sheetName": "Legacy Export",
+  "legacyPrefixRows": [
+    ["Unrecognized export"],
+    ["School records"],
+    ["Generated report"],
+    ["Do not edit"],
+    ["Column layout"]
+  ],
+  "records": [
+    {"C": "NIS-001", "D": "Siswa Uji A", "F": "0000000001", "AM": "X", "AN": "1"},
+    {"C": "NIS-002", "D": "Siswa Uji B", "F": "0000000002", "AM": "X", "AN": "2"}
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "sheetName": "Data Kelas 2026",
+  "titleRows": [["Daftar Siswa Sekolah"]],
+  "headers": [
+    "Nama Lengkap",
+    "NISN",
+    "NIS",
+    "Kelas",
+    "Nama Ayah",
+    "Agama Ayah",
+    "Nama Ibu",
+    "Agama Ibu",
+    "Nama Wali",
+    "Agama Wali",
+    "Kolom Tambahan"
+  ],
+  "records": [
+    ["Siswa Uji A", "0000000001", "NIS-001", "X-1", "Ayah A", "Islam", "Ibu A", "Kristen", "Wali A", "Hindu", "abaikan"],
+    ["Siswa Uji B", "0000000002", "NIS-002", "X-2", "Ayah B", "Islam", "Ibu B", "Kristen", "Wali B", "Hindu", "abaikan"]
+  ]
+}

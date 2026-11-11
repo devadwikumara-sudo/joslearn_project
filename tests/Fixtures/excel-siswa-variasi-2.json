@@ -1,0 +1,14 @@
+{
+  "sheetName": "Roster XI",
+  "skipRows": 6,
+  "headers": [
+    "KELAS SAAT INI",
+    "NOMOR INDUK SISWA NASIONAL",
+    "NAMA-PESERTA DIDIK",
+    "NO. INDUK"
+  ],
+  "records": [
+    ["X-1", "0000000001", "Siswa Uji A", "NIS-001"],
+    ["X-2", "0000000002", "Siswa Uji B", "NIS-002"]
+  ]
+}
