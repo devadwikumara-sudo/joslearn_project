@@ -349,7 +349,13 @@ class ImportBatchController extends Controller
 
         $requestedTaName = trim((string) $request->input('tahun_ajaran', ''));
         $taName = $requestedTaName === '' ? '' : $this->normAcademicYear($requestedTaName);
-        $semester = $request->input('semester', 'Genap');
+        $semesterBerjalan = DB::table('sekolah_pengaturan')
+            ->where('kunci', 'semester_berjalan')
+            ->value('isi');
+        $semesterDefault = in_array($semesterBerjalan, ['Ganjil', 'Genap'], true)
+            ? $semesterBerjalan
+            : 'Genap';
+        $semester = $request->input('semester', $semesterDefault);
         $mode = $request->input('mode', 'semua');
         $kelasInput = $request->input('kelas', '');
         $dup = $request->input('dup', 'skip');

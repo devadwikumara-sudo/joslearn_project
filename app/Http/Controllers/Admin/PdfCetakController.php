@@ -3,11 +3,9 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Guru\GuruBiodata;
 use App\Models\Guru\GuruWaliKelas;
 use App\Models\SekolahIdentitas;
 use App\Models\SekolahKelas;
-use App\Models\SekolahMapel;
 use App\Models\SekolahTahunAjaran;
 use App\Models\SiswaBiodata;
 use App\Models\SiswaEkskul;
@@ -47,7 +45,7 @@ class PdfCetakController extends Controller
         $ta = $request->input('ta', 'Semua');
 
         // Jika tidak ada list ID tetapi ada parameter kelas, ambil semua siswa di kelas tersebut
-        if (empty($ids) && !empty($kelas)) {
+        if (empty($ids) && ! empty($kelas)) {
             $query = SiswaRiwayatKelas::whereNull('deleted_at');
 
             if ($kelas !== '*') {
@@ -77,7 +75,7 @@ class PdfCetakController extends Controller
     {
         // 1. Data Identitas Sekolah
         $sekolah = SekolahIdentitas::first();
-        if (!$sekolah) {
+        if (! $sekolah) {
             $sekolah = (object) [
                 'nama' => 'SMA NEGERI 1 NGANJUK',
                 'npsn' => '20538338',
@@ -208,7 +206,7 @@ class PdfCetakController extends Controller
                 $ekskulGrouped = [];
                 foreach ($ekskulRows as $er) {
                     $semKey = ($er->semester === 2 || strtolower($er->semester) === 'genap') ? 'Genap' : 'Ganjil';
-                    if (!isset($ekskulGrouped[$er->nama_kegiatan])) {
+                    if (! isset($ekskulGrouped[$er->nama_kegiatan])) {
                         $ekskulGrouped[$er->nama_kegiatan] = [
                             'nama' => $er->nama_kegiatan,
                             'nilai' => ['Ganjil' => '-', 'Genap' => '-'],
@@ -230,33 +228,33 @@ class PdfCetakController extends Controller
                 }
 
                 $riwayatDataList[] = [
-                    'riwayatKelas'  => $rk,
-                    'taNama'        => $taNama,
-                    'nilaiMap'      => $nilaiMap,
-                    'hadirMap'      => $hadirMap,
-                    'kokurMap'      => $kokurMap,
-                    'ekskulList'    => array_values($ekskulGrouped),
+                    'riwayatKelas' => $rk,
+                    'taNama' => $taNama,
+                    'nilaiMap' => $nilaiMap,
+                    'hadirMap' => $hadirMap,
+                    'kokurMap' => $kokurMap,
+                    'ekskulList' => array_values($ekskulGrouped),
                     'waliKelasNama' => $waliKelasNama,
-                    'waliKelasNip'  => $waliKelasNip,
+                    'waliKelasNip' => $waliKelasNip,
                 ];
             }
 
             // Jika siswa belum punya riwayat kelas (hanya biodata baru)
             if (empty($riwayatDataList)) {
                 $riwayatDataList[] = [
-                    'riwayatKelas'  => null,
-                    'taNama'        => $filterTa !== 'Semua' ? $filterTa : ($taList[0] ?? '2024/2025'),
-                    'nilaiMap'      => ['Ganjil' => [], 'Genap' => []],
-                    'hadirMap'      => ['Ganjil' => ['sakit' => 0, 'izin' => 0, 'alpa' => 0], 'Genap' => ['sakit' => 0, 'izin' => 0, 'alpa' => 0]],
-                    'kokurMap'      => ['Ganjil' => null, 'Genap' => null],
-                    'ekskulList'    => [],
+                    'riwayatKelas' => null,
+                    'taNama' => $filterTa !== 'Semua' ? $filterTa : ($taList[0] ?? '2024/2025'),
+                    'nilaiMap' => ['Ganjil' => [], 'Genap' => []],
+                    'hadirMap' => ['Ganjil' => ['sakit' => 0, 'izin' => 0, 'alpa' => 0], 'Genap' => ['sakit' => 0, 'izin' => 0, 'alpa' => 0]],
+                    'kokurMap' => ['Ganjil' => null, 'Genap' => null],
+                    'ekskulList' => [],
                     'waliKelasNama' => null,
-                    'waliKelasNip'  => null,
+                    'waliKelasNip' => null,
                 ];
             }
 
             $siswaItems[] = [
-                'siswa'   => $s,
+                'siswa' => $s,
                 'riwayat' => $riwayatDataList,
             ];
         }
@@ -270,25 +268,30 @@ class PdfCetakController extends Controller
                 $minTahun = null;
                 foreach ($siswaCollection as $s) {
                     if ($s->tanggal_diterima && preg_match('/^(\d{4})/', $s->tanggal_diterima, $ym)) {
-                        $y = (int)$ym[1];
+                        $y = (int) $ym[1];
                         if ($minTahun === null || $y < $minTahun) {
                             $minTahun = $y;
                         }
                     }
                 }
                 $coverKelasList[] = [
-                    'kelas'    => $kNama,
+                    'kelas' => $kNama,
                     'angkatan' => $minTahun ?: (date('Y') - 1),
                 ];
             }
         }
 
+        $kktp = DB::table('sekolah_pengaturan')
+            ->where('kunci', 'kktp')
+            ->value('isi') ?? 75;
+
         $subTitle = count($siswaItems) === 1
-            ? ($siswaItems[0]['siswa']->nama_lengkap . ' · NISN ' . $siswaItems[0]['siswa']->nisn)
-            : (count($siswaItems) . ' Siswa · Kurikulum Merdeka');
+            ? ($siswaItems[0]['siswa']->nama_lengkap.' · NISN '.$siswaItems[0]['siswa']->nisn)
+            : (count($siswaItems).' Siswa · Kurikulum Merdeka');
 
         return view('pdf.dokumen', compact(
             'sekolah',
+            'kktp',
             'taList',
             'optBio',
             'optNilai',

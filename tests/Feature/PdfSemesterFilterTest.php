@@ -22,6 +22,7 @@ class PdfSemesterFilterTest extends TestCase
             'siswa_riwayat_kelas',
             'sekolah_kelas',
             'sekolah_tahun_ajaran',
+            'sekolah_pengaturan',
             'sekolah_identitas',
             'siswa_biodata',
         ] as $table) {
@@ -37,6 +38,11 @@ class PdfSemesterFilterTest extends TestCase
         });
         Schema::create('sekolah_identitas', function (Blueprint $table): void {
             $table->id();
+        });
+        Schema::create('sekolah_pengaturan', function (Blueprint $table): void {
+            $table->id();
+            $table->string('kunci')->unique();
+            $table->string('isi')->nullable();
         });
         Schema::create('sekolah_tahun_ajaran', function (Blueprint $table): void {
             $table->id();

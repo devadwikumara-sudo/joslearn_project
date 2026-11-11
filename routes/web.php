@@ -209,6 +209,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin.only'])->grou
     Route::put('/setting', [SettingController::class, 'update'])->name('setting.update');
     Route::post('/setting/tahun-ajaran', [SettingController::class, 'tambahTahunAjaran'])->name('setting.tahun-ajaran.tambah');
     Route::post('/setting/tahun-ajaran/aktif', [SettingController::class, 'setTahunAjaranAktif'])->name('setting.tahun-ajaran.aktif');
+    Route::post('/setting/cadangan/unduh', [SettingController::class, 'unduhCadangan'])->name('setting.cadangan.unduh');
+    Route::post('/setting/cadangan/pulihkan', [SettingController::class, 'pulihkanCadangan'])->name('setting.cadangan.pulihkan');
+    Route::delete('/setting/tahun-ajaran/hapus-data', [SettingController::class, 'hapusDataTahunAjaran'])->name('setting.tahun-ajaran.hapus-data');
     Route::delete('/setting/akun/{id}', [SettingController::class, 'hapusAkun'])->name('setting.akun.hapus');
 });
 

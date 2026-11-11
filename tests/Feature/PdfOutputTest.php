@@ -15,7 +15,7 @@ class PdfOutputTest extends TestCase
     {
         config([
             'database.default' => 'mysql',
-            'database.connections.mysql.database' => 'josbook_db',
+            'database.connections.mysql.database' => 'josbook',
         ]);
         \Illuminate\Support\Facades\DB::purge('mysql');
 

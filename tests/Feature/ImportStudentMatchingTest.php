@@ -36,6 +36,7 @@ class ImportStudentMatchingTest extends TestCase
             'siswa_ekskul',
             'siswa_riwayat_kelas',
             'catatan_aktivitas',
+            'sekolah_pengaturan',
             'sekolah_mapel',
             'sekolah_kelas',
             'sekolah_tahun_ajaran',
@@ -83,6 +84,12 @@ class ImportStudentMatchingTest extends TestCase
             $table->string('nama')->unique();
             $table->boolean('sedang_berjalan')->default(false);
             $table->timestamps();
+        });
+        Schema::create('sekolah_pengaturan', function (Blueprint $table): void {
+            $table->id();
+            $table->string('kunci')->unique();
+            $table->string('isi')->nullable();
+            $table->timestamp('updated_at')->nullable();
         });
 
         Schema::create('sekolah_kelas', function (Blueprint $table): void {
