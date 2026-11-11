@@ -7,10 +7,7 @@ use App\Models\Guru\GuruBiodata;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-<<<<<<< HEAD
 use PhpOffice\PhpSpreadsheet\IOFactory;
-=======
->>>>>>> 497b07e27e50c1c03a318e4e1e5f3c83921f699c
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Tests\TestCase;
 
@@ -22,10 +19,7 @@ class ImportStudentMatchingTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-<<<<<<< HEAD
         config(['app.key' => 'base64:'.base64_encode(str_repeat('j', 32))]);
-=======
->>>>>>> 497b07e27e50c1c03a318e4e1e5f3c83921f699c
 
         foreach ([
             'import_baris',
@@ -156,6 +150,8 @@ class ImportStudentMatchingTest extends TestCase
             $table->id();
             $table->unsignedBigInteger('riwayat_kelas_id');
             $table->string('semester');
+            $table->unsignedBigInteger('import_unggahan_id')->nullable();
+            $table->unsignedBigInteger('import_terakhir_unggahan_id')->nullable();
             $table->unsignedBigInteger('mapel_id');
             $table->decimal('nilai_angka', 5, 2);
             $table->timestamps();
@@ -165,6 +161,8 @@ class ImportStudentMatchingTest extends TestCase
             $table->id();
             $table->unsignedBigInteger('riwayat_kelas_id');
             $table->string('semester');
+            $table->unsignedBigInteger('import_unggahan_id')->nullable();
+            $table->unsignedBigInteger('import_terakhir_unggahan_id')->nullable();
             $table->unsignedSmallInteger('sakit')->default(0);
             $table->unsignedSmallInteger('izin')->default(0);
             $table->unsignedSmallInteger('alpa')->default(0);
@@ -176,6 +174,8 @@ class ImportStudentMatchingTest extends TestCase
             $table->id();
             $table->unsignedBigInteger('riwayat_kelas_id');
             $table->string('semester');
+            $table->unsignedBigInteger('import_unggahan_id')->nullable();
+            $table->unsignedBigInteger('import_terakhir_unggahan_id')->nullable();
             $table->string('nama_kegiatan');
             $table->string('predikat')->nullable();
             $table->timestamps();
@@ -378,6 +378,25 @@ class ImportStudentMatchingTest extends TestCase
         $this->assertSame(1, DB::table('siswa_nilai')
             ->where('riwayat_kelas_id', 2)
             ->count());
+    }
+
+    public function test_later_import_tracks_the_latest_batch_without_changing_the_creating_batch(): void
+    {
+        $row = [
+            'nisn' => '0000000002',
+            'nis' => '1002',
+            'nama' => 'Nama Sama',
+            'kelas' => 'X-1',
+            'mtk' => 80,
+        ];
+
+        $firstImport = $this->import('nilai', [$row])->assertOk();
+        $secondImport = $this->import('nilai', [array_merge($row, ['mtk' => 90])])->assertOk();
+        $record = DB::table('siswa_nilai')->where('riwayat_kelas_id', 2)->first();
+
+        $this->assertSame((int) $firstImport->json('batch_id'), (int) $record->import_unggahan_id);
+        $this->assertSame((int) $secondImport->json('batch_id'), (int) $record->import_terakhir_unggahan_id);
+        $this->assertSame(90.0, (float) $record->nilai_angka);
     }
 
     public function test_conflicting_identifiers_and_ambiguous_names_are_skipped_with_row_errors(): void
@@ -1303,10 +1322,11 @@ class ImportStudentMatchingTest extends TestCase
         ]);
         $this->assertSame(450, DB::table('import_baris')->where('unggahan_id', $batchId)->count());
         $this->assertSame(1, DB::table('import_unggahan')->where('id', $batchId)->count());
+        $this->assertSame(1, DB::table('siswa_nilai')->where('import_unggahan_id', $batchId)->count());
+        $this->assertSame(1, DB::table('siswa_nilai')->where('import_terakhir_unggahan_id', $batchId)->count());
         $this->assertSame(1, DB::table('catatan_aktivitas')->where('objek_id', $batchId)->count());
     }
 
-<<<<<<< HEAD
     public function test_downloaded_grade_template_can_be_filled_and_imported_through_the_batch_endpoint(): void
     {
         $download = $this->actingAs($this->admin)->get(route('admin.import.nilai.template'));
@@ -1345,8 +1365,6 @@ class ImportStudentMatchingTest extends TestCase
         ]);
     }
 
-=======
->>>>>>> 497b07e27e50c1c03a318e4e1e5f3c83921f699c
     /**
      * @param  array<int, array<string, mixed>>  $rows
      */

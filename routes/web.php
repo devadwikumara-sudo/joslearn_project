@@ -122,6 +122,14 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin.only'])->grou
     Route::post('/import/start-batch', [ImportBatchController::class, 'startBatch'])->name('import.start-batch');
     Route::post('/import/save-batch', [ImportBatchController::class, 'saveBatch'])->name('import.save-batch');
     Route::post('/import/fail-batch', [ImportBatchController::class, 'failBatch'])->name('import.fail-batch');
+    Route::get('/import/batches/{batch}', [ImportBatchController::class, 'showManagedBatch'])
+        ->whereNumber('batch')->name('import.batch.show');
+    Route::put('/import/batches/{batch}/records/{record}', [ImportBatchController::class, 'updateManagedRecord'])
+        ->whereNumber(['batch', 'record'])->name('import.batch.records.update');
+    Route::delete('/import/batches/{batch}', [ImportBatchController::class, 'destroyManagedBatch'])
+        ->whereNumber('batch')->name('import.batch.destroy');
+    Route::delete('/import/{jenis}/hapus-semua', [ImportBatchController::class, 'destroyAllForYear'])
+        ->whereIn('jenis', ['nilai', 'kehadiran', 'ekskul'])->name('import.batch.destroy-all');
 
     // Import Siswa
     Route::get('/import/siswa', [DataSiswaController::class, 'importView'])->name('import.siswa');
@@ -132,20 +140,20 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin.only'])->grou
     Route::get('/import/nilai', [ImportNilaiAdminController::class, 'index'])->name('import.nilai');
     Route::post('/import/nilai', [ImportNilaiAdminController::class, 'store'])->name('import.nilai.store');
     Route::post('/import/nilai/upload', [ImportNilaiAdminController::class, 'store'])->name('import.nilai.upload');
-    Route::get('/import/nilai/template', [ImportNilaiAdminController::class, 'template'])->name('import.nilai.template');
+    Route::get('/import/nilai/template', [ImportTemplateController::class, 'download'])->defaults('jenis', 'nilai')->name('import.nilai.template');
     Route::post('/import/nilai/confirm', [ImportNilaiAdminController::class, 'confirm'])->name('import.nilai.confirm');
 
     // Import Ekskul (import ekskul.png)
     Route::get('/import/ekskul', [ImportEkskulAdminController::class, 'index'])->name('import.ekskul');
     Route::post('/import/ekskul', [ImportEkskulAdminController::class, 'store'])->name('import.ekskul.store');
     Route::post('/import/ekskul/upload', [ImportEkskulAdminController::class, 'store'])->name('import.ekskul.upload');
-    Route::get('/import/ekskul/template', [ImportEkskulAdminController::class, 'template'])->name('import.ekskul.template');
+    Route::get('/import/ekskul/template', [ImportTemplateController::class, 'download'])->defaults('jenis', 'ekskul')->name('import.ekskul.template');
 
     // Import Kehadiran (import kehadiran.png)
     Route::get('/import/kehadiran', [ImportKehadiranAdminController::class, 'index'])->name('import.kehadiran');
     Route::post('/import/kehadiran', [ImportKehadiranAdminController::class, 'store'])->name('import.kehadiran.store');
     Route::post('/import/kehadiran/upload', [ImportKehadiranAdminController::class, 'store'])->name('import.kehadiran.upload');
-    Route::get('/import/kehadiran/template', [ImportKehadiranAdminController::class, 'template'])->name('import.kehadiran.template');
+    Route::get('/import/kehadiran/template', [ImportTemplateController::class, 'download'])->defaults('jenis', 'kehadiran')->name('import.kehadiran.template');
 
     // Kenaikan Kelas (kenaikan kelas.png)
     Route::get('/kenaikan-kelas', [KenaikanKelasController::class, 'index'])->name('kenaikan-kelas');
