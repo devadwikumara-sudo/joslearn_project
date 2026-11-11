@@ -116,7 +116,10 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin.only'])->grou
     Route::delete('/data-guru/{id}', [DataGuruController::class, 'destroy'])->name('data-guru.destroy');
 
     // Import Fleksibel API (Universal Batch Save)
+    Route::post('/import/metadata', [ImportBatchController::class, 'metadata'])->name('import.metadata');
+    Route::post('/import/start-batch', [ImportBatchController::class, 'startBatch'])->name('import.start-batch');
     Route::post('/import/save-batch', [ImportBatchController::class, 'saveBatch'])->name('import.save-batch');
+    Route::post('/import/fail-batch', [ImportBatchController::class, 'failBatch'])->name('import.fail-batch');
 
     // Import Siswa
     Route::get('/import/siswa', [DataSiswaController::class, 'importView'])->name('import.siswa');
@@ -216,7 +219,10 @@ Route::prefix('guru')->name('guru.')->middleware(['auth', 'role.web'])->group(fu
     Route::get('/data-siswa/{id}', [DataSiswaGuruController::class, 'show'])->name('data-siswa.show');
 
     // Import Fleksibel API (Universal Batch Save - Guru)
+    Route::post('/import/metadata', [ImportBatchController::class, 'metadata'])->name('import.metadata');
+    Route::post('/import/start-batch', [ImportBatchController::class, 'startBatch'])->name('import.start-batch');
     Route::post('/import/save-batch', [ImportBatchController::class, 'saveBatch'])->name('import.save-batch');
+    Route::post('/import/fail-batch', [ImportBatchController::class, 'failBatch'])->name('import.fail-batch');
 
     // Import Nilai (import nilai.png - guru)
     Route::get('/import-nilai', [ImportNilaiGuruController::class, 'index'])->name('import-nilai');

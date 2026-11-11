@@ -20,6 +20,11 @@ class ImportStudentMatchingTest extends TestCase
         parent::setUp();
 
         foreach ([
+            'import_baris',
+            'import_unggahan',
+            'import_format_tersimpan',
+            'import_kamus_kolom',
+            'import_kamus_mapel',
             'guru_mengajar',
             'guru_wali_kelas',
             'akun_pengguna',
@@ -44,6 +49,31 @@ class ImportStudentMatchingTest extends TestCase
             $table->string('nomor_induk')->nullable();
             $table->softDeletes();
             $table->timestamps();
+            foreach ([
+                'nama_panggilan', 'jenis_kelamin', 'tempat_lahir', 'tanggal_lahir', 'agama',
+                'kewarganegaraan', 'nik', 'anak_ke', 'jumlah_saudara', 'status_yatim',
+                'bahasa_sehari_hari', 'alamat_jalan', 'alamat_rt_rw', 'alamat_desa',
+                'alamat_kecamatan', 'alamat_kabupaten', 'alamat_provinsi', 'alamat_kode_pos',
+                'nomor_hp', 'tempat_tinggal', 'jarak_ke_sekolah_km', 'golongan_darah',
+                'penyakit', 'kelainan_fisik', 'tinggi_badan_cm', 'berat_badan_kg',
+                'sekolah_asal', 'tanggal_ijazah_smp', 'nomor_ijazah_smp', 'lama_belajar_tahun',
+                'jenis_registrasi', 'pindahan_dari_sekolah', 'alasan_pindah', 'kelas_diterima',
+                'rombel_diterima', 'tanggal_diterima', 'nama_ayah', 'agama_ayah',
+                'kewarganegaraan_ayah', 'pendidikan_ayah', 'pekerjaan_ayah', 'penghasilan_ayah',
+                'nomor_hp_ayah', 'keadaan_ayah', 'nama_ibu', 'agama_ibu', 'kewarganegaraan_ibu',
+                'pendidikan_ibu', 'pekerjaan_ibu', 'penghasilan_ibu', 'nomor_hp_ibu', 'keadaan_ibu',
+                'ortu_alamat_jalan', 'ortu_alamat_rt_rw', 'ortu_alamat_desa', 'ortu_alamat_kecamatan',
+                'ortu_alamat_kabupaten', 'ortu_alamat_provinsi', 'ortu_alamat_kode_pos', 'nama_wali',
+                'agama_wali', 'kewarganegaraan_wali', 'pendidikan_wali', 'pekerjaan_wali',
+                'penghasilan_wali', 'nomor_hp_wali', 'wali_alamat_jalan', 'wali_alamat_rt_rw',
+                'wali_alamat_desa', 'wali_alamat_kecamatan', 'wali_alamat_kabupaten',
+                'wali_alamat_provinsi', 'wali_alamat_kode_pos', 'tanggal_keluar', 'kelas_keluar',
+                'alasan_keluar', 'sekolah_tujuan', 'nomor_peserta_psaj', 'nomor_skl',
+                'nomor_ijazah_sma', 'tanggal_ijazah_sma', 'nomor_transkrip', 'tahun_lulus',
+                'kegiatan_setelah_lulus', 'catatan',
+            ] as $column) {
+                $table->text($column)->nullable();
+            }
         });
 
         Schema::create('sekolah_tahun_ajaran', function (Blueprint $table): void {
@@ -154,6 +184,70 @@ class ImportStudentMatchingTest extends TestCase
             $table->string('alamat_ip')->nullable();
             $table->timestamp('created_at')->nullable();
         });
+        Schema::create('import_format_tersimpan', function (Blueprint $table): void {
+            $table->id();
+            $table->string('nama', 100);
+            $table->string('jenis', 20);
+            $table->string('kode_struktur', 64);
+            $table->string('nama_sheet', 100)->nullable();
+            $table->unsignedSmallInteger('baris_judul')->nullable();
+            $table->longText('pemetaan_kolom');
+            $table->unsignedInteger('dipakai_kali')->default(0);
+            $table->timestamp('terakhir_dipakai_at')->nullable();
+            $table->unsignedBigInteger('dibuat_oleh')->nullable();
+            $table->timestamps();
+            $table->unique(['jenis', 'kode_struktur']);
+        });
+        Schema::create('import_unggahan', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('pengguna_id');
+            $table->string('jenis', 20);
+            $table->string('nama_file', 255);
+            $table->string('lokasi', 255);
+            $table->string('status', 20)->default('diunggah');
+            $table->unsignedBigInteger('format_tersimpan_id')->nullable();
+            $table->unsignedInteger('tahun_ajaran_id')->nullable();
+            $table->string('semester', 10)->nullable();
+            $table->unsignedInteger('kelas_id')->nullable();
+            $table->string('jika_data_sudah_ada', 10)->default('lewati');
+            $table->longText('pemetaan_kolom')->nullable();
+            $table->unsignedInteger('jumlah_baris')->default(0);
+            $table->unsignedInteger('jumlah_siap')->default(0);
+            $table->unsignedInteger('jumlah_peringatan')->default(0);
+            $table->unsignedInteger('jumlah_error')->default(0);
+            $table->unsignedInteger('jumlah_tersimpan')->default(0);
+            $table->string('pesan_gagal', 500)->nullable();
+            $table->timestamp('created_at')->nullable();
+            $table->timestamp('selesai_at')->nullable();
+        });
+        Schema::create('import_baris', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('unggahan_id');
+            $table->string('nama_sheet', 100)->nullable();
+            $table->unsignedInteger('nomor_baris_excel');
+            $table->longText('data_asli')->nullable();
+            $table->longText('data_bersih')->nullable();
+            $table->string('status', 20)->default('siap');
+            $table->longText('pesan')->nullable();
+        });
+        Schema::create('import_kamus_kolom', function (Blueprint $table): void {
+            $table->id();
+            $table->string('jenis', 20);
+            $table->string('milik_siapa', 20)->default('umum');
+            $table->string('judul_di_excel', 120);
+            $table->string('kolom_tujuan', 60);
+            $table->string('asal', 20)->default('bawaan');
+            $table->boolean('aktif')->default(true);
+            $table->unsignedBigInteger('dibuat_oleh')->nullable();
+            $table->timestamps();
+            $table->unique(['jenis', 'milik_siapa', 'judul_di_excel']);
+        });
+        Schema::create('import_kamus_mapel', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedInteger('mapel_id');
+            $table->string('nama_di_excel', 150)->unique();
+            $table->timestamp('created_at')->nullable();
+        });
 
         DB::table('sekolah_tahun_ajaran')->insert([
             'id' => 1,
@@ -232,6 +326,11 @@ class ImportStudentMatchingTest extends TestCase
     protected function tearDown(): void
     {
         foreach ([
+            'import_baris',
+            'import_unggahan',
+            'import_format_tersimpan',
+            'import_kamus_kolom',
+            'import_kamus_mapel',
             'guru_mengajar',
             'guru_wali_kelas',
             'akun_pengguna',
@@ -998,6 +1097,205 @@ class ImportStudentMatchingTest extends TestCase
             ->assertSee('value="83.5"', false)
             ->assertDontSee('0000000002')
             ->assertViewHas('siswa', fn ($siswa): bool => $siswa->count() === 1);
+    }
+
+    public function test_admin_column_correction_is_learned_and_reused_for_the_next_import(): void
+    {
+        $correction = [
+            'name' => 'Nilai',
+            'header_row' => 1,
+            'headers' => ['NISN', 'Nama Lengkap', 'Kelas', 'Nilai Tambahan'],
+            'mapping' => [0 => 'nisn', 1 => 'nama', 2 => 'kelas', 3 => 'mtk'],
+            'corrected' => [3 => 'mtk'],
+        ];
+        $start = $this->actingAs($this->admin)->withoutMiddleware()->postJson(route('admin.import.start-batch'), [
+            'type' => 'nilai',
+            'file_name' => 'nilai-tambahan.xlsx',
+            'total_rows' => 1,
+            'tahun_ajaran' => '2025/2026',
+            'semester' => 'Ganjil',
+            'kelas' => 'X-1',
+            'mapping_corrections' => [$correction],
+        ]);
+        $start->assertCreated()->assertJsonPath('total_rows', 1);
+        $batchId = $start->json('batch_id');
+
+        $this->postJson(route('admin.import.save-batch'), [
+            'batch_id' => $batchId,
+            'type' => 'nilai',
+            'tahun_ajaran' => '2025/2026',
+            'semester' => 'Ganjil',
+            'mode' => 'semua',
+            'rows' => [[
+                'nisn' => '0000000001',
+                'nama' => 'Nama Sama',
+                'kelas' => 'X-1',
+                'mtk' => 87,
+                '__excel_row' => 2,
+            ]],
+            'final_chunk' => true,
+        ])->assertOk()->assertJsonPath('count', 1);
+
+        $metadata = $this->postJson(route('admin.import.metadata'), [
+            'type' => 'nilai',
+            'sheets' => [[
+                'name' => 'Nilai',
+                'headers' => $correction['headers'],
+            ]],
+        ]);
+
+        $metadata->assertOk()
+            ->assertJsonPath('dictionaries.columns.nilai tambahan', 'mtk')
+            ->assertJsonPath('formats.0.mapping.3', 'mtk');
+        $this->assertDatabaseHas('import_kamus_kolom', [
+            'jenis' => 'nilai',
+            'judul_di_excel' => 'nilai tambahan',
+            'kolom_tujuan' => 'mtk',
+            'asal' => 'admin',
+            'dibuat_oleh' => $this->admin->id,
+        ]);
+        $this->assertDatabaseHas('import_unggahan', [
+            'id' => $batchId,
+            'format_tersimpan_id' => 1,
+            'jumlah_baris' => 1,
+            'jumlah_tersimpan' => 1,
+            'status' => 'selesai',
+        ]);
+    }
+
+    public function test_student_import_normalizes_excel_values_and_records_date_warnings(): void
+    {
+        $excelDate = (int) ((strtotime('2008-05-12 00:00:00 UTC') - strtotime('1899-12-30 00:00:00 UTC')) / 86400);
+        $response = $this->import('siswa', [
+            [
+                'nisn' => 123456789,
+                'nis' => '1.003e3',
+                'nama' => '  Siswa   Masa Depan  ',
+                'tgl' => '01/01/2999',
+                'tgl_masuk' => '12 Mei 2008',
+                'tgl_ijazah_smp' => $excelDate,
+                'tgl_keluar' => '01-01-2024',
+                'alamat' => '-',
+                'tmp' => 'X',
+                'agama' => 'N/A',
+                'kewarganegaraan' => '   ',
+                '__excel_row' => 2,
+            ],
+            [
+                'nisn' => 987654321,
+                'nama' => 'Siswa Usia Tidak Wajar',
+                'tgl' => '01-01-1800',
+                '__excel_row' => 3,
+            ],
+        ]);
+
+        $response->assertOk()->assertJsonPath('count', 2);
+
+        $student = DB::table('siswa_biodata')->where('nisn', '0123456789')->first();
+        $this->assertNotNull($student);
+        $this->assertSame('1003', $student->nomor_induk);
+        $this->assertSame('Siswa Masa Depan', $student->nama_lengkap);
+        $this->assertSame('2999-01-01', $student->tanggal_lahir);
+        $this->assertSame('2008-05-12', $student->tanggal_diterima);
+        $this->assertSame('2008-05-12', $student->tanggal_ijazah_smp);
+        $this->assertSame('2024-01-01', $student->tanggal_keluar);
+        $this->assertNull($student->alamat_jalan);
+        $this->assertNull($student->tempat_lahir);
+        $this->assertNull($student->agama);
+        $this->assertNull($student->kewarganegaraan);
+
+        $this->assertDatabaseHas('siswa_biodata', [
+            'nisn' => '0987654321',
+            'tanggal_lahir' => '1800-01-01',
+        ]);
+        $this->assertDatabaseHas('import_unggahan', [
+            'jumlah_baris' => 2,
+            'jumlah_tersimpan' => 2,
+            'jumlah_peringatan' => 2,
+            'status' => 'selesai',
+        ]);
+        $this->assertSame(2, DB::table('import_baris')->where('status', 'peringatan')->count());
+    }
+
+    public function test_server_accepts_comma_decimal_long_scores_and_rejects_out_of_range_values(): void
+    {
+        $response = $this->import('nilai', [
+            [
+                'nisn' => '0000000001',
+                'nama' => 'Nama Sama',
+                'kelas' => 'X-1',
+                'mapelcol' => 'Matematika',
+                'nilaicol' => '85,5',
+                '__excel_row' => 2,
+            ],
+            [
+                'nisn' => '0000000002',
+                'nama' => 'Nama Sama',
+                'kelas' => 'X-1',
+                'mtk' => '100,1',
+                '__excel_row' => 3,
+            ],
+        ]);
+
+        $response->assertOk()->assertJsonPath('count', 1)->assertJsonPath('skipped', 1);
+        $this->assertSame(85.5, (float) DB::table('siswa_nilai')->value('nilai_angka'));
+        $this->assertDatabaseHas('import_baris', [
+            'nomor_baris_excel' => 3,
+            'status' => 'error',
+        ]);
+    }
+
+    public function test_450_rows_in_three_chunks_are_recorded_in_one_completed_batch(): void
+    {
+        $start = $this->actingAs($this->admin)->withoutMiddleware()->postJson(route('admin.import.start-batch'), [
+            'type' => 'nilai',
+            'file_name' => 'nilai-450.xlsx',
+            'total_rows' => 450,
+            'tahun_ajaran' => '2025/2026',
+            'semester' => 'Ganjil',
+            'kelas' => 'X-1',
+        ]);
+        $start->assertCreated()->assertJsonPath('total_rows', 450);
+        $batchId = $start->json('batch_id');
+
+        foreach ([200, 200, 50] as $chunkIndex => $chunkSize) {
+            $rows = [];
+            for ($offset = 0; $offset < $chunkSize; $offset++) {
+                $rows[] = [
+                    'nisn' => '0000000001',
+                    'nama' => 'Nama Sama',
+                    'kelas' => 'X-1',
+                    'mtk' => 80,
+                    '__excel_row' => $chunkIndex * 200 + $offset + 2,
+                ];
+            }
+
+            $response = $this->postJson(route('admin.import.save-batch'), [
+                'batch_id' => $batchId,
+                'type' => 'nilai',
+                'tahun_ajaran' => '2025/2026',
+                'semester' => 'Ganjil',
+                'mode' => 'semua',
+                'rows' => $rows,
+                'final_chunk' => $chunkIndex === 2,
+            ]);
+
+            $response->assertOk()
+                ->assertJsonPath('count', $chunkSize)
+                ->assertJsonPath('batch_id', $batchId)
+                ->assertJsonPath('completed', $chunkIndex === 2);
+        }
+
+        $this->assertDatabaseHas('import_unggahan', [
+            'id' => $batchId,
+            'jumlah_baris' => 450,
+            'jumlah_siap' => 450,
+            'jumlah_tersimpan' => 450,
+            'status' => 'selesai',
+        ]);
+        $this->assertSame(450, DB::table('import_baris')->where('unggahan_id', $batchId)->count());
+        $this->assertSame(1, DB::table('import_unggahan')->where('id', $batchId)->count());
+        $this->assertSame(1, DB::table('catatan_aktivitas')->where('objek_id', $batchId)->count());
     }
 
     /**

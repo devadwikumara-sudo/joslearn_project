@@ -50,14 +50,19 @@
 
     const BLN = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 
-    const iso = v => {
-        if (typeof v === 'number' && v > 20000 && v < 80000) {
-            return new Date(Math.round((v - 25569) * 864e5)).toISOString().slice(0, 10);
-        }
-        return v;
+    const iso = value => {
+        if (typeof value !== 'number' || value <= 0 || value >= 80000) return value;
+        const serial = value < 60 ? value + 1 : value;
+        const date = new Date(Date.UTC(1899, 11, 30) + Math.round(serial * 864e5));
+        return Number.isNaN(date.getTime()) ? value : date.toISOString().slice(0, 10);
     };
 
-    const cl = v => (typeof v === 'string' ? v.trim() : v);
+    const cl = value => {
+        if (value == null) return null;
+        if (typeof value !== 'string') return value;
+        const text = value.trim().replace(/\s+/g, ' ');
+        return !text || ['-', 'x', 'n/a'].includes(text.toLowerCase()) ? null : text;
+    };
     const RM = {'10':'X', '11':'XI', '12':'XII'};
 
     const normK = v => {
@@ -94,24 +99,78 @@
     };
 
     const normN = v => {
-        v = String(v ?? '').replace(/[^0-9]/g, '').trim();
-        if (v.length >= 6 && v.length <= 9) return v.padStart(10, '0');
-        return v;
+        let value = numStr(v).trim();
+        if (/^[+-]?\d+(?:\.\d+)?e[+-]?\d+$/i.test(value)) {
+            const number = Number(value);
+            value = Number.isFinite(number) ? number.toLocaleString('fullwide', {useGrouping:false, maximumFractionDigits:0}) : value;
+        }
+        value = value.replace(/\.0+$/, '').replace(/\D/g, '');
+        if (value.length >= 6 && value.length <= 9) return value.padStart(10, '0');
+        return value;
     };
 
-    const numStr = v => (typeof v === 'number' ? v.toLocaleString('fullwide', {useGrouping:false}) : String(v ?? '').trim());
+    const numStr = value => {
+        if (typeof value === 'number') {
+            return value.toLocaleString('fullwide', {useGrouping:false, maximumFractionDigits:20});
+        }
+        const text = String(value ?? '').trim();
+        if (/^[+-]?\d+(?:\.\d+)?e[+-]?\d+$/i.test(text)) {
+            const number = Number(text);
+            return Number.isFinite(number)
+                ? number.toLocaleString('fullwide', {useGrouping:false, maximumFractionDigits:0})
+                : text;
+        }
+        return text;
+    };
 
     const toIso = v => {
-        if (typeof v === 'number' && v > 20000 && v < 80000) return iso(v);
-        const t = String(v ?? '').trim();
+        if (typeof v === 'number' && v > 0 && v < 80000) return iso(v);
+        const t = String(v ?? '').trim().replace(/\s+/g, ' ');
+        const valid = (year, month, day) => {
+            const date = new Date(Date.UTC(year, month - 1, day));
+            return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+        };
         let m = /^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})$/.exec(t);
-        if (m) return m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0');
+        if (m && valid(Number(m[3]), Number(m[2]), Number(m[1]))) {
+            return m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0');
+        }
         m = /^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/.exec(t);
-        const bi = m ? BLN.findIndex(b => b.toLowerCase() === m[2].toLowerCase()) : -1;
-        return bi >= 0 ? m[3] + '-' + String(bi + 1).padStart(2, '0') + '-' + m[1].padStart(2, '0') : t;
+        const monthNames = [...BLN, 'Mei'];
+        const bi = m ? monthNames.findIndex(b => b.toLowerCase() === m[2].toLowerCase()) : -1;
+        if (bi >= 0 && valid(Number(m[3]), (bi % 12) + 1, Number(m[1]))) {
+            return m[3] + '-' + String((bi % 12) + 1).padStart(2, '0') + '-' + m[1].padStart(2, '0');
+        }
+        return t;
     };
 
     const nz = s => String(s ?? '').toLowerCase().replace(/\([^)]*\)/g, ' ').replace(/[^a-z0-9]+/g, ' ').trim();
+
+    function readRows(sheet) {
+        const rows = XLSX.utils.sheet_to_json(sheet, {header: 1, defval: ''});
+        const merges = sheet?.['!merges'] || [];
+        merges.forEach(range => {
+            const {s, e} = range;
+            if (!s || !e || s.r >= 30) return;
+            const title = rows[s.r]?.[s.c];
+            if (title == null || String(title).trim() === '') return;
+            for (let rowIndex = s.r + 1; rowIndex <= Math.min(e.r, 29); rowIndex++) {
+                rows[rowIndex] ||= [];
+                if (rows[rowIndex][s.c] == null || String(rows[rowIndex][s.c]).trim() === '') {
+                    rows[rowIndex][s.c] = title;
+                }
+            }
+            if (e.c > s.c && rows[s.r + 1]) {
+                for (let columnIndex = s.c; columnIndex <= e.c; columnIndex++) {
+                    const child = rows[s.r + 1][columnIndex];
+                    if (child != null && String(child).trim() !== '' && nz(child) !== nz(title)) {
+                        rows[s.r + 1][columnIndex] = `${String(title).trim()} | ${String(child).trim()}`;
+                    }
+                }
+            }
+        });
+
+        return rows;
+    }
 
     // ─── Kamus Alias Header (Mendukung Format Apapun) ─────────────────────────
     const ALX = {
@@ -285,9 +344,21 @@
         return _am;
     };
 
-    const fieldOf = h => AMAP()[nz(h)] || '';
+    const fieldOf = h => {
+        const parts = String(h ?? '').split('|').map(part => nz(part)).filter(Boolean);
+        const aliases = S?.imp?.dictionaries?.columns || {};
+        for (const part of parts.reverse()) {
+            if (aliases[part]) return aliases[part];
+        }
+        return AMAP()[nz(h)] || parts.map(part => AMAP()[part]).find(Boolean) || '';
+    };
     const mapelOf = h => {
-        const x = nz(h);
+        const parts = String(h ?? '').split('|').map(part => nz(part)).filter(Boolean).reverse();
+        const aliases = S?.imp?.dictionaries?.subjects || {};
+        for (const part of parts) {
+            if (aliases[part]) return aliases[part];
+        }
+        const x = parts[0] || nz(h);
         if (!x) return '';
         const r = SUB.find(m => nz(m[1]) === x || m[0] === x);
         if (r) return r[0];
@@ -323,7 +394,7 @@
             }
 
             const base = hsplit(text).b;
-            const field = studentOnly ? fieldOf(text) : (fx(base) || fx(text) || (mapelOf(base) ? 'mapel' : ''));
+            const field = studentOnly ? fieldOf(text) : (mapelOf(base) ? 'mapel' : (fx(base) || fx(text) || ''));
             fields.push(field);
             if (field) {
                 score++;
@@ -446,7 +517,7 @@
         let best = null;
         for (const name of w.SheetNames) {
             if (name === excludedSheet) continue;
-            const rows = XLSX.utils.sheet_to_json(w.Sheets[name], {header: 1, defval: ''});
+            const rows = readRows(w.Sheets[name]);
             for (let rowIndex = 0; rowIndex < Math.min(rows.length, 30); rowIndex++) {
                 const fields = (rows[rowIndex] || []).map(fieldOf);
                 const exitScore = fields.filter(field => exitFields.includes(field)).length;
@@ -474,7 +545,7 @@
     function realRows(w, columnOverrides = {}) {
         const sheetRows = w.SheetNames.map(name => ({
             name,
-            rows: XLSX.utils.sheet_to_json(w.Sheets[name], {header: 1, defval: ''})
+            rows: readRows(w.Sheets[name])
         }));
         let best = null;
         for (const sheet of sheetRows) {
@@ -502,6 +573,8 @@
             sheetCount: w.SheetNames.length,
             headerRow: headerRowIndex + 1,
             headerDetected: useHeaders,
+            headers: headers.map(header => String(header ?? '').trim()),
+            mapping: mapping.fields,
             legacyFallback: !useHeaders,
             recognized: mapping.recognized,
             uncertain: mapping.uncertain,
@@ -589,14 +662,17 @@
             for (const [column, field] of Object.entries(RMAP)) {
                 const index = columnFor(field, CI(column));
                 let value = index < 0 ? '-' : cl(row[index]);
-                if ((field === 'tgl' || field === 'tgl_masuk' || field === 'tgl_ijazah_smp') && typeof value === 'number') {
-                    value = iso(value);
+                if (field === 'kelas_masuk' && value === null && String(row[index] ?? '').trim().toUpperCase() === 'X') {
+                    value = 'X';
+                }
+                if (['tgl', 'tgl_masuk', 'tgl_ijazah_smp'].includes(field) && value !== null) {
+                    value = toIso(value);
                 }
                 if (field === 'nik' && typeof value === 'number' && String(value).replace(/\D/g, '').length === 16) {
                     numericNik = true;
                 }
                 if (['nis', 'nisn', 'nik'].includes(field) && typeof value === 'number') value = numStr(value);
-                student[field] = (value === '' || value == null) ? '-' : value;
+                student[field] = (value === '' || value == null) ? null : value;
             }
 
             for (const [field, key] of Object.entries(alumniFields)) {
@@ -607,10 +683,10 @@
                 if (field === 'tahun_lulus') {
                     value = value === '' || value == null || value === '-' ? '' : numStr(value);
                 }
-                student[key] = (value === '' || value == null) && field !== 'tahun_lulus' ? '-' : value;
+                student[key] = (value === '' || value == null) && field !== 'tahun_lulus' ? null : value;
             }
 
-            student.nis = String(student.nis ?? '');
+            student.nis = numStr(student.nis);
             student.nisn = normN(String(row[nisnIndex] ?? student.nisn ?? '').trim());
             const classFromSheet = classIndex >= 0 ? normK(row[classIndex]) : '';
             const classFromAdmission = normK((student.kelas_masuk || '') + '-' + (student.rombel_masuk || ''));
@@ -629,7 +705,7 @@
                     if (valueIndex < 0) continue;
                     let value = cl(controlRow[valueIndex]);
                     if (field.startsWith('tgl')) value = toIso(value);
-                    student[field] = (value === '' || value == null) ? '-' : value;
+                    student[field] = (value === '' || value == null) ? null : value;
                 }
                 for (const field of ['status', 'tahun_lulus', 'lanjut']) {
                     const index = controlColumn(field);
@@ -711,7 +787,7 @@
             if (!h) return;
             const q = hsplit(h);
             base[i] = q.b;
-            let f = fx(q.b), m = f ? '' : mapelOf(q.b);
+            let m = mapelOf(q.b), f = m ? '' : fx(q.b);
             map[i] = f || (m ? 'm:' + m : '');
             if (q.s && map[i]) semOf[i] = q.s;
         });
@@ -1078,6 +1154,9 @@
                 }
                 const date = new Date(`${r[key]}T00:00:00`);
                 if (date > new Date()) addWarning(idx, id, `${FL[key] || key} berada di masa depan`);
+                if (key === 'tgl' && (Date.now() - date.getTime()) / (365.2425 * 864e5) > 120) {
+                    addWarning(idx, id, 'Usia berdasarkan tanggal lahir melebihi 120 tahun');
+                }
             });
         });
         return {errors, warns, statuses};
@@ -1096,6 +1175,10 @@
             rows: null,
             detection: null,
             studentColumnOverrides: {},
+            studentColumnCorrections: {},
+            studentOriginalMap: {},
+            dictionaries: {columns: {}, subjects: {}},
+            savedFormats: [],
             mappingIssues: [],
             statuses: [],
             warningsConfirmed: false,
@@ -1150,6 +1233,53 @@
         if (taEl) taEl.value = years[0];
     }
 
+    function importEndpoint(action) {
+        const endpointMeta = document.querySelector('meta[name="batch-import-url"]');
+        const endpoint = endpointMeta ? endpointMeta.getAttribute('content') : '';
+        return endpoint.replace(/\/save-batch\/?$/, `/${action}`);
+    }
+
+    async function postImportJson(endpoint, payload) {
+        const token = document.querySelector('meta[name="csrf-token"]');
+        const csrfToken = token ? token.getAttribute('content') : '';
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': csrfToken
+            },
+            body: JSON.stringify(payload)
+        });
+        const contentType = response.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+            await response.text();
+            throw new Error(`Server mengembalikan halaman, bukan JSON (HTTP ${response.status}). Muat ulang halaman dan pastikan sesi login masih aktif.`);
+        }
+
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+            throw new Error(data.message || `Permintaan import gagal (HTTP ${response.status}).`);
+        }
+
+        return data;
+    }
+
+    function savedFormatFor(formats, index) {
+        return Array.isArray(formats) ? formats[index] : null;
+    }
+
+    function applyFormatMapping(sheet, format) {
+        if (!format?.mapping) return false;
+        Object.entries(format.mapping).forEach(([column, mapping]) => {
+            if (Number.isInteger(Number(column)) && column in sheet.map) {
+                sheet.map[column] = mapping;
+            }
+        });
+        sheet.formatId = format.format_id;
+        return true;
+    }
+
     const escapeHtml = value => String(value ?? '')
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
@@ -1169,6 +1299,7 @@
         const issues = [];
         if (!hasIdentity) issues.push('Kolom identitas wajib dipetakan: NISN atau Nama.');
         if (I.t === 'nilai' && !mapped.some(key => key.startsWith('m:') || key === 'new')
+            && !mapped.some(key => SC.includes(key) || (I.newM || []).some(mapel => mapel.kode === key))
             && !(mapped.includes('mapelcol') && mapped.includes('nilaicol'))) {
             issues.push('Kolom nilai mapel belum terdeteksi atau dipetakan.');
         }
@@ -1417,7 +1548,14 @@
     window.changeColMap = function(sheetIdx, colIdx, newMapping) {
         const I = S.imp;
         if (!I.raws || !I.raws[sheetIdx]) return;
-        I.raws[sheetIdx].map[colIdx] = newMapping;
+        const sheet = I.raws[sheetIdx];
+        sheet.map[colIdx] = newMapping;
+        sheet.correctedMap ||= {};
+        if (newMapping === (sheet.initialMap?.[colIdx] || '')) {
+            delete sheet.correctedMap[colIdx];
+        } else {
+            sheet.correctedMap[colIdx] = newMapping;
+        }
         I.rows = buildRows(I);
         I.warningsConfirmed = false;
         if (I.rows.some(q => q.kelas)) I.mode = 'semua';
@@ -1428,6 +1566,11 @@
         const I = S.imp;
         if (!studentWorkbook || !I.detection) return;
         I.studentColumnOverrides[columnIndex] = field;
+        if (field === (I.studentOriginalMap[columnIndex] || '')) {
+            delete I.studentColumnCorrections[columnIndex];
+        } else {
+            I.studentColumnCorrections[columnIndex] = field;
+        }
 
         const result = realRows(studentWorkbook, I.studentColumnOverrides);
         I.detection = result.detection;
@@ -1437,6 +1580,27 @@
         renderPreviewUI();
     };
 
+    function mappingCorrections(I) {
+        if (I.t === 'siswa') {
+            if (!Object.keys(I.studentColumnCorrections || {}).length || !I.detection?.headers?.length) return [];
+            return [{
+                name: I.detection.sheet,
+                header_row: I.detection.headerRow,
+                headers: I.detection.headers,
+                mapping: {...(I.detection.mapping || {}), ...(I.studentColumnOverrides || {})},
+                corrected: I.studentColumnCorrections
+            }];
+        }
+
+        return (I.raws || []).filter(sheet => Object.keys(sheet.correctedMap || {}).length).map(sheet => ({
+            name: sheet.name,
+            header_row: sheet.hr + 1,
+            headers: sheet.heads || [],
+            mapping: sheet.map || {},
+            corrected: sheet.correctedMap
+        }));
+    }
+
     window.editImportCell = function(cell) {
         const I = S.imp;
         const rowIndex = Number(cell?.dataset?.row);
@@ -1444,22 +1608,26 @@
         if (!Number.isInteger(rowIndex) || !field || !I.rows?.[rowIndex]) return;
 
         const row = I.rows[rowIndex];
-        let value = String(cell.textContent ?? '').trim();
+        let value = cl(cell.textContent);
+        if (value === null) value = '';
         if (['sakit', 'izin', 'alpa', ...SC, ...(I.newM || []).map(mapel => mapel.kode), 'nilai', 'nilaicol'].includes(field)
             && value !== '') {
             value = value.replace(',', '.');
         }
         if (field === 'nisn' || field === 'nis' || field === 'nik' || field === 'hp') {
-            value = value.replace(/\D/g, '');
+            value = numStr(value).replace(/\D/g, '');
+            if (field === 'nisn') value = normN(value);
         } else if (field === 'kelas') {
             value = normK(value);
         } else if (field === 'sem') {
             value = normSem(value);
         } else if (field === 'tahun_ajaran') {
             value = normAcademicYear(value) || value;
+        } else if (['tgl', 'tgl_masuk', 'tgl_ijazah_smp', 'tgl_keluar', 'tgl_ijazah_sma'].includes(field)) {
+            value = toIso(value);
         }
 
-        row[field] = value;
+        row[field] = value === '' ? null : value;
         I.warningsConfirmed = false;
         renderPreviewUI();
     };
@@ -1495,7 +1663,7 @@
         readFormOptions();
 
         const r = new FileReader();
-        r.onload = function(x) {
+        r.onload = async function(x) {
             let w;
             try {
                 w = XLSX.read(x.target.result, {type: 'array'});
@@ -1510,13 +1678,42 @@
             I.detection = null;
             I.fileName = f.name || '';
             I.studentColumnOverrides = {};
+            I.studentColumnCorrections = {};
+            I.studentOriginalMap = {};
+            I.dictionaries = {columns: {}, subjects: {}};
+            I.savedFormats = [];
             I.warningsConfirmed = false;
             I.newM = [];
             I.newX = [];
 
+            try {
+                const metadata = await postImportJson(importEndpoint('metadata'), {type: I.t});
+                I.dictionaries = metadata.dictionaries || {columns: {}, subjects: {}};
+            } catch (error) {
+                alert('Kamus import tidak dapat dimuat: ' + error.message);
+                return;
+            }
+
             if (I.t === 'siswa') {
                 studentWorkbook = w;
-                const result = realRows(w, I.studentColumnOverrides);
+                let result = realRows(w, I.studentColumnOverrides);
+                if (result.detection?.headerDetected) {
+                    try {
+                        const formats = await postImportJson(importEndpoint('metadata'), {
+                            type: I.t,
+                            sheets: [{name: result.detection.sheet, headers: result.detection.headers}]
+                        });
+                        const format = savedFormatFor(formats.formats, 0);
+                        I.studentOriginalMap = {...(result.detection.mapping || {})};
+                        if (applyFormatMapping({map: I.studentColumnOverrides}, format)) {
+                            I.savedFormats = [format];
+                            result = realRows(w, I.studentColumnOverrides);
+                        }
+                    } catch (error) {
+                        alert('Format import tidak dapat diperiksa: ' + error.message);
+                        return;
+                    }
+                }
                 I.detection = result.detection;
                 I.raws = null;
                 I.rows = result.rows;
@@ -1528,7 +1725,7 @@
             }
 
             // 2. Analisis Fleksibel — semua sheet (skip Kontrol Induk untuk siswa)
-            const rd = n => XLSX.utils.sheet_to_json(w.Sheets[n], {header: 1, defval: ''});
+            const rd = n => readRows(w.Sheets[n]);
             const sheetNames = I.t === 'siswa'
                 ? w.SheetNames.filter(name => !/kontrol\s*induk/i.test(name))
                 : w.SheetNames;
@@ -1554,9 +1751,22 @@
                 }];
             }
 
-            // Jalankan deteksi kolom otomatis untuk kolom tambahan/baru
-            use.forEach(z => assignX(z, I.t));
-
+            try {
+                const formats = await postImportJson(importEndpoint('metadata'), {
+                    type: I.t,
+                    sheets: use.map(sheet => ({name: sheet.name, headers: sheet.heads || []}))
+                });
+                I.savedFormats = (formats.formats || []).filter(format => format?.format_id);
+                use.forEach((sheet, index) => applyFormatMapping(sheet, savedFormatFor(formats.formats, index)));
+            } catch (error) {
+                alert('Format import tidak dapat diperiksa: ' + error.message);
+                return;
+            }
+            use.forEach(sheet => assignX(sheet, I.t));
+            use.forEach(sheet => {
+                sheet.initialMap = {...sheet.map};
+                sheet.correctedMap = {};
+            });
             I.raws = use;
             const detectedColumns = use.flatMap(sheet => (sheet.heads || []).map((header, index) => ({
                 sheet: sheet.name,
@@ -1589,6 +1799,10 @@
         S.imp.raws = null;
         S.imp.detection = null;
         S.imp.studentColumnOverrides = {};
+        S.imp.studentColumnCorrections = {};
+        S.imp.studentOriginalMap = {};
+        S.imp.dictionaries = {columns: {}, subjects: {}};
+        S.imp.savedFormats = [];
         S.imp.mappingIssues = [];
         S.imp.statuses = [];
         S.imp.warningsConfirmed = false;
@@ -1602,7 +1816,7 @@
     };
 
     // ─── Eksekusi Batch Import ke Server ────────────────────────────────────────
-    window.executeBatchImport = function() {
+    window.executeBatchImport = async function() {
         const I = S.imp;
         readFormOptions();
 
@@ -1630,8 +1844,6 @@
             btn.textContent = '⏳ Menyimpan ke database...';
         }
 
-        const token = document.querySelector('meta[name="csrf-token"]');
-        const csrfToken = token ? token.getAttribute('content') : '';
         const endpointMeta = document.querySelector('meta[name="batch-import-url"]');
         const endpoint = endpointMeta ? endpointMeta.getAttribute('content') : '';
         const appBaseMeta = document.querySelector('meta[name="app-base-url"]');
@@ -1654,91 +1866,106 @@
 
         const payload = {
             type: I.t,
+            file_name: I.fileName || 'import.xlsx',
+            total_rows: rowsToSend.length,
             tahun_ajaran: I.ta || '',
             semester: I.sem || 'Genap',
             mode: I.mode || 'semua',
             kelas: I.kelas || '',
             dup: I.dup || 'skip',
-            rows: rowsToSend,
+            format_id: I.savedFormats?.find(format => format?.format_id)?.format_id || null,
+            mapping_corrections: mappingCorrections(I),
             new_classes: [...new Set(rowsToSend.map(r => normK(r.kelas || '')).filter(Boolean))],
             new_mapel: (I.newM || []).filter(mapel => rowsToSend.some(row => row[mapel.kode] !== '' && row[mapel.kode] != null))
         };
 
         const targetKelas = I.mode === 'kelas' ? I.kelas : (rowsToSend[0] ? normK(rowsToSend[0].kelas) : '');
+        let batchId = null;
+        try {
+            const started = await postImportJson(importEndpoint('start-batch'), payload);
+            batchId = started.batch_id;
+            const chunkSize = 200;
+            const chunkCount = Math.ceil(rowsToSend.length / chunkSize);
+            const errors = [];
+            let count = 0;
+            let skipped = 0;
+            let lastResponse = null;
 
-        return fetch(endpoint, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'X-CSRF-TOKEN': csrfToken
-            },
-            body: JSON.stringify(payload)
-        })
-        .then(async res => {
-            const contentType = res.headers.get('content-type') || '';
-            if (!contentType.includes('application/json')) {
-                await res.text();
-                throw new Error(`Server mengembalikan halaman, bukan JSON (HTTP ${res.status}). Muat ulang halaman dan pastikan sesi login masih aktif.`);
-            }
-
-            return res.json();
-        })
-        .then(data => {
-            if (data.success) {
-                const container = document.getElementById('josbook-import-preview-area');
-                if (container) {
-                    const rowErrors = Array.isArray(data.errors) ? data.errors : [];
-                    const escapedErrors = rowErrors.map(function(error) {
-                        const reason = String(error.reason || 'Baris dilewati')
-                            .replace(/&/g, '&amp;')
-                            .replace(/</g, '&lt;')
-                            .replace(/>/g, '&gt;')
-                            .replace(/"/g, '&quot;')
-                            .replace(/'/g, '&#039;');
-                        return `<li>Baris ${Number(error.row) || '-'}: ${reason}</li>`;
-                    }).join('');
-                    const errorSummary = rowErrors.length
-                        ? `<details style="margin:0 0 14px"><summary style="cursor:pointer">Lihat ${rowErrors.length} baris gagal/dilewati</summary><ul>${escapedErrors}</ul></details>`
-                        : '';
-                    container.innerHTML = `
-                        <div class="card" style="margin-top:14px;border-left:4px solid #27ae60;background:#f6fbf8;padding:20px">
-                            <h3 style="color:#27ae60;margin:0 0 8px;font-size:16px">✅ ${data.message}</h3>
-                            ${data.class_warning ? `<p class="sub" style="margin:0 0 14px;color:#e67e22">${String(data.class_warning).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>` : ''}
-                            ${errorSummary}
-                            <div class="bar" style="margin-top:14px;gap:10px;flex-wrap:wrap">
-                                ${I.t === 'siswa' ? `
-                                    <a href="${appBaseUrl}/admin/data-siswa" class="btn a" style="padding:6px 12px;font-size:12px;text-decoration:none;font-weight:600">👉 Buka Halaman Data Siswa</a>
-                                    ${targetKelas ? `<a href="${appBaseUrl}/admin/data-siswa?kelas=${encodeURIComponent(targetKelas)}" class="btn" style="padding:6px 10px;font-size:12px;text-decoration:none">Lihat Kelas ${targetKelas}</a>` : ''}
-                                    <a href="${appBaseUrl}/admin/alumni?aj=${encodeURIComponent('Alumni (Lulus)')}" class="btn o" style="padding:6px 10px;font-size:12px;text-decoration:none">Lihat Alumni &amp; Kontrol Induk</a>
-                                    <a href="${appBaseUrl}/admin/pelacakan-alumni" class="btn o" style="padding:6px 10px;font-size:12px;text-decoration:none">Periksa Pelacakan Alumni</a>
-                                ` : I.t === 'nilai' ? `
-                                    <a href="${appBaseUrl}/${importRolePath}/${importPage.nilai}" class="btn a" style="padding:6px 12px;font-size:12px;text-decoration:none;font-weight:600">🔄 Selesai &amp; Muat Ulang Data Nilai</a>
-                                ` : I.t === 'hadir' ? `
-                                    <a href="${appBaseUrl}/${importRolePath}/${importPage.hadir}" class="btn a" style="padding:6px 12px;font-size:12px;text-decoration:none;font-weight:600">🔄 Selesai &amp; Muat Ulang Data Kehadiran</a>
-                                ` : `
-                                    <a href="${appBaseUrl}/${importRolePath}/${importPage.ekskul}" class="btn a" style="padding:6px 12px;font-size:12px;text-decoration:none;font-weight:600">🔄 Selesai &amp; Muat Ulang Data Ekskul</a>
-                                `}
-                                <button type="button" class="btn o" onclick="resetImportPreview()">⬆ Import File Lain</button>
-                            </div>
-                        </div>`;
-                }
-                if (window.toast) window.toast(data.message, 4000);
-            } else {
-                alert('Gagal mengimpor: ' + (data.message || 'Kesalahan sistem'));
+            for (let chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
+                const start = chunkIndex * chunkSize;
+                const chunk = rowsToSend.slice(start, start + chunkSize);
                 if (btn) {
-                    btn.disabled = false;
-                    btn.textContent = '⬇ Coba Impor Lagi';
+                    btn.textContent = `⏳ Potongan ${chunkIndex + 1}/${chunkCount} · ${Math.min(start + chunk.length, rowsToSend.length)}/${rowsToSend.length} baris`;
+                }
+                lastResponse = await postImportJson(endpoint, {
+                    ...payload,
+                    batch_id: batchId,
+                    rows: chunk,
+                    final_chunk: chunkIndex === chunkCount - 1
+                });
+                count += Number(lastResponse.count) || 0;
+                skipped += Number(lastResponse.skipped) || 0;
+                errors.push(...(Array.isArray(lastResponse.errors) ? lastResponse.errors : []));
+            }
+
+            const data = {
+                ...lastResponse,
+                success: true,
+                count,
+                skipped,
+                errors,
+                message: `Berhasil mengimpor ${count} data ${I.t}${skipped ? ` (${skipped} baris gagal/dilewati)` : ''}.`
+            };
+            const container = document.getElementById('josbook-import-preview-area');
+            if (container) {
+                const escapedErrors = errors.map(error => {
+                    const reason = escapeHtml(error.reason || 'Baris dilewati');
+                    return `<li>Baris ${Number(error.row) || '-'}: ${reason}</li>`;
+                }).join('');
+                const errorSummary = errors.length
+                    ? `<details style="margin:0 0 14px"><summary style="cursor:pointer">Lihat ${errors.length} baris gagal/dilewati</summary><ul>${escapedErrors}</ul></details>`
+                    : '';
+                container.innerHTML = `
+                    <div class="card" style="margin-top:14px;border-left:4px solid #27ae60;background:#f6fbf8;padding:20px">
+                        <h3 style="color:#27ae60;margin:0 0 8px;font-size:16px">✅ ${escapeHtml(data.message)}</h3>
+                        ${data.class_warning ? `<p class="sub" style="margin:0 0 14px;color:#e67e22">${escapeHtml(data.class_warning)}</p>` : ''}
+                        ${errorSummary}
+                        <div class="bar" style="margin-top:14px;gap:10px;flex-wrap:wrap">
+                            ${I.t === 'siswa' ? `
+                                <a href="${appBaseUrl}/admin/data-siswa" class="btn a" style="padding:6px 12px;font-size:12px;text-decoration:none;font-weight:600">👉 Buka Halaman Data Siswa</a>
+                                ${targetKelas ? `<a href="${appBaseUrl}/admin/data-siswa?kelas=${encodeURIComponent(targetKelas)}" class="btn" style="padding:6px 10px;font-size:12px;text-decoration:none">Lihat Kelas ${escapeHtml(targetKelas)}</a>` : ''}
+                                <a href="${appBaseUrl}/admin/alumni?aj=${encodeURIComponent('Alumni (Lulus)')}" class="btn o" style="padding:6px 10px;font-size:12px;text-decoration:none">Lihat Alumni &amp; Kontrol Induk</a>
+                                <a href="${appBaseUrl}/admin/pelacakan-alumni" class="btn o" style="padding:6px 10px;font-size:12px;text-decoration:none">Periksa Pelacakan Alumni</a>
+                            ` : I.t === 'nilai' ? `
+                                <a href="${appBaseUrl}/${importRolePath}/${importPage.nilai}" class="btn a" style="padding:6px 12px;font-size:12px;text-decoration:none;font-weight:600">🔄 Selesai &amp; Muat Ulang Data Nilai</a>
+                            ` : I.t === 'hadir' ? `
+                                <a href="${appBaseUrl}/${importRolePath}/${importPage.hadir}" class="btn a" style="padding:6px 12px;font-size:12px;text-decoration:none;font-weight:600">🔄 Selesai &amp; Muat Ulang Data Kehadiran</a>
+                            ` : `
+                                <a href="${appBaseUrl}/${importRolePath}/${importPage.ekskul}" class="btn a" style="padding:6px 12px;font-size:12px;text-decoration:none;font-weight:600">🔄 Selesai &amp; Muat Ulang Data Ekskul</a>
+                            `}
+                            <button type="button" class="btn o" onclick="resetImportPreview()">⬆ Import File Lain</button>
+                        </div>
+                    </div>`;
+            }
+            if (window.toast) window.toast(data.message, 4000);
+        } catch (error) {
+            let message = error.message;
+            if (batchId !== null) {
+                try {
+                    await postImportJson(importEndpoint('fail-batch'), {
+                        batch_id: batchId,
+                        message: message.slice(0, 500)
+                    });
+                } catch (failureError) {
+                    message += ` Gagal mencatat status batch: ${failureError.message}`;
                 }
             }
-        })
-        .catch(err => {
-            alert('Impor gagal: ' + err.message);
+            alert('Impor gagal: ' + message);
             if (btn) {
                 btn.disabled = false;
                 btn.textContent = '⬇ Coba Impor Lagi';
             }
-        });
+        }
     };
 
 })(window);

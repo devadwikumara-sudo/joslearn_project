@@ -46,7 +46,7 @@ function workbookFromFixture(fixture) {
     };
 }
 
-function importWorkbook(workbook, expectedType = 'siswa') {
+async function importWorkbook(workbook, expectedType = 'siswa', dictionaries = {columns: {}, subjects: {}}) {
     const alerts = [];
     const window = {toast() {}};
     const preview = {innerHTML: ''};
@@ -74,22 +74,62 @@ function importWorkbook(workbook, expectedType = 'siswa') {
         },
         utils: {
             sheet_to_json(sheet) {
-                return sheet;
+                const rows = Array.isArray(sheet) ? sheet : sheet.data;
+                return rows.map(row => row.map(cell => cell && typeof cell === 'object' && 'v' in cell ? cell.v : cell));
             }
         }
     };
     window.XLSX = XLSX;
+    const requests = [];
     window.fetch = async (endpoint, options) => {
-        payload = JSON.parse(options.body);
+        const request = JSON.parse(options.body);
+        requests.push({endpoint, request});
+        let data;
+        if (endpoint.endsWith('/metadata')) {
+            data = {
+                success: true,
+                dictionaries,
+                formats: (request.sheets || []).map(sheet => ({
+                    name: sheet.name,
+                    fingerprint: 'test-fingerprint',
+                    format_id: null,
+                    mapping: null
+                }))
+            };
+        } else if (endpoint.endsWith('/start-batch')) {
+            data = {success: true, batch_id: 17, total_rows: request.total_rows};
+        } else if (endpoint.endsWith('/save-batch')) {
+            payload = request;
+            data = {
+                success: true,
+                batch_id: request.batch_id,
+                count: request.rows.length,
+                skipped: 0,
+                errors: [],
+                completed: request.final_chunk,
+                message: 'Impor selesai'
+            };
+        } else {
+            data = {success: true};
+        }
         return {
+            ok: true,
+            status: 200,
             headers: {get: () => 'application/json'},
-            json: async () => ({success: true, message: 'Impor selesai'})
+            json: async () => data
         };
     };
 
     class FileReaderStub {
         readAsArrayBuffer() {
-            this.onload({target: {result: null}});
+            this.finished = this.onload({target: {result: null}});
+        }
+    }
+    let reader;
+    class TrackedFileReader extends FileReaderStub {
+        constructor() {
+            super();
+            reader = this;
         }
     }
 
@@ -100,24 +140,26 @@ function importWorkbook(workbook, expectedType = 'siswa') {
         fetch: window.fetch,
         Blob,
         URL,
-        FileReader: FileReaderStub,
+        FileReader: TrackedFileReader,
         alert: message => alerts.push(message)
     });
     window.smartFile({target: {files: [{name: 'fixture.xlsx'}]}}, expectedType);
+    await reader.finished;
 
     return {
         state: JSON.parse(JSON.stringify(window.JosBookState.imp)),
         alerts,
         preview,
         window,
+        requests,
         getPayload: () => payload
     };
 }
 
-test('reads student records across four sheet and header variations', () => {
-    fixtures.forEach((fixtureName, index) => {
+test('reads student records across four sheet and header variations', async () => {
+    for (const [index, fixtureName] of fixtures.entries()) {
         const fixture = JSON.parse(readFileSync(resolve(directory, '../Fixtures', fixtureName), 'utf8'));
-        const {state, alerts} = importWorkbook(workbookFromFixture(fixture));
+        const {state, alerts} = await importWorkbook(workbookFromFixture(fixture));
         const keyFields = state.rows.map(({nisn, nama, nis, kelas}) => ({nisn, nama, nis, kelas}));
 
         assert.deepEqual(alerts, [], fixtureName);
@@ -126,12 +168,12 @@ test('reads student records across four sheet and header variations', () => {
         assert.equal(state.detection.sheet, fixture.sheetName, fixtureName);
         assert.equal(state.detection.legacyFallback, index === 3, fixtureName);
         assert.equal(state.detection.headerRow, index === 0 ? 2 : index === 1 ? 7 : index === 2 ? 1 : 5, fixtureName);
-    });
+    }
 });
 
-test('maps repeated parent and guardian headings by family group', () => {
+test('maps repeated parent and guardian headings by family group', async () => {
     const fixture = JSON.parse(readFileSync(resolve(directory, '../Fixtures', fixtures[2]), 'utf8'));
-    const {state} = importWorkbook(workbookFromFixture(fixture));
+    const {state} = await importWorkbook(workbookFromFixture(fixture));
 
     assert.equal(state.rows[0].agama_ayah, 'Islam');
     assert.equal(state.rows[0].kerja_ayah, 'Petani');
@@ -143,7 +185,7 @@ test('maps repeated parent and guardian headings by family group', () => {
     assert.equal(state.detection.unknown.length, 0);
 });
 
-test('reports missing required student headings and allows correcting the mapping', () => {
+test('reports missing required student headings and allows correcting the mapping', async () => {
     const workbooks = [
         {
             SheetNames: ['Data Siswa'],
@@ -156,8 +198,8 @@ test('reports missing required student headings and allows correcting the mappin
     ];
     const expectedMissingHeadings = ['NISN', 'Nama'];
 
-    workbooks.forEach((workbook, index) => {
-        const {state, alerts, window} = importWorkbook(workbook);
+    for (const [index, workbook] of workbooks.entries()) {
+        const {state, alerts, window} = await importWorkbook(workbook);
 
         assert.deepEqual(alerts, []);
         assert.equal(state.rows.length, 0);
@@ -167,10 +209,10 @@ test('reports missing required student headings and allows correcting the mappin
         window.changeStudentColumnMap(1, index === 0 ? 'nisn' : 'nama');
         assert.equal(window.JosBookState.imp.mappingIssues.length, 0);
         assert.equal(window.JosBookState.imp.rows.length, 1);
-    });
+    }
 });
 
-test('selects the sheet with the strongest matching header row', () => {
+test('selects the sheet with the strongest matching header row', async () => {
     const workbook = {
         SheetNames: ['Catatan', 'Data Siswa'],
         Sheets: {
@@ -182,7 +224,7 @@ test('selects the sheet with the strongest matching header row', () => {
             ]
         }
     };
-    const {state, alerts} = importWorkbook(workbook);
+    const {state, alerts} = await importWorkbook(workbook);
 
     assert.deepEqual(alerts, []);
     assert.equal(state.detection.sheet, 'Data Siswa');
@@ -200,7 +242,7 @@ test('shows per-row errors, edits cells, and sends only corrected rows', async (
             ]
         }
     };
-    const {state, preview, window, getPayload} = importWorkbook(workbook, 'nilai');
+    const {state, preview, window, getPayload} = await importWorkbook(workbook, 'nilai');
 
     assert.equal(state.rows.length, 1);
     assert.equal(window.JosBookState.imp.statuses[0].status, 'error');
@@ -227,7 +269,7 @@ test('excludes error rows from the batch payload', async () => {
             ]
         }
     };
-    const {window, getPayload} = importWorkbook(workbook, 'nilai');
+    const {window, getPayload} = await importWorkbook(workbook, 'nilai');
 
     assert.equal(window.JosBookState.imp.statuses[0].status, 'ready');
     assert.equal(window.JosBookState.imp.statuses[1].status, 'error');
@@ -246,7 +288,7 @@ test('requires confirmation before including warning rows', async () => {
             ]
         }
     };
-    const {alerts, window, getPayload} = importWorkbook(workbook);
+    const {alerts, window, getPayload} = await importWorkbook(workbook);
 
     assert.equal(window.JosBookState.imp.statuses[0].status, 'warning');
     await window.executeBatchImport();
@@ -256,4 +298,113 @@ test('requires confirmation before including warning rows', async () => {
     window.confirmImportWarnings(true);
     await window.executeBatchImport();
     assert.equal(getPayload().rows.length, 1);
+});
+
+test('normalizes numeric identifiers, whitespace, and empty placeholders', async () => {
+    const workbook = {
+        SheetNames: ['Data Siswa'],
+        Sheets: {
+            'Data Siswa': [
+                ['NISN', 'Nama Lengkap', 'NIS', 'Alamat', 'Tempat Lahir', 'Agama', 'Kewarganegaraan'],
+                [123456789, '  Siswa   Uji  ', 1.23456789012e11, '-', 'X', 'N/A', '   ']
+            ]
+        }
+    };
+    const {state} = await importWorkbook(workbook);
+
+    assert.equal(state.rows.length, 1);
+    assert.equal(state.rows[0].nisn, '0123456789');
+    assert.equal(state.rows[0].nis, '123456789012');
+    assert.equal(state.rows[0].nama, 'Siswa Uji');
+    assert.equal(state.rows[0].alamat, null);
+    assert.equal(state.rows[0].tmp, null);
+    assert.equal(state.rows[0].agama, null);
+    assert.equal(state.rows[0].kewarganegaraan, null);
+});
+
+test('normalizes supported dates and warns for future or implausibly old dates', async () => {
+    const excelDate = (Date.UTC(2008, 4, 12) - Date.UTC(1899, 11, 30)) / 864e5;
+    const workbook = {
+        SheetNames: ['Data Siswa'],
+        Sheets: {
+            'Data Siswa': [
+                ['NISN', 'Nama Lengkap', 'Tanggal Lahir', 'Tanggal Diterima'],
+                ['0000000001', 'Tanggal Teks', '12/05/2008', '12 Mei 2008'],
+                ['0000000002', 'Tanggal Serial', excelDate, excelDate],
+                ['0000000003', 'Tanggal Masa Depan', '01/01/2999', '01-01-2024'],
+                ['0000000004', 'Tanggal Usia Tidak Wajar', '01/01/1800', '01-01-2024']
+            ]
+        }
+    };
+    const {state} = await importWorkbook(workbook);
+
+    assert.equal(state.rows[0].tgl, '2008-05-12');
+    assert.equal(state.rows[0].tgl_masuk, '2008-05-12');
+    assert.equal(state.rows[1].tgl, '2008-05-12');
+    assert.equal(state.rows[1].tgl_masuk, '2008-05-12');
+    assert.equal(state.rows[2].tgl_masuk, '2024-01-01');
+    assert.equal(state.rows[3].tgl_masuk, '2024-01-01');
+    assert.equal(state.statuses[2].status, 'warning');
+    assert.equal(state.statuses[3].status, 'warning');
+});
+
+test('normalizes comma decimals and rejects scores outside the allowed range', async () => {
+    const workbook = {
+        SheetNames: ['Nilai Uji'],
+        Sheets: {
+            'Nilai Uji': [
+                ['NISN', 'Nama Lengkap', 'Kelas', 'Matematika'],
+                ['0000000001', 'Desimal', 'X-1', '85,5'],
+                ['0000000002', 'Di Atas', 'X-1', '100,1'],
+                ['0000000003', 'Di Bawah', 'X-1', '-0,1']
+            ]
+        }
+    };
+    const {state} = await importWorkbook(workbook, 'nilai');
+
+    assert.equal(state.rows[0].mtk, '85.5');
+    assert.equal(state.statuses[0].status, 'ready');
+    assert.equal(state.statuses[1].status, 'error');
+    assert.equal(state.statuses[2].status, 'error');
+});
+
+test('combines merged two-row headings and uses cached formula results', async () => {
+    const workbook = {
+        SheetNames: ['Nilai Uji'],
+        Sheets: {
+            'Nilai Uji': {
+                data: [
+                    ['Nilai', '', '', ''],
+                    ['NISN', 'Nama Lengkap', 'Kelas', 'Matematika'],
+                    ['123456789', 'Siswa Uji', 'X-1', {f: '40+45.5', v: 85.5}]
+                ],
+                '!merges': [{s: {r: 0, c: 0}, e: {r: 0, c: 3}}]
+            }
+        }
+    };
+    const {state} = await importWorkbook(workbook, 'nilai');
+
+    assert.equal(state.detection.sheets[0].headerRow, 2);
+    assert.equal(state.raws[0].heads[3], 'Nilai | Matematika');
+    assert.equal(state.rows[0].nisn, '0123456789');
+    assert.equal(state.rows[0].mtk, 85.5);
+    assert.equal(state.statuses[0].status, 'ready');
+});
+
+test('parses long-format subject and score columns with comma decimals', async () => {
+    const workbook = {
+        SheetNames: ['Nilai Uji'],
+        Sheets: {
+            'Nilai Uji': [
+                ['NISN', 'Nama Lengkap', 'Kelas', 'Mata Pelajaran', 'Nilai'],
+                ['0000000001', 'Siswa Uji', 'X-1', 'Matematika', '85,5']
+            ]
+        }
+    };
+    const {state} = await importWorkbook(workbook, 'nilai');
+
+    assert.equal(state.rows.length, 1);
+    assert.equal(state.rows[0].mapelcol, 'Matematika');
+    assert.equal(state.rows[0].nilaicol, '85.5');
+    assert.equal(state.statuses[0].status, 'ready');
 });
