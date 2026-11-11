@@ -6,10 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\SekolahKelas;
 use App\Models\SekolahTahunAjaran;
 use App\Models\SiswaBiodata;
-<<<<<<< HEAD
 use App\Services\AcademicRecordAccess;
-=======
->>>>>>> 497b07e27e50c1c03a318e4e1e5f3c83921f699c
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -99,7 +96,6 @@ class DataSiswaGuruController extends Controller
         return $this->renderListPdf($siswaList, $filters);
     }
 
-<<<<<<< HEAD
     public function show(int $id, Request $request, AcademicRecordAccess $access): View
     {
         $siswa = SiswaBiodata::with(['riwayatKelas' => function ($query): void {
@@ -111,15 +107,6 @@ class DataSiswaGuruController extends Controller
         }
 
         return view('guru.data-siswa-detail', compact('siswa', 'academicManagePermissions'));
-=======
-    public function show(int $id): View
-    {
-        $siswa = SiswaBiodata::with(['riwayatKelas' => function ($query): void {
-            $query->with(['kelas', 'tahunAjaran'])->orderByDesc('tahun_ajaran_id');
-        }])->findOrFail($id);
-
-        return view('guru.data-siswa-detail', compact('siswa'));
->>>>>>> 497b07e27e50c1c03a318e4e1e5f3c83921f699c
     }
 
     /** @param array{tahun_ajaran?: int|null, kelas?: string, q?: string, st?: string} $filters */

@@ -18,6 +18,8 @@ class TeacherClassPromotionTest extends TestCase
         'siswa_riwayat_kelas',
         'siswa_biodata',
         'guru_wali_kelas',
+        'guru_mengajar',
+        'sekolah_mapel',
         'guru_biodata',
         'sekolah_kelas',
         'sekolah_tahun_ajaran',
@@ -61,6 +63,13 @@ class TeacherClassPromotionTest extends TestCase
             $table->timestamps();
         });
 
+        Schema::create('sekolah_mapel', function (Blueprint $table): void {
+            $table->id();
+            $table->string('kode')->unique();
+            $table->string('nama');
+            $table->timestamps();
+        });
+
         Schema::create('guru_biodata', function (Blueprint $table): void {
             $table->id();
             $table->string('nama');
@@ -86,6 +95,18 @@ class TeacherClassPromotionTest extends TestCase
             $table->unsignedBigInteger('kelas_id');
             $table->unsignedBigInteger('guru_id');
             $table->timestamps();
+            $table->unique(['tahun_ajaran_id', 'kelas_id']);
+            $table->unique(['tahun_ajaran_id', 'guru_id']);
+        });
+
+        Schema::create('guru_mengajar', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('tahun_ajaran_id');
+            $table->unsignedBigInteger('guru_id');
+            $table->unsignedBigInteger('kelas_id');
+            $table->unsignedBigInteger('mapel_id');
+            $table->timestamp('created_at')->nullable();
+            $table->unique(['tahun_ajaran_id', 'kelas_id', 'mapel_id']);
         });
 
         Schema::create('siswa_biodata', function (Blueprint $table): void {
@@ -285,6 +306,134 @@ class TeacherClassPromotionTest extends TestCase
             'nama_wali_kelas' => 'Guru Lama',
             'nip_wali_kelas' => '1234567890',
         ]);
+    }
+
+    public function test_updating_teacher_replaces_current_year_assignments_and_keeps_old_year_snapshots(): void
+    {
+        [$year, $nextYear, $sourceClass, $destinationClass, $teacher, $student] = $this->seedPromotionData();
+        DB::table('sekolah_mapel')->insert([
+            ['id' => 1, 'kode' => 'mtk', 'nama' => 'Matematika'],
+            ['id' => 2, 'kode' => 'ind', 'nama' => 'Bahasa Indonesia'],
+        ]);
+        DB::table('guru_mengajar')->insert([
+            [
+                'tahun_ajaran_id' => $year,
+                'guru_id' => $teacher,
+                'kelas_id' => $sourceClass,
+                'mapel_id' => 1,
+            ],
+            [
+                'tahun_ajaran_id' => $nextYear,
+                'guru_id' => $teacher,
+                'kelas_id' => $sourceClass,
+                'mapel_id' => 1,
+            ],
+        ]);
+        DB::table('siswa_riwayat_kelas')->where('id', function ($query) use ($student, $year): void {
+            $query->select('id')
+                ->from('siswa_riwayat_kelas')
+                ->where('siswa_id', $student)
+                ->where('tahun_ajaran_id', $year);
+        })->update([
+            'wali_guru_id' => $teacher,
+            'nama_wali_kelas' => 'Guru X1',
+            'nip_wali_kelas' => '1234567890',
+        ]);
+
+        $previousYear = DB::table('sekolah_tahun_ajaran')->insertGetId([
+            'nama' => '2024/2025',
+            'sedang_berjalan' => false,
+        ]);
+        DB::table('siswa_riwayat_kelas')->insert([
+            'siswa_id' => $student,
+            'tahun_ajaran_id' => $previousYear,
+            'kelas_id' => $sourceClass,
+            'status' => 'Aktif',
+            'wali_guru_id' => $teacher,
+            'nama_wali_kelas' => 'Guru X1',
+            'nip_wali_kelas' => '1234567890',
+        ]);
+        $targetStudent = DB::table('siswa_biodata')->insertGetId([
+            'nama_lengkap' => 'Siswa Kelas Tujuan',
+            'nisn' => '0000000002',
+        ]);
+        DB::table('siswa_riwayat_kelas')->insert([
+            'siswa_id' => $targetStudent,
+            'tahun_ajaran_id' => $year,
+            'kelas_id' => $destinationClass,
+            'status' => 'Aktif',
+        ]);
+        $admin = $this->createUser('admin', 'admin', null);
+
+        $this->actingAs($admin)->put(route('admin.data-guru.update', $teacher), [
+            'nama' => 'Guru X1 Diperbarui',
+            'nip' => '1234567890',
+            'is_wali' => '1',
+            'wali_kelas' => 'XI-1',
+            'is_mapel' => '1',
+            'penugasan_mengajar' => [
+                ['kelas' => 'XI-1', 'mapel' => 'ind'],
+            ],
+        ])->assertRedirect(route('admin.data-guru'));
+
+        $this->assertDatabaseHas('guru_wali_kelas', [
+            'tahun_ajaran_id' => $year,
+            'kelas_id' => $destinationClass,
+            'guru_id' => $teacher,
+        ]);
+        $this->assertDatabaseMissing('guru_wali_kelas', [
+            'tahun_ajaran_id' => $year,
+            'kelas_id' => $sourceClass,
+            'guru_id' => $teacher,
+        ]);
+        $this->assertDatabaseHas('guru_mengajar', [
+            'tahun_ajaran_id' => $year,
+            'guru_id' => $teacher,
+            'kelas_id' => $destinationClass,
+            'mapel_id' => 2,
+        ]);
+        $this->assertDatabaseMissing('guru_mengajar', [
+            'tahun_ajaran_id' => $year,
+            'guru_id' => $teacher,
+            'kelas_id' => $sourceClass,
+            'mapel_id' => 1,
+        ]);
+        $this->assertDatabaseHas('guru_mengajar', [
+            'tahun_ajaran_id' => $nextYear,
+            'guru_id' => $teacher,
+            'kelas_id' => $sourceClass,
+            'mapel_id' => 1,
+        ]);
+        $this->assertDatabaseHas('siswa_riwayat_kelas', [
+            'siswa_id' => $targetStudent,
+            'tahun_ajaran_id' => $year,
+            'wali_guru_id' => $teacher,
+            'nama_wali_kelas' => 'Guru X1 Diperbarui',
+            'nip_wali_kelas' => '1234567890',
+        ]);
+        $this->assertDatabaseHas('siswa_riwayat_kelas', [
+            'siswa_id' => $student,
+            'tahun_ajaran_id' => $previousYear,
+            'nama_wali_kelas' => 'Guru X1',
+            'nip_wali_kelas' => '1234567890',
+        ]);
+        $this->assertDatabaseHas('catatan_aktivitas', [
+            'pengguna_id' => $admin->id,
+            'aksi' => 'edit_guru',
+            'objek_id' => $teacher,
+        ]);
+    }
+
+    public function test_teacher_form_provides_homeroom_and_paired_teaching_assignment_choices(): void
+    {
+        $this->seedPromotionData();
+        $admin = $this->createUser('admin', 'admin', null);
+
+        $this->actingAs($admin)->get(route('admin.data-guru'))
+            ->assertOk()
+            ->assertSee('Pilih kelas wali')
+            ->assertSee('Tambah penugasan kelas dan mapel')
+            ->assertSee('penugasan_mengajar[');
     }
 
     private function seedPromotionData(): array

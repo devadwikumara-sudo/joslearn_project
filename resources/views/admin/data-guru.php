@@ -87,7 +87,7 @@
                                 <button type="submit" class="btn a" style="padding:3px 8px;font-size:12px">Buat akun</button>
                             </form>
                         @endif
-                        <button type="button" class="btn o" style="padding:3px 8px;font-size:12px" onclick="editGuruData({{ json_encode($g) }})">Edit</button>
+                        <button type="button" class="btn o" style="padding:3px 8px;font-size:12px" onclick="editGuruData({{ \Illuminate\Support\Js::from($g) }})">Edit</button>
                         <form action="{{ route('admin.data-guru.destroy', $g->id) }}" method="POST" style="display:inline" onsubmit="return confirm('Hapus guru {{ $g->nama }}?')">
                             @csrf
                             @method('DELETE')
@@ -186,43 +186,49 @@
 
             <div class="card" style="margin:0 0 10px;background:#f8fafc">
                 <label style="display:flex;gap:6px;font-size:13px;font-weight:600;align-items:center;cursor:pointer">
-                    <input type="checkbox" name="is_mapel" id="g-ismp" value="1"> Guru mapel — bisa mengedit nilai mapelnya
+                    <input type="checkbox" name="is_mapel" id="g-ismp" value="1" onchange="syncGuruRoleFields()"> Guru mapel — bisa mengedit nilai mapelnya
                 </label>
-                <div style="margin-top:8px">
-                    <label style="font-size:12px">Mata pelajaran diampu:</label>
-                    <div class="bar" style="flex-wrap:wrap;gap:8px">
-                        @foreach($mapelList as $k => $mNama)
-                            <label style="display:flex;gap:4px;font-size:12px;margin:0;cursor:pointer">
-                                <input type="checkbox" name="mapel_ampu[]" value="{{ $k }}"> {{ $mNama }}
-                            </label>
-                        @endforeach
-                    </div>
-                </div>
-                <div style="margin-top:8px">
-                    <label style="font-size:12px">Mengajar di kelas:</label>
-                    <div class="bar" style="flex-wrap:wrap;gap:8px">
-                        @foreach($kelasList as $k)
-                            <label style="display:flex;gap:4px;font-size:12px;margin:0;cursor:pointer">
-                                <input type="checkbox" name="kelas_ajar[]" value="{{ $k }}"> {{ $k }}
-                            </label>
-                        @endforeach
-                    </div>
-                </div>
+                <fieldset id="g-mapel-fields" style="border:0;padding:0;margin:8px 0 0;min-width:0">
+                    <div id="g-teaching-assignments" style="display:grid;gap:8px"></div>
+                    <button type="button" class="btn o" style="margin-top:8px" onclick="addTeacherAssignmentRow()">+ Tambah penugasan kelas dan mapel</button>
+                </fieldset>
             </div>
 
             <div class="card" style="margin:0;background:#f8fafc">
                 <label style="display:flex;gap:6px;font-size:13px;font-weight:600;align-items:center;cursor:pointer">
-                    <input type="checkbox" name="is_wali" id="g-iswali" value="1"> Wali kelas — bisa menaikkan kelas siswa di kelasnya
+                    <input type="checkbox" name="is_wali" id="g-iswali" value="1" onchange="syncGuruRoleFields()"> Wali kelas — bisa menaikkan kelas siswa di kelasnya
                 </label>
-                <div style="margin-top:8px">
-                    <select name="wali_kelas" id="g-wali">
+                <fieldset id="g-wali-fields" style="border:0;padding:0;margin:8px 0 0;min-width:0">
+                    <select name="wali_kelas" id="g-wali" required>
                         <option value="">— Pilih kelas wali —</option>
                         @foreach($kelasList as $k)
                             <option value="{{ $k }}">{{ $k }}</option>
                         @endforeach
                     </select>
-                </div>
+                </fieldset>
             </div>
+
+            <template id="g-teaching-assignment-template">
+                <div data-assignment-row class="bar" style="flex-wrap:wrap;gap:8px">
+                    <label style="flex:1;min-width:160px">Kelas
+                        <select data-field="kelas" required>
+                            <option value="">Pilih kelas</option>
+                            @foreach($kelasList as $k)
+                                <option value="{{ $k }}">{{ $k }}</option>
+                            @endforeach
+                        </select>
+                    </label>
+                    <label style="flex:1;min-width:160px">Mata pelajaran
+                        <select data-field="mapel" required>
+                            <option value="">Pilih mata pelajaran</option>
+                            @foreach($mapelList as $kode => $nama)
+                                <option value="{{ $kode }}">{{ $nama }}</option>
+                            @endforeach
+                        </select>
+                    </label>
+                    <button type="button" class="btn x" data-remove-assignment aria-label="Hapus penugasan">Hapus</button>
+                </div>
+            </template>
 
             <div class="bar" style="margin-top:16px;border-top:1px solid #e2e8f0;padding-top:12px">
                 <span class="sp"></span>
@@ -235,16 +241,45 @@
 
 @push('scripts')
 <script>
+var nextTeachingAssignmentIndex = 0;
+
 function toggleModalGuru(show) {
     var modal = document.getElementById('modal-guru');
     if (!modal) return;
     modal.style.display = show ? 'flex' : 'none';
     if (show) {
         document.getElementById('form-guru').reset();
+        document.getElementById('g-teaching-assignments').replaceChildren();
+        nextTeachingAssignmentIndex = 0;
+        addTeacherAssignmentRow();
+        syncGuruRoleFields();
         document.getElementById('modal-title').textContent = 'Tambah Guru';
         document.getElementById('form-guru').action = "{{ route('admin.data-guru.store') }}";
         document.getElementById('guru-method').value = 'POST';
     }
+}
+
+function addTeacherAssignmentRow(kelas, mapel) {
+    var template = document.getElementById('g-teaching-assignment-template');
+    var container = document.getElementById('g-teaching-assignments');
+    var row = template.content.firstElementChild.cloneNode(true);
+    var index = nextTeachingAssignmentIndex++;
+    var classSelect = row.querySelector('[data-field="kelas"]');
+    var subjectSelect = row.querySelector('[data-field="mapel"]');
+
+    classSelect.name = 'penugasan_mengajar[' + index + '][kelas]';
+    subjectSelect.name = 'penugasan_mengajar[' + index + '][mapel]';
+    classSelect.value = kelas || '';
+    subjectSelect.value = mapel || '';
+    row.querySelector('[data-remove-assignment]').addEventListener('click', function() {
+        row.remove();
+    });
+    container.appendChild(row);
+}
+
+function syncGuruRoleFields() {
+    document.getElementById('g-mapel-fields').disabled = !document.getElementById('g-ismp').checked;
+    document.getElementById('g-wali-fields').disabled = !document.getElementById('g-iswali').checked;
 }
 
 function editGuruData(g) {
@@ -265,7 +300,28 @@ function editGuruData(g) {
     document.getElementById('g-hp').value = g.nomor_hp || '';
     document.getElementById('g-email').value = g.email || '';
     document.getElementById('g-alamat').value = g.alamat || '';
+
+    var waliKelas = (g.wali_kelas || [])[0] || null;
+    document.getElementById('g-iswali').checked = Boolean(waliKelas);
+    document.getElementById('g-wali').value = waliKelas && waliKelas.kelas ? waliKelas.kelas.nama : '';
+
+    var assignments = g.mengajar || [];
+    var assignmentsContainer = document.getElementById('g-teaching-assignments');
+    assignmentsContainer.replaceChildren();
+    nextTeachingAssignmentIndex = 0;
+    document.getElementById('g-ismp').checked = assignments.length > 0;
+    assignments.forEach(function(assignment) {
+        var kelas = assignment.kelas ? assignment.kelas.nama : '';
+        var mapel = assignment.mapel ? assignment.mapel.kode : '';
+        addTeacherAssignmentRow(kelas, mapel);
+    });
+    if (!assignments.length) {
+        addTeacherAssignmentRow();
+    }
+    syncGuruRoleFields();
 }
+
+syncGuruRoleFields();
 </script>
 @endpush
 @endsection

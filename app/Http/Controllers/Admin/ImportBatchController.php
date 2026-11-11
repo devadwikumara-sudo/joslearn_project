@@ -21,11 +21,14 @@ use App\Services\ImportDictionaryService;
 use App\Support\Semester;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
+use Illuminate\View\View;
 
 class ImportBatchController extends Controller
 {
@@ -169,6 +172,168 @@ class ImportBatchController extends Controller
         ])->save();
 
         return response()->json(['success' => true]);
+    }
+
+    public function showManagedBatch(ImportUnggahan $batch): View
+    {
+        $this->academicTableForType($batch->jenis);
+
+        $rows = ImportBaris::query()
+            ->where('unggahan_id', $batch->id)
+            ->orderBy('nomor_baris_excel')
+            ->get();
+        $records = $this->recordsForBatch($batch);
+        $tahunAjaran = $batch->tahun_ajaran_id === null
+            ? null
+            : SekolahTahunAjaran::query()->find($batch->tahun_ajaran_id);
+        $kelas = $batch->kelas_id === null
+            ? null
+            : SekolahKelas::query()->find($batch->kelas_id);
+
+        return view('admin.import.batch-detail', [
+            'batch' => $batch,
+            'rows' => $rows,
+            'records' => $records,
+            'tahunAjaran' => $tahunAjaran,
+            'kelas' => $kelas,
+            'editing' => request()->boolean('edit') && $batch->status === 'selesai',
+        ]);
+    }
+
+    public function updateManagedRecord(Request $request, ImportUnggahan $batch, int $record): RedirectResponse
+    {
+        $this->academicTableForType($batch->jenis);
+        abort_unless($batch->status === 'selesai', 404);
+
+        $target = match ($batch->jenis) {
+            'nilai' => SiswaNilai::query()->where('import_terakhir_unggahan_id', $batch->id)->findOrFail($record),
+            'kehadiran' => SiswaKehadiran::query()->where('import_terakhir_unggahan_id', $batch->id)->findOrFail($record),
+            'ekskul' => SiswaEkskul::query()->where('import_terakhir_unggahan_id', $batch->id)->findOrFail($record),
+        };
+
+        $validated = match ($batch->jenis) {
+            'nilai' => $request->validate([
+                'nilai_angka' => ['required', 'numeric', 'between:0,100'],
+            ]),
+            'kehadiran' => $request->validate([
+                'sakit' => ['required', 'integer', 'between:0,65535'],
+                'izin' => ['required', 'integer', 'between:0,65535'],
+                'alpa' => ['required', 'integer', 'between:0,65535'],
+                'kokurikuler' => ['nullable', 'string', 'max:4000'],
+            ]),
+            'ekskul' => $request->validate([
+                'nama_kegiatan' => [
+                    'required',
+                    'string',
+                    'max:100',
+                    Rule::unique('siswa_ekskul', 'nama_kegiatan')
+                        ->where('riwayat_kelas_id', $target->riwayat_kelas_id)
+                        ->where('semester', $target->semester)
+                        ->ignore($target->id),
+                ],
+                'predikat' => ['nullable', 'string', 'max:30'],
+            ]),
+        };
+
+        $target->fill($validated)->save();
+
+        CatatanAktivitas::create([
+            'pengguna_id' => $request->user()->id,
+            'peran' => $request->user()->peran,
+            'aksi' => 'edit_batch_import_'.$batch->jenis,
+            'keterangan' => "Koreksi data #{$target->id} pada batch import #{$batch->id}.",
+            'objek_tipe' => $target->getTable(),
+            'objek_id' => $target->id,
+            'alamat_ip' => $request->ip(),
+            'created_at' => now(),
+        ]);
+
+        return redirect()
+            ->route('admin.import.batch.show', ['batch' => $batch->id, 'edit' => 1])
+            ->with('success', 'Baris hasil impor berhasil diperbarui.');
+    }
+
+    public function destroyManagedBatch(Request $request, ImportUnggahan $batch): RedirectResponse
+    {
+        $table = $this->academicTableForType($batch->jenis);
+        $validated = $request->validate([
+            'tahun_ajaran_id' => ['required', 'integer', 'exists:sekolah_tahun_ajaran,id'],
+            'konfirmasi' => ['required', 'string', Rule::in(['HAPUS BATCH '.$batch->id])],
+        ]);
+        abort_unless((int) $validated['tahun_ajaran_id'] === (int) $batch->tahun_ajaran_id, 404);
+
+        if ($batch->status !== 'selesai') {
+            return back()->with('error', 'Hanya batch yang selesai yang dapat dihapus.');
+        }
+
+        $deletedCount = DB::transaction(function () use ($request, $batch, $table): int {
+            $deleted = DB::table($table)->where('import_unggahan_id', $batch->id)->delete();
+            if ($deleted === 0) {
+                return 0;
+            }
+
+            $batch->forceFill(['status' => 'dibatalkan'])->save();
+            CatatanAktivitas::create([
+                'pengguna_id' => $request->user()->id,
+                'peran' => $request->user()->peran,
+                'aksi' => 'hapus_batch_import_'.$batch->jenis,
+                'keterangan' => "Batch import #{$batch->id} dihapus; {$deleted} data {$batch->jenis} dihapus.",
+                'objek_tipe' => 'import_unggahan',
+                'objek_id' => $batch->id,
+                'alamat_ip' => $request->ip(),
+                'created_at' => now(),
+            ]);
+
+            return $deleted;
+        });
+
+        if ($deletedCount === 0) {
+            return back()->with('error', 'Batch ini tidak memiliki data hasil yang tercatat untuk dihapus.');
+        }
+
+        return back()->with('success', "{$deletedCount} data milik batch #{$batch->id} berhasil dihapus.");
+    }
+
+    public function destroyAllForYear(Request $request, string $jenis): RedirectResponse
+    {
+        $table = $this->academicTableForType($jenis);
+        $tahunAjaran = $request->validate([
+            'tahun_ajaran_id' => ['required', 'integer', 'exists:sekolah_tahun_ajaran,id'],
+            'konfirmasi' => [
+                'required',
+                'string',
+                Rule::in(['HAPUS SEMUA '.mb_strtoupper($jenis).' '.(string) SekolahTahunAjaran::query()->whereKey($request->input('tahun_ajaran_id'))->value('nama')]),
+            ],
+        ]);
+        $year = SekolahTahunAjaran::query()->findOrFail($tahunAjaran['tahun_ajaran_id']);
+
+        $deletedCount = DB::transaction(function () use ($request, $jenis, $table, $year): int {
+            $historyIds = DB::table('siswa_riwayat_kelas')
+                ->where('tahun_ajaran_id', $year->id)
+                ->select('id');
+            $deleted = DB::table($table)->whereIn('riwayat_kelas_id', $historyIds)->delete();
+
+            CatatanAktivitas::create([
+                'pengguna_id' => $request->user()->id,
+                'peran' => $request->user()->peran,
+                'aksi' => 'hapus_semua_import_'.$jenis,
+                'keterangan' => "Hapus semua data {$jenis} tahun ajaran {$year->nama}; {$deleted} baris dihapus.",
+                'objek_tipe' => $table,
+                'objek_id' => null,
+                'alamat_ip' => $request->ip(),
+                'created_at' => now(),
+            ]);
+
+            return $deleted;
+        });
+
+        $label = match ($jenis) {
+            'nilai' => 'nilai',
+            'kehadiran' => 'kehadiran',
+            'ekskul' => 'ekstrakurikuler',
+        };
+
+        return back()->with('success', "{$deletedCount} data {$label} tahun ajaran {$year->nama} berhasil dihapus.");
     }
 
     public function saveBatch(Request $request): JsonResponse
@@ -315,11 +480,11 @@ class ImportBatchController extends Controller
                 if ($type === 'siswa') {
                     [$savedCount, $skippedCount, $rowErrors, $unlinkedCount] = $this->saveSiswa($rows, $ta, $mode, $kelasInput);
                 } elseif ($type === 'nilai') {
-                    [$savedCount, $skippedCount, $rowErrors] = $this->saveNilai($rows, $ta, $semester, $mode, $kelasInput, $user, $requestedTaName !== '', $createdYearIds, $createdHistoryIds);
+                    [$savedCount, $skippedCount, $rowErrors] = $this->saveNilai($rows, $ta, $semester, $mode, $kelasInput, $user, $requestedTaName !== '', (int) $activeUpload->id, $createdYearIds, $createdHistoryIds);
                 } elseif ($type === 'kehadiran') {
-                    [$savedCount, $skippedCount, $rowErrors] = $this->saveKehadiran($rows, $ta, $semester, $mode, $kelasInput, $user, $requestedTaName !== '', $createdYearIds, $createdHistoryIds);
+                    [$savedCount, $skippedCount, $rowErrors] = $this->saveKehadiran($rows, $ta, $semester, $mode, $kelasInput, $user, $requestedTaName !== '', (int) $activeUpload->id, $createdYearIds, $createdHistoryIds);
                 } elseif ($type === 'ekskul') {
-                    [$savedCount, $skippedCount, $rowErrors] = $this->saveEkskul($rows, $ta, $semester, $mode, $kelasInput, $user, $requestedTaName !== '', $createdYearIds, $createdHistoryIds);
+                    [$savedCount, $skippedCount, $rowErrors] = $this->saveEkskul($rows, $ta, $semester, $mode, $kelasInput, $user, $requestedTaName !== '', (int) $activeUpload->id, $createdYearIds, $createdHistoryIds);
                 } elseif ($type === 'guru') {
                     [$savedCount, $skippedCount, $rowErrors] = $this->saveGuru($rows);
                 }
@@ -1529,7 +1694,41 @@ class ImportBatchController extends Controller
         return ['year' => $year, 'explicit' => true, 'error' => null];
     }
 
-    private function saveNilai($rows, $ta, $semester, $mode, $kelasInput, Pengguna $user, bool $defaultYearIsExplicit, array &$createdYearIds, array &$createdHistoryIds)
+    private function academicTableForType(string $type): string
+    {
+        return match ($type) {
+            'nilai' => 'siswa_nilai',
+            'kehadiran' => 'siswa_kehadiran',
+            'ekskul' => 'siswa_ekskul',
+            default => abort(404),
+        };
+    }
+
+    private function recordsForBatch(ImportUnggahan $batch): Collection
+    {
+        $relations = ['riwayatKelas.siswa', 'riwayatKelas.kelas'];
+
+        return match ($batch->jenis) {
+            'nilai' => SiswaNilai::query()
+                ->where('import_terakhir_unggahan_id', $batch->id)
+                ->with([...$relations, 'mapel'])
+                ->orderBy('id')
+                ->get(),
+            'kehadiran' => SiswaKehadiran::query()
+                ->where('import_terakhir_unggahan_id', $batch->id)
+                ->with($relations)
+                ->orderBy('id')
+                ->get(),
+            'ekskul' => SiswaEkskul::query()
+                ->where('import_terakhir_unggahan_id', $batch->id)
+                ->with($relations)
+                ->orderBy('id')
+                ->get(),
+            default => abort(404),
+        };
+    }
+
+    private function saveNilai($rows, $ta, $semester, $mode, $kelasInput, Pengguna $user, bool $defaultYearIsExplicit, int $uploadId, array &$createdYearIds, array &$createdHistoryIds)
     {
         $saved = 0;
         $skipped = 0;
@@ -1641,7 +1840,7 @@ class ImportBatchController extends Controller
             }
 
             foreach ($scores as [$mapel, $numVal]) {
-                SiswaNilai::updateOrCreate(
+                $nilai = SiswaNilai::updateOrCreate(
                     [
                         'riwayat_kelas_id' => $riwayat->id,
                         'semester' => $sem,
@@ -1651,6 +1850,11 @@ class ImportBatchController extends Controller
                         'nilai_angka' => $numVal,
                     ]
                 );
+                $tracking = ['import_terakhir_unggahan_id' => $uploadId];
+                if ($nilai->wasRecentlyCreated) {
+                    $tracking['import_unggahan_id'] = $uploadId;
+                }
+                $nilai->forceFill($tracking)->save();
             }
             $saved++;
         }
@@ -1658,7 +1862,7 @@ class ImportBatchController extends Controller
         return [$saved, $skipped, $errors];
     }
 
-    private function saveKehadiran($rows, $ta, $semester, $mode, $kelasInput, Pengguna $user, bool $defaultYearIsExplicit, array &$createdYearIds, array &$createdHistoryIds)
+    private function saveKehadiran($rows, $ta, $semester, $mode, $kelasInput, Pengguna $user, bool $defaultYearIsExplicit, int $uploadId, array &$createdYearIds, array &$createdHistoryIds)
     {
         $saved = 0;
         $skipped = 0;
@@ -1700,7 +1904,7 @@ class ImportBatchController extends Controller
 
             $sem = $target['semester'];
 
-            SiswaKehadiran::updateOrCreate(
+            $kehadiran = SiswaKehadiran::updateOrCreate(
                 [
                     'riwayat_kelas_id' => $riwayat->id,
                     'semester' => $sem,
@@ -1712,6 +1916,11 @@ class ImportBatchController extends Controller
                     'kokurikuler' => $this->cleanVal($r['kokur'] ?? $r['kokurikuler'] ?? null),
                 ]
             );
+            $tracking = ['import_terakhir_unggahan_id' => $uploadId];
+            if ($kehadiran->wasRecentlyCreated) {
+                $tracking['import_unggahan_id'] = $uploadId;
+            }
+            $kehadiran->forceFill($tracking)->save();
 
             $saved++;
         }
@@ -1719,7 +1928,7 @@ class ImportBatchController extends Controller
         return [$saved, $skipped, $errors];
     }
 
-    private function saveEkskul($rows, $ta, $semester, $mode, $kelasInput, Pengguna $user, bool $defaultYearIsExplicit, array &$createdYearIds, array &$createdHistoryIds)
+    private function saveEkskul($rows, $ta, $semester, $mode, $kelasInput, Pengguna $user, bool $defaultYearIsExplicit, int $uploadId, array &$createdYearIds, array &$createdHistoryIds)
     {
         $saved = 0;
         $skipped = 0;
@@ -1764,7 +1973,7 @@ class ImportBatchController extends Controller
             $predikat = $this->cleanVal($r['predikat'] ?? 'A');
 
             if ($namaKeg) {
-                SiswaEkskul::updateOrCreate(
+                $ekskul = SiswaEkskul::updateOrCreate(
                     [
                         'riwayat_kelas_id' => $riwayat->id,
                         'semester' => $sem,
@@ -1774,6 +1983,11 @@ class ImportBatchController extends Controller
                         'predikat' => $predikat,
                     ]
                 );
+                $tracking = ['import_terakhir_unggahan_id' => $uploadId];
+                if ($ekskul->wasRecentlyCreated) {
+                    $tracking['import_unggahan_id'] = $uploadId;
+                }
+                $ekskul->forceFill($tracking)->save();
                 $saved++;
             } else {
                 $skipped++;

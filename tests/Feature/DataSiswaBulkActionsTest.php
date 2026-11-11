@@ -70,6 +70,7 @@ class DataSiswaBulkActionsTest extends TestCase
             $table->id();
             $table->unsignedBigInteger('riwayat_kelas_id');
             $table->unsignedBigInteger('mapel_id');
+            $table->string('semester');
         });
         Schema::create('siswa_kehadiran', function (Blueprint $table): void {
             $table->id();
@@ -98,6 +99,7 @@ class DataSiswaBulkActionsTest extends TestCase
         DB::table('sekolah_kelas')->insert([
             ['id' => 1, 'nama' => 'X-1', 'tingkat' => 'X'],
             ['id' => 2, 'nama' => 'X-2', 'tingkat' => 'X'],
+            ['id' => 3, 'nama' => 'XI-1', 'tingkat' => 'XI'],
         ]);
     }
 
@@ -149,32 +151,93 @@ class DataSiswaBulkActionsTest extends TestCase
     public function test_selected_class_move_only_updates_selected_students_and_logs_the_action(): void
     {
         $admin = $this->createAccount('admin');
-        $selectedStudentId = $this->createStudent('Dipilih pindah', 1, 1);
-        $unselectedStudentId = $this->createStudent('Tetap di kelas', 1, 1);
+        $selectedStudentId = $this->createStudent('Dipilih pindah satu', 2, 1);
+        $secondSelectedStudentId = $this->createStudent('Dipilih pindah dua', 2, 1);
+        $unselectedStudentId = $this->createStudent('Tetap di kelas', 2, 1);
 
         $response = $this->actingAs($admin)->from(route('admin.data-siswa'))
             ->post(route('admin.data-siswa.bulk-update'), [
-                'tahun_ajaran' => 1,
+                'tahun_ajaran' => 2,
                 'kelas' => 'X-1',
-                'target_tahun_ajaran' => 1,
                 'target_kelas' => 'X-2',
-                'siswa_ids' => [$selectedStudentId],
+                'siswa_ids' => [$selectedStudentId, $secondSelectedStudentId],
             ]);
 
         $response->assertRedirect(route('admin.data-siswa'));
         $this->assertDatabaseHas('siswa_riwayat_kelas', [
             'siswa_id' => $selectedStudentId,
-            'tahun_ajaran_id' => 1,
+            'tahun_ajaran_id' => 2,
+            'kelas_id' => 2,
+        ]);
+        $this->assertDatabaseHas('siswa_riwayat_kelas', [
+            'siswa_id' => $secondSelectedStudentId,
+            'tahun_ajaran_id' => 2,
             'kelas_id' => 2,
         ]);
         $this->assertDatabaseHas('siswa_riwayat_kelas', [
             'siswa_id' => $unselectedStudentId,
-            'tahun_ajaran_id' => 1,
+            'tahun_ajaran_id' => 2,
             'kelas_id' => 1,
         ]);
+        $this->assertDatabaseCount('siswa_riwayat_kelas', 3);
         $this->assertDatabaseHas('catatan_aktivitas', [
             'pengguna_id' => $admin->id,
             'aksi' => 'pindah_kelas_massal',
+        ]);
+        $this->assertDatabaseCount('catatan_aktivitas', 2);
+        $response->assertSessionHas('bulk_move_results.0.berhasil', true);
+        $response->assertSessionHas('bulk_move_results.1.berhasil', true);
+    }
+
+    public function test_bulk_move_rejects_a_class_at_a_different_level_from_existing_grade_semesters(): void
+    {
+        $admin = $this->createAccount('admin');
+        $studentId = $this->createStudent('Nilai kelas X', 1, 1);
+        $historyId = DB::table('siswa_riwayat_kelas')
+            ->where('siswa_id', $studentId)
+            ->where('tahun_ajaran_id', 1)
+            ->value('id');
+        DB::table('siswa_nilai')->insert([
+            'riwayat_kelas_id' => $historyId,
+            'mapel_id' => 1,
+            'semester' => 'Ganjil',
+        ]);
+
+        $response = $this->actingAs($admin)->from(route('admin.data-siswa'))
+            ->post(route('admin.data-siswa.bulk-update'), [
+                'tahun_ajaran' => 1,
+                'kelas' => 'X-1',
+                'target_kelas' => 'XI-1',
+                'siswa_ids' => [$studentId],
+            ]);
+
+        $response->assertRedirect(route('admin.data-siswa'));
+        $response->assertSessionHas('bulk_move_results.0.berhasil', false);
+        $this->assertDatabaseHas('siswa_riwayat_kelas', [
+            'siswa_id' => $studentId,
+            'tahun_ajaran_id' => 1,
+            'kelas_id' => 1,
+        ]);
+        $this->assertDatabaseCount('catatan_aktivitas', 0);
+    }
+
+    public function test_bulk_move_does_not_create_a_history_when_the_selected_year_has_none(): void
+    {
+        $this->actingAs($this->createAccount('admin'));
+        $studentId = $this->createStudent('Tidak ada riwayat tahun berjalan', 1, 1);
+
+        $response = $this->from(route('admin.data-siswa'))->post(route('admin.data-siswa.bulk-update'), [
+            'tahun_ajaran' => 2,
+            'kelas' => '*',
+            'target_kelas' => 'X-2',
+            'siswa_ids' => [$studentId],
+        ]);
+
+        $response->assertRedirect(route('admin.data-siswa'));
+        $response->assertSessionHas('bulk_move_results.0.berhasil', false);
+        $this->assertDatabaseMissing('siswa_riwayat_kelas', [
+            'siswa_id' => $studentId,
+            'tahun_ajaran_id' => 2,
         ]);
     }
 

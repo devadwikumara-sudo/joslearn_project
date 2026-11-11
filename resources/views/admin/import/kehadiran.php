@@ -38,11 +38,7 @@
     <div class="bar" style="margin-top:14px">
         <input type="file" accept=".xlsx,.xls,.csv" id="excel-file-input" onchange="smartFile(event, 'hadir')">
         <button type="button" class="btn" onclick="loadDemoHadir()">Pakai data contoh</button>
-<<<<<<< HEAD
         <a href="{{ route('admin.import.kehadiran.template') }}" class="btn">⬇ Template Excel</a>
-=======
-        <button type="button" class="btn" onclick="downloadTemplateHadir()">⬇ Template Excel</button>
->>>>>>> 497b07e27e50c1c03a318e4e1e5f3c83921f699c
     </div>
 
     <p class="sub" style="margin:8px 0 0;font-size:12px">
@@ -53,63 +49,16 @@
 {{-- Container Preview Otomatis (Card 2 & 3: Deteksi + Pratinjau + Eksekusi Batch) --}}
 <div id="josbook-import-preview-area"></div>
 
-{{-- Card 4: Data Hasil Impor --}}
-<div class="card" style="margin-top:14px">
-    <h3>Data hasil impor seluruh tahun ajaran</h3>
-    <div class="tw">
-        <table>
-            <thead>
-                <tr>
-                    <th>Kelas</th>
-                    <th>Tahun ajaran</th>
-                    <th>Semester</th>
-                    <th>Baris Kehadiran</th>
-                    <th>Aksi</th>
-                </tr>
-            </thead>
-            <tbody>
-                @forelse($riwayatImport ?? [] as $row)
-                <tr>
-                    <td><strong>{{ $row->kelas }}</strong></td>
-                    <td>{{ $row->tahun_ajaran }}</td>
-                    <td>{{ $row->semester_number ? 'Semester '.$row->semester_number : $row->semester }}</td>
-                    <td><b>{{ $row->baris }}</b> baris</td>
-                    <td>
-                        <a href="{{ route('admin.data-siswa', ['kelas' => $row->kelas]) }}" class="btn o" style="padding:3px 8px;font-size:12px">Lihat di Data Siswa</a>
-                    </td>
-                </tr>
-                @empty
-                <tr>
-                    <td colspan="5" style="text-align:center;padding:24px;color:var(--mu)">
-                        Belum ada data kehadiran yang diimpor.
-                    </td>
-                </tr>
-                @endforelse
-            </tbody>
-        </table>
-    </div>
-</div>
+@include('admin.import._batch-list', [
+    'type' => 'kehadiran',
+    'indexRoute' => 'admin.import.kehadiran',
+    'batches' => $batches,
+    'tahunAjaranList' => $tahunAjaranList,
+    'tahunAjaranTerpilihId' => $tahunAjaranTerpilihId,
+])
 
 @push('scripts')
 <script>
-<<<<<<< HEAD
-=======
-function downloadTemplateHadir() {
-    if (!window.XLSX) {
-        alert('Library SheetJS belum selesai termuat.');
-        return;
-    }
-    var cols = ['nisn', 'nama', 'kelas', 'sem', 'sakit', 'izin', 'alpa', 'kokur'];
-    var sample = [
-        ['0081234561', 'Ahmad Faiz', 'X-1', '2', 1, 0, 0, 'Sangat baik dalam kegiatan P5'],
-        ['0081234562', 'Bunga Citra', 'X-1', '2', 0, 1, 0, 'Aktif dan kreatif dalam pameran karya']
-    ];
-    var w = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(w, XLSX.utils.aoa_to_sheet([cols, ...sample]), 'Kehadiran');
-    XLSX.writeFile(w, 'template-kehadiran.xlsx');
-}
-
->>>>>>> 497b07e27e50c1c03a318e4e1e5f3c83921f699c
 function loadDemoHadir() {
     var dummy = [
         { nisn: '0081234561', nama: 'Ahmad Faiz', kelas: 'X-1', sem: '2', sakit: 1, izin: 0, alpa: 0, kokur: 'Menunjukkan komitmen tinggi dalam proyek penguatan profil pelajar pancasila.' },
