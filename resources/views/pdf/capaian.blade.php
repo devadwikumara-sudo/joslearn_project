@@ -77,7 +77,7 @@
             ],
         ],
     ];
-    $layout = $curMapel[$tingkat] ?? ($curMapel['XI']); // XII default sama dengan XI
+    $layout = $curMapel[$tingkat] ?? ($curMapel['XI'] ?? []);
 
     // Title text
     $ttl = ($optNilai && $optHadir && $optEkskul && $optNaik)
@@ -265,8 +265,10 @@
             if (!$keputusan) {
                 $keputusan = $isXII ? 'LULUS' : 'NAIK';
             }
-            $pilihanKenaikan = $isXII ? ['LULUS', 'TIDAK LULUS'] : ['NAIK', 'TIDAK NAIK'];
-            $kelasTujuan = $riwayatKelas?->kelas_berikutnya ?? ($nextKelasMap[$kelasNama] ?? '-');
+            $pilihanKenaikan = in_array(strtoupper($keputusan), ['LULUS', 'TIDAK LULUS'], true)
+                ? ['LULUS', 'TIDAK LULUS']
+                : ['NAIK', 'TIDAK NAIK'];
+            $kelasTujuan = $kelasTujuanNama ?? ($nextKelasMap[$kelasNama] ?? '-');
             $tglKeputusan = $riwayatKelas?->tanggal_keputusan_kenaikan ?? now()->toDateString();
             $namaSekolah = strtoupper($sekolah->nama ?? 'SMA NEGERI 1 NGANJUK');
             $namaKepsek = $sekolah->nama_kepala_sekolah ?? 'Drs. SUGIARTO, M.Pd.';

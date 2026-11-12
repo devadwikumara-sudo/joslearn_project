@@ -2,8 +2,9 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class SiswaRiwayatKelas extends Model
@@ -27,6 +28,11 @@ class SiswaRiwayatKelas extends Model
     public function kelas()
     {
         return $this->belongsTo(SekolahKelas::class, 'kelas_id');
+    }
+
+    public function kelasTujuan(): BelongsTo
+    {
+        return $this->belongsTo(SekolahKelas::class, 'kelas_tujuan_id');
     }
 
     public function nilai(): HasMany

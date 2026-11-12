@@ -129,11 +129,28 @@ class PdfCetakController extends Controller
             }
         }
 
+        $tingkatMapel = [];
+        $mapelKurikulumRows = DB::table('sekolah_mapel_per_tingkat as kurikulum')
+            ->join('sekolah_mapel as mapel', 'mapel.id', '=', 'kurikulum.mapel_id')
+            ->orderBy('kurikulum.tingkat')
+            ->orderBy('kurikulum.urutan')
+            ->orderBy('mapel.nama')
+            ->get([
+                'kurikulum.tingkat',
+                'kurikulum.kelompok_mapel',
+                'mapel.kode',
+                'mapel.nama',
+            ]);
+
+        foreach ($mapelKurikulumRows as $mapelKurikulum) {
+            $tingkatMapel[$mapelKurikulum->tingkat][$mapelKurikulum->kelompok_mapel][$mapelKurikulum->kode] = $mapelKurikulum->nama;
+        }
+
         // 5. Query Siswa & Bangun Data Lengkap
         $siswaCollection = SiswaBiodata::whereIn('id', $siswaIds)
             ->whereNull('deleted_at')
-            ->with(['riwayatKelas' => function ($q) {
-                $q->whereNull('deleted_at')->with(['kelas', 'tahunAjaran']);
+            ->with(['riwayatKelas' => function ($query) {
+                $query->whereNull('deleted_at')->with(['kelas', 'kelasTujuan', 'tahunAjaran']);
             }])
             ->orderBy('nomor_induk')
             ->orderBy('nama_lengkap')
@@ -216,19 +233,20 @@ class PdfCetakController extends Controller
                 }
 
                 // Wali Kelas
-                $waliKelasNama = null;
-                $waliKelasNip = null;
-                $waliRel = GuruWaliKelas::where('kelas_id', $rk->kelas_id)
-                    ->where('tahun_ajaran_id', $rk->tahun_ajaran_id)
-                    ->with('guru')
-                    ->first();
-                if ($waliRel && $waliRel->guru) {
-                    $waliKelasNama = $waliRel->guru->nama;
-                    $waliKelasNip = $waliRel->guru->nip;
+                $waliKelasNama = $rk->nama_wali_kelas;
+                $waliKelasNip = $rk->nip_wali_kelas;
+                if (! filled($waliKelasNama) || ! filled($waliKelasNip)) {
+                    $waliRel = GuruWaliKelas::where('kelas_id', $rk->kelas_id)
+                        ->where('tahun_ajaran_id', $rk->tahun_ajaran_id)
+                        ->with('guru')
+                        ->first();
+                    $waliKelasNama = filled($waliKelasNama) ? $waliKelasNama : $waliRel?->guru?->nama;
+                    $waliKelasNip = filled($waliKelasNip) ? $waliKelasNip : $waliRel?->guru?->nip;
                 }
 
                 $riwayatDataList[] = [
                     'riwayatKelas' => $rk,
+                    'kelasTujuanNama' => $rk->kelasTujuan?->nama,
                     'taNama' => $taNama,
                     'nilaiMap' => $nilaiMap,
                     'hadirMap' => $hadirMap,
@@ -243,6 +261,7 @@ class PdfCetakController extends Controller
             if (empty($riwayatDataList)) {
                 $riwayatDataList[] = [
                     'riwayatKelas' => null,
+                    'kelasTujuanNama' => null,
                     'taNama' => $filterTa !== 'Semua' ? $filterTa : ($taList[0] ?? '2024/2025'),
                     'nilaiMap' => ['Ganjil' => [], 'Genap' => []],
                     'hadirMap' => ['Ganjil' => ['sakit' => 0, 'izin' => 0, 'alpa' => 0], 'Genap' => ['sakit' => 0, 'izin' => 0, 'alpa' => 0]],
@@ -305,6 +324,7 @@ class PdfCetakController extends Controller
             'filterKelas',
             'filterKelasList',
             'paper',
+            'tingkatMapel',
             'subTitle',
             'showCover',
             'coverKelasList',
