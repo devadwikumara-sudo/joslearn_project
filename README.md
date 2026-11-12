@@ -1,50 +1,33 @@
-# Menyiapkan database JosLearn
+# JosBook Web
 
-Skema database aplikasi dikelola dengan migration Laravel di `database/migrations`. Setiap anggota tim menjalankan migration pada database lokalnya sendiri; `git pull` membagikan perubahan skema, bukan isi database lokal.
+JosBook adalah sistem Buku Induk digital SMA Negeri 1 Rejoso Nganjuk. Aplikasi web menggunakan Laravel; aplikasi siswa menggunakan API pada `/api/v1/*`.
 
-Migration skema membuat 30 tabel dan membutuhkan MySQL 8.0 atau lebih baru. Migration lain membuat tabel sesi serta data referensi kelas dan tahun ajaran. Jangan mengimpor dump SQL untuk tabel yang sama sebelum menjalankan migration.
+## Development lokal
 
-## Setup lokal
-
-1. Pastikan MySQL berjalan dan buat database kosong:
-
-   ```sql
-   CREATE DATABASE josbook CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-   ```
-
-2. Pasang dependency dan buat file `.env` jika belum ada:
+1. Siapkan PHP 8.3, Composer, dan MySQL 8.0 atau lebih baru. Buat database `josbook`.
+2. Pasang dependency dan salin contoh konfigurasi bila `.env` belum ada:
 
    ```powershell
    composer install
    if (-not (Test-Path .env)) { Copy-Item .env.example .env }
    ```
 
-3. Atur koneksi database di `.env` agar sesuai dengan MySQL lokal:
-
-   ```dotenv
-   DB_CONNECTION=mysql
-   DB_HOST=127.0.0.1
-   DB_PORT=3306
-   DB_DATABASE=josbook
-   DB_USERNAME=root
-   DB_PASSWORD=
-   ```
-
-4. Buat app key, jalankan migration dan data awal, lalu periksa statusnya:
+3. Untuk development lokal, atur `.env` ke `APP_ENV=local`, `APP_DEBUG=true`, serta sesuaikan koneksi database.
+4. Buat app key dan jalankan migration serta data development:
 
    ```powershell
    php artisan key:generate
    php artisan migrate --seed
-   php artisan migrate:status
    ```
 
-`--seed` menjalankan `DatabaseSeeder`, yang membuat akun demo dan memuat data siswa contoh. Gunakan hanya untuk development; jangan seed data ini ke production. Ganti kredensial demo dan pastikan data siswa contoh tidak dipakai atau dibagikan sebagai data nyata.
+`DatabaseSeeder` membuat data demo hanya di luar environment production. Data siswa demo bersifat sintetis. Jangan gunakan seeder demo pada database produksi.
 
-## Jika database sudah berisi data
+## Tes
 
-- Cadangkan database sebelum mengubah skema.
-- `php artisan migrate` hanya menjalankan migration yang belum tercatat. Periksa `php artisan migrate:status` terlebih dahulu jika status migration tidak diketahui.
-- Jangan gunakan `php artisan migrate:fresh` pada database yang datanya ingin dipertahankan: perintah itu menghapus semua tabel.
-- Jangan mengimpor dump SQL untuk skema yang sama bersamaan dengan migration. Database yang tabelnya sudah dibuat di luar migration perlu direkonsiliasi terlebih dahulu, bukan langsung dijalankan dengan migration ini.
+```powershell
+php artisan test
+```
 
-Setelah anggota tim melakukan `git pull`, mereka cukup menyiapkan database dan `.env` masing-masing, kemudian menjalankan `php artisan migrate --seed` untuk database development yang baru.
+## Deploy
+
+Ikuti [README_DEPLOY.md](README_DEPLOY.md). `.env` berisi rahasia khusus lingkungan dan tidak boleh dimasukkan ke ZIP atau paket rilis.

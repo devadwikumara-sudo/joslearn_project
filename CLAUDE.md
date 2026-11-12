@@ -19,8 +19,7 @@ JosBook adalah sistem Buku Induk digital SMA Negeri 1 Rejoso Nganjuk.
 - Satu guru bisa merangkap guru mapel (guru_mengajar) dan wali kelas (guru_wali_kelas). Hak akses guru dihitung dari
   relasi dua tabel itu untuk tahun ajaran berjalan, BUKAN dari kolom peran.
 - Nama dan NIP wali kelas disalin ke siswa_riwayat_kelas (nama_wali_kelas, nip_wali_kelas) agar PDF tahun lama tidak berubah.
-- Tabel import_unggahan, import_baris, import_format_tersimpan, import_kamus_kolom, import_kamus_mapel sudah ada di migration
-  tetapi belum dipakai kode.
+- Tabel `import_*` digunakan dalam alur batch import; cek controller dan model aktual sebelum mengubah skemanya.
 
 ## Peran dan hak akses
 - admin: akses penuh.
@@ -36,7 +35,7 @@ JosBook adalah sistem Buku Induk digital SMA Negeri 1 Rejoso Nganjuk.
 - Middleware: app/Http/Middleware (EnsureAdminOnly, EnsureUserIsAdminOrGuru, EnsureSiswaOnly)
 - Import: app/Http/Controllers/Admin/ImportBatchController.php (server), public/js/josbook-excel.js (pembacaan Excel di browser, SheetJS)
 - PDF: app/Http/Controllers/Admin/PdfCetakController.php, views di resources/views/pdf/
-- Controller guru: app/Http/Controllers/Guru/ (sebagian masih kerangka kosong)
+- Controller guru: `app/Http/Controllers/Guru/` mencakup beranda, data siswa, input nilai, import, log aktivitas, dan pengaturan. Periksa implementasi per controller; jangan mengasumsikan seluruhnya masih kerangka.
 - Model: app/Models (Admin/, Auth/, Guru/)
 - Test: tests/Feature
 

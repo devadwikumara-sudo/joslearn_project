@@ -9,7 +9,7 @@
 
 ## 2. Siapkan konfigurasi rahasia
 
-Salin `.env.example` menjadi `.env` di server. Isi `APP_URL`, koneksi database, `CORS_ALLOWED_ORIGINS` dengan origin resmi (dipisahkan koma), SMTP, dan `ADMIN_REGISTRATION_CODE` dengan nilai acak yang kuat. Jangan mengunggah `.env` ke Git atau ke paket rilis.
+Salin `.env.example` menjadi `.env` di server. Isi `APP_URL`, koneksi database, `CORS_ALLOWED_ORIGINS` dengan origin resmi (dipisahkan koma), `SANCTUM_EXPIRATION` dalam menit, SMTP (`MAIL_SCHEME`, `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`), dan `ADMIN_REGISTRATION_CODE` dengan nilai acak yang kuat. Jangan mengunggah `.env` ke Git atau ke paket rilis.
 
 Sebelum seeder produksi pertama kali, atur `ADMIN_INITIAL_USERNAME`, `ADMIN_INITIAL_EMAIL`, dan `ADMIN_INITIAL_PASSWORD` di `.env` server. Kata sandi awal minimal 12 karakter; akun admin pertama diwajibkan mengganti kata sandi saat login. Hapus `ADMIN_INITIAL_PASSWORD` setelah akun dibuat. Seeder tidak akan membuat admin kedua jika admin sudah ada.
 
@@ -53,7 +53,7 @@ Atur service untuk mulai otomatis setelah server restart dan pantau log worker.
 Tambahkan cron berikut untuk menjalankan scheduler Laravel setiap menit:
 
 ```cron
-* * * * * cd /path/ke/joslearn_project && php artisan schedule:run >> /dev/null 2>&1
+* * * * * cd /path/ke/josbook && php artisan schedule:run >> /dev/null 2>&1
 ```
 
 Pastikan cron berjalan dengan user aplikasi dan pantau log scheduler.
@@ -67,13 +67,21 @@ Pastikan cron berjalan dengan user aplikasi dan pantau log scheduler.
 
 ## 8. Isi paket rilis
 
-Paket untuk server tidak boleh menyertakan `.env`, `.claude`, `.mcp.json`, `storage/logs/*.log`, `database/*.sqlite`, atau `.phpunit.result.cache`. Berkas pengaturan lokal `.claude` dan `.mcp.json` boleh tetap berada di checkout pengembang; kecualikan keduanya saat membuat arsip rilis. Contoh dari root proyek:
+Paket untuk server tidak boleh menyertakan `.env`, `.env.backup`, `.env.production`, `.claude`, `.mcp.json`, `storage/logs/*.log`, `database/*.sqlite`, `.phpunit.result.cache`, `scratch_schema.php`, `www.lnk`, atau README lama. Jangan membuat ZIP dari seluruh checkout melalui file manager: `.gitignore` tidak mengecualikan berkas dari arsip ZIP. Gunakan perintah berikut dan periksa isi arsip sebelum mengirimkannya:
 
 ```sh
-tar --exclude=.git --exclude=.env --exclude=.claude --exclude=.mcp.json \
+tar --exclude-vcs-ignores --exclude=.git --exclude=.env \
+    --exclude=.env.backup --exclude=.env.production \
+    --exclude=.env.testing --exclude=.env.local --exclude=.env.staging \
+    --exclude=.claude --exclude=.mcp.json \
     --exclude='storage/logs/*.log' --exclude='database/*.sqlite' \
-    --exclude=.phpunit.result.cache -czf josbook-release.tar.gz .
+    --exclude=.phpunit.result.cache --exclude=scratch_schema.php --exclude=www.lnk \
+    --exclude=README.txt --exclude=README-PASANG.md \
+    --exclude=josbook-release.tar.gz \
+    -czf josbook-release.tar.gz .
 ```
+
+Jika kredensial SMTP pernah masuk ke ZIP yang dibagikan, segera cabut/ganti kata sandi tersebut di penyedia SMTP, lalu perbarui secret pada environment server. Jangan menaruh kredensial baru di repositori atau arsip.
 
 ## Yang perlu dilakukan di server
 

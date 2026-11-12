@@ -4,92 +4,44 @@
 
 @section('content')
 <h2>Beranda</h2>
-<p class="sub">Selamat datang, <b>{{ Auth::user()->nama ?? Auth::user()->username }}</b> · Ringkasan aktivitas mengajar</p>
+<p class="sub">Selamat datang, <b>{{ $namaGuru }}</b> · {{ $tanggalHariIni }}</p>
 
-{{-- Stat Cards --}}
-<div class="g g4" style="margin-bottom:14px">
-    <div class="card st">
-        <span>Kelas Diampu</span>
-        <b>{{ $kelasDiampu ?? '—' }}</b>
-    </div>
-    <div class="card st">
-        <span>Total Siswa</span>
-        <b>{{ $totalSiswa ?? '—' }}</b>
-    </div>
-    <div class="card st">
-        <span>Nilai Belum Input</span>
-        <b style="color:{{ ($nilaiPending ?? 0) > 0 ? '#946200' : 'var(--ok)' }}">{{ $nilaiPending ?? '0' }}</b>
-    </div>
-    <div class="card st">
-        <span>Import Bulan Ini</span>
-        <b>{{ $importBulanIni ?? '0' }}</b>
-    </div>
+<div class="bar" style="flex-wrap:wrap;margin-bottom:14px">
+    @if($mapelDiajar->isNotEmpty())
+        <span class="bd ok">Guru {{ $mapelDiajar->pluck('nama')->join(', ') }}</span>
+    @endif
+    @foreach($kelasWali as $kelas)
+        <span class="bd ok">Wali Kelas {{ $kelas->nama }}</span>
+    @endforeach
+    <span class="bd">{{ $tahunAjaran?->nama ?? 'Tahun ajaran belum ditetapkan' }}</span>
+    <span class="bd">{{ $semesterBerjalan ?? 'Semester belum ditetapkan' }}</span>
 </div>
+
+@unless($adaPenugasan)
+    <div class="note" style="margin-bottom:14px">Belum ada penugasan, hubungi admin.</div>
+@endunless
 
 <div class="g g2">
-    {{-- Kelas yang Diampu --}}
-    <div class="card">
-        <h3>Kelas yang Diampu</h3>
-        @forelse($kelasList ?? [] as $kls)
-        <div class="row">
-            <div>
-                <b>{{ $kls->nama_kelas }}</b>
-                <div style="font-size:11px;color:var(--mu)">{{ $kls->mata_pelajaran }} · {{ $kls->jumlah_siswa }} siswa</div>
+    @if($mapelDiajar->isNotEmpty())
+        <div class="card">
+            <h3>Guru Mapel</h3>
+            <p class="sub">Mata pelajaran: {{ $mapelDiajar->pluck('nama')->join(', ') }}</p>
+            <div class="row">
+                <div>
+                    <b>Kelas diajar</b>
+                    <div style="font-size:11px;color:var(--mu)">{{ $kelasDiajar->pluck('nama')->join(', ') }}</div>
+                </div>
             </div>
-            <a href="{{ route('guru.data-siswa') }}?kelas={{ urlencode($kls->nama_kelas) }}" class="btn o" style="padding:4px 10px;font-size:11px">Lihat</a>
+            <a href="{{ route('guru.input-nilai-mapel') }}" class="btn" style="margin-top:12px">Input nilai mapel</a>
         </div>
-        @empty
-        <p style="color:var(--mu);font-size:12px;text-align:center;padding:20px">Data kelas belum tersedia.</p>
-        @endforelse
-    </div>
+    @endif
 
-    <div class="card">
-        <h3>Wali Kelas</h3>
-        @forelse($kelasWali as $kelas)
-        <div class="row">
-            <b>{{ $kelas->nama }}</b>
-            <a href="{{ route('guru.kenaikan-kelas', ['kelas' => $kelas->nama]) }}" class="btn o" style="padding:4px 10px;font-size:11px">Kenaikan kelas</a>
+    @foreach($kelasWali as $kelas)
+        <div class="card">
+            <h3>Wali Kelas {{ $kelas->nama }}</h3>
+            <p class="sub">{{ $kelas->jumlah_siswa }} siswa aktif pada tahun ajaran berjalan.</p>
+            <a href="{{ route('guru.kenaikan-kelas', ['kelas' => $kelas->nama]) }}" class="btn">Kenaikan kelas</a>
         </div>
-        @empty
-        <p style="color:var(--mu);font-size:12px;text-align:center;padding:20px">Anda tidak memiliki kelas wali pada tahun ajaran berjalan.</p>
-        @endforelse
-    </div>
-
-    {{-- Tugas dan Pengingat --}}
-    <div class="card">
-        <h3>Pengingat</h3>
-        @if(($nilaiPending ?? 0) > 0)
-        <div class="note">
-            Ada <b>{{ $nilaiPending }} siswa</b> yang nilainya belum diinput.
-            <a href="{{ route('guru.input-nilai-mapel') }}" style="color:var(--p);font-weight:700;display:block;margin-top:4px">→ Input Nilai Sekarang</a>
-        </div>
-        @endif
-
-        @forelse($pengingat ?? [] as $p)
-        <div class="row">
-            <div>
-                <b style="font-size:12px">{{ $p->judul }}</b>
-                <div style="font-size:11px;color:var(--mu)">{{ $p->deskripsi }}</div>
-            </div>
-            <span style="font-size:11px;color:var(--mu)">{{ \Carbon\Carbon::parse($p->tanggal)->format('d M') }}</span>
-        </div>
-        @empty
-        @if(($nilaiPending ?? 0) === 0)
-        <p style="color:var(--mu);font-size:12px;text-align:center;padding:20px">Tidak ada pengingat saat ini. 🎉</p>
-        @endif
-        @endforelse
-    </div>
-</div>
-
-{{-- Akses Cepat --}}
-<div class="card">
-    <h3>Akses Cepat</h3>
-    <div style="display:flex;gap:10px;flex-wrap:wrap">
-        <a href="{{ route('guru.import-nilai') }}" class="btn">📊 Import Nilai</a>
-        <a href="{{ route('guru.import-ekskul') }}" class="btn o">🏃 Import Ekskul</a>
-        <a href="{{ route('guru.import-ketidakhadiran') }}" class="btn o">📋 Import Ketidakhadiran</a>
-        <a href="{{ route('guru.input-nilai-mapel') }}" class="btn o">✏️ Input Nilai Mapel</a>
-        <a href="{{ route('guru.data-siswa') }}" class="btn o">👨‍🎓 Lihat Data Siswa</a>
-    </div>
+    @endforeach
 </div>
 @endsection

@@ -29,6 +29,8 @@ use App\Http\Controllers\Guru\ImportEkskulGuruController;
 use App\Http\Controllers\Guru\ImportKetidakhadiranController;
 use App\Http\Controllers\Guru\ImportNilaiGuruController;
 use App\Http\Controllers\Guru\InputNilaiMapelController;
+use App\Http\Controllers\Guru\LogAktivitasGuruController;
+use App\Http\Controllers\Guru\SettingGuruController;
 use Illuminate\Support\Facades\Route;
 
 // ─── ALUR LOGIN & AUTENTIKASI GURU & ADMIN ───────────────────────────────────
@@ -220,6 +222,10 @@ Route::prefix('guru')->name('guru.')->middleware(['auth', 'role.web'])->group(fu
 
     // Beranda Guru (beranda guru.png)
     Route::get('/beranda', [BerandaGuruController::class, 'index'])->name('beranda');
+    Route::get('/log-aktivitas', [LogAktivitasGuruController::class, 'index'])->name('log-aktivitas');
+    Route::get('/setting', [SettingGuruController::class, 'index'])->name('setting');
+    Route::put('/setting/profil', [SettingGuruController::class, 'updateProfil'])->name('setting.profil');
+    Route::put('/setting/password', [SettingGuruController::class, 'updateKataSandi'])->name('setting.password');
 
     // Data Siswa (data siswa.png - guru)
     Route::get('/data-siswa', [DataSiswaGuruController::class, 'index'])->name('data-siswa');

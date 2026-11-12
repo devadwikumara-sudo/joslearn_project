@@ -1,11 +1,14 @@
 *.log
 /database/*.sqlite
+/seeders/
+/scratch_schema.php
+/www.lnk
 /.claude/
 /.mcp.json
 .DS_Store
 .env
-.env.backup
-.env.production
+.env.*
+!.env.example
 .phpactor.json
 .phpunit.result.cache
 /.codex
