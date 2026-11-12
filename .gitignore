@@ -1,4 +1,7 @@
 *.log
+/database/*.sqlite
+/.claude/
+/.mcp.json
 .DS_Store
 .env
 .env.backup

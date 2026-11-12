@@ -12,6 +12,8 @@ class ImportEkskulGuruController extends Controller
 {
     public function index(Request $request, AksesGuru $aksesGuru): View
     {
+        abort_unless($aksesGuru->adalahWali($request->user()), 403, 'Anda tidak memiliki penugasan wali kelas pada tahun ajaran berjalan.');
+
         return view('guru.import-ekskul', [
             'kelasList' => $aksesGuru->kelasWali($request->user())->pluck('nama')->all(),
             'riwayat' => [],

@@ -20,6 +20,8 @@ class InputNilaiMapelController extends Controller
     public function index(Request $request, AksesGuru $aksesGuru): View
     {
         $pengguna = $request->user();
+        abort_unless($aksesGuru->adalahGuruMapel($pengguna), 403, 'Anda tidak memiliki penugasan guru mapel pada tahun ajaran berjalan.');
+
         $kelasList = $aksesGuru->kelasDiajar($pengguna);
         $kelasTerpilih = null;
         $mapelList = collect();

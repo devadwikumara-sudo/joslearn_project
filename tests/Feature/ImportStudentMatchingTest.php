@@ -1019,6 +1019,58 @@ class ImportStudentMatchingTest extends TestCase
             'mapel_id' => 1,
             'semester' => 'Ganjil',
         ])->assertRedirect();
+
+        $this->postJson(route('guru.import.metadata'), ['type' => 'siswa'])->assertForbidden();
+        $this->postJson(route('guru.import.metadata'), ['type' => 'guru'])->assertForbidden();
+    }
+
+    public function test_teacher_without_assignments_cannot_open_or_start_any_import(): void
+    {
+        $guru = $this->buatAkunGuru('guru-tanpa-penugasan');
+        $this->actingAs($guru)->withoutMiddleware();
+
+        $this->get(route('guru.input-nilai-mapel'))->assertForbidden();
+        $this->get(route('guru.import-nilai'))->assertForbidden();
+        $this->get(route('guru.import-ekskul'))->assertForbidden();
+        $this->get(route('guru.import-ketidakhadiran'))->assertForbidden();
+
+        foreach (['nilai', 'kehadiran', 'ekskul', 'siswa', 'guru'] as $type) {
+            $this->postJson(route('guru.import.metadata'), ['type' => $type])->assertForbidden();
+            $this->postJson(route('guru.import.start-batch'), [
+                'type' => $type,
+                'total_rows' => 1,
+            ])->assertForbidden();
+            $this->postJson(route('guru.import.save-batch'), [
+                'type' => $type,
+                'rows' => [['kelas' => 'X-1']],
+            ])->assertForbidden();
+        }
+    }
+
+    public function test_subject_teacher_cannot_use_homeroom_imports_and_homeroom_teacher_cannot_use_grade_imports(): void
+    {
+        $guruMapel = $this->buatAkunGuru('guru-mapel-saja');
+        $this->tugaskanMapel($guruMapel, 1, 1, 1);
+        $guruWali = $this->buatAkunGuru('guru-wali-saja');
+        $this->tugaskanWali($guruWali, 1, 1);
+
+        $this->actingAs($guruMapel)->withoutMiddleware();
+        $this->get(route('guru.input-nilai-mapel'))->assertOk();
+        $this->get(route('guru.import-nilai'))->assertOk();
+        $this->get(route('guru.import-ekskul'))->assertForbidden();
+        $this->get(route('guru.import-ketidakhadiran'))->assertForbidden();
+        $this->post(route('guru.import-ekskul.store'), ['kelas' => 'X-1'])->assertForbidden();
+        $this->post(route('guru.import-ketidakhadiran.store'), ['kelas' => 'X-1'])->assertForbidden();
+
+        $this->actingAs($guruWali);
+        $this->get(route('guru.input-nilai-mapel'))->assertForbidden();
+        $this->get(route('guru.import-nilai'))->assertForbidden();
+        $this->get(route('guru.import-ekskul'))->assertOk();
+        $this->get(route('guru.import-ketidakhadiran'))->assertOk();
+        $this->post(route('guru.import-nilai.store'), [
+            'kelas' => 'X-1',
+            'mata_pelajaran' => 'Matematika',
+        ])->assertForbidden();
     }
 
     public function test_teacher_can_input_grade_for_active_student_and_activity_is_logged(): void

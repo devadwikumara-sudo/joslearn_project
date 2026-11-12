@@ -132,25 +132,23 @@ class DataSiswaGuruTest extends TestCase
             ->assertRedirect(route('login'));
     }
 
-    public function test_teacher_can_open_student_edit_form(): void
+    public function test_teacher_cannot_open_student_edit_form(): void
     {
         $this->actingAs($this->createAccount('guru'))
-            ->get(route('guru.data-siswa.edit', 1))
-            ->assertOk()
-            ->assertSee('Siswa Satu')
-            ->assertSee(route('guru.data-siswa.update', 1), false);
+            ->get('/guru/data-siswa/1/edit')
+            ->assertNotFound();
     }
 
-    public function test_student_account_cannot_edit_student_data(): void
+    public function test_teacher_cannot_update_student_data(): void
     {
-        $this->actingAs($this->createAccount('siswa'))
-            ->put(route('guru.data-siswa.update', 1), [
+        $this->actingAs($this->createAccount('guru'))
+            ->put('/guru/data-siswa/1', [
                 'nama_lengkap' => 'Nama Tidak Boleh Berubah',
                 'nisn' => '1000000001',
                 'kelas' => 'X-1',
                 'tahun_ajaran' => '2026/2027',
             ])
-            ->assertRedirect(route('login'));
+            ->assertStatus(405);
 
         $this->assertDatabaseHas('siswa_biodata', [
             'id' => 1,

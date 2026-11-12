@@ -92,7 +92,6 @@
                             <td style="white-space:nowrap">
                                 <a href="{{ route('guru.data-siswa.show', $murid->id) }}" class="btn o" style="padding:3px 8px;font-size:12px">Lihat</a>
                                 <a href="{{ route('guru.data-siswa.pdf', array_merge(['id' => $murid->id], $studentFilters)) }}" class="btn" style="padding:3px 8px;font-size:12px">PDF</a>
-                                <a href="{{ route('guru.data-siswa.edit', $murid->id) }}" class="btn o" style="padding:3px 8px;font-size:12px">Edit</a>
                             </td>
                         </tr>
                     @empty

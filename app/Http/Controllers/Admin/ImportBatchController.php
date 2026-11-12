@@ -577,6 +577,21 @@ class ImportBatchController extends Controller
             ], 403);
         }
 
+        if ($user->peran === 'guru') {
+            $hasAssignment = match ($type) {
+                'nilai' => $this->aksesGuru->adalahGuruMapel($user),
+                'kehadiran', 'ekskul' => $this->aksesGuru->adalahWali($user),
+                default => true,
+            };
+
+            if (! $hasAssignment) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Akses ditolak: guru tidak memiliki penugasan yang sesuai pada tahun ajaran berjalan.',
+                ], 403);
+            }
+        }
+
         return null;
     }
 

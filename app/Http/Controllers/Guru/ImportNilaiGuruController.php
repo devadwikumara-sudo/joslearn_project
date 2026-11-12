@@ -13,6 +13,8 @@ class ImportNilaiGuruController extends Controller
 {
     public function index(Request $request, AksesGuru $aksesGuru): View
     {
+        abort_unless($aksesGuru->adalahGuruMapel($request->user()), 403, 'Anda tidak memiliki penugasan guru mapel pada tahun ajaran berjalan.');
+
         return view('guru.import-nilai', [
             'kelasList' => $aksesGuru->kelasDiajar($request->user())->pluck('nama')->all(),
             'riwayat' => [],
