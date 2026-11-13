@@ -1029,6 +1029,7 @@ class ImportStudentMatchingTest extends TestCase
         $guru = $this->buatAkunGuru('guru-tanpa-penugasan');
         $this->actingAs($guru)->withoutMiddleware();
 
+        $this->get(route('guru.import-data'))->assertForbidden();
         $this->get(route('guru.input-nilai-mapel'))->assertForbidden();
         $this->get(route('guru.import-nilai'))->assertForbidden();
         $this->get(route('guru.import-ekskul'))->assertForbidden();
@@ -1045,6 +1046,69 @@ class ImportStudentMatchingTest extends TestCase
                 'rows' => [['kelas' => 'X-1']],
             ])->assertForbidden();
         }
+    }
+
+    public function test_admin_import_page_offers_all_import_types(): void
+    {
+        $response = $this->actingAs($this->admin)->withoutMiddleware()->get(route('admin.import-data'));
+
+        $response->assertOk()
+            ->assertViewHas('allowedTypes', ['siswa', 'guru', 'nilai', 'kehadiran', 'ekskul'])
+            ->assertViewHas('type', 'siswa')
+            ->assertSee('Import Data')
+            ->assertSee(route('admin.import-data', ['jenis' => 'nilai']), false)
+            ->assertSee(route('admin.import-data.template', ['jenis' => 'siswa']), false);
+
+        $this->get(route('admin.import-data', ['jenis' => 'nilai']))
+            ->assertOk()
+            ->assertViewHas('type', 'nilai')
+            ->assertSee('Data hasil impor 2025/2026')
+            ->assertSee('name="jenis" value="nilai"', false);
+    }
+
+    public function test_teacher_import_page_exposes_only_assigned_import_types(): void
+    {
+        $guruMapel = $this->buatAkunGuru('guru-tab-mapel');
+        $this->tugaskanMapel($guruMapel, 1, 1, 1);
+        $guruWali = $this->buatAkunGuru('guru-tab-wali');
+        $this->tugaskanWali($guruWali, 1, 1);
+        $guruRangkap = $this->buatAkunGuru('guru-tab-rangkap');
+        $this->tugaskanMapel($guruRangkap, 1, 1, 1);
+        $this->tugaskanWali($guruRangkap, 1, 1);
+
+        $this->actingAs($guruMapel)->withoutMiddleware()
+            ->get(route('guru.import-data'))
+            ->assertOk()
+            ->assertViewHas('allowedTypes', ['nilai'])
+            ->assertViewHas('kelasList', fn ($kelasList): bool => $kelasList->all() === ['X-1'])
+            ->assertSee('Import Nilai')
+            ->assertDontSee('Import Kehadiran')
+            ->assertDontSee('Import Ekskul');
+
+        $this->actingAs($guruWali)
+            ->get(route('guru.import-data'))
+            ->assertOk()
+            ->assertViewHas('allowedTypes', ['kehadiran', 'ekskul'])
+            ->assertViewHas('kelasList', fn ($kelasList): bool => $kelasList->all() === ['X-1'])
+            ->assertDontSee('Import Nilai')
+            ->assertSee('Import Kehadiran')
+            ->assertSee('Import Ekskul');
+
+        $this->actingAs($guruRangkap)
+            ->get(route('guru.import-data'))
+            ->assertOk()
+            ->assertViewHas('allowedTypes', ['nilai', 'kehadiran', 'ekskul']);
+    }
+
+    public function test_teacher_cannot_open_or_download_unassigned_import_type(): void
+    {
+        $guru = $this->buatAkunGuru('guru-tab-terbatas');
+        $this->tugaskanMapel($guru, 1, 1, 1);
+        $this->actingAs($guru)->withoutMiddleware();
+
+        $this->get(route('guru.import-data', ['jenis' => 'ekskul']))->assertForbidden();
+        $this->get(route('guru.import-data.template', ['jenis' => 'siswa']))->assertForbidden();
+        $this->get(route('guru.import-data.template', ['jenis' => 'nilai']))->assertOk();
     }
 
     public function test_subject_teacher_cannot_use_homeroom_imports_and_homeroom_teacher_cannot_use_grade_imports(): void

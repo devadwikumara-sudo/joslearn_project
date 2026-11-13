@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\DataGuruController;
 use App\Http\Controllers\Admin\DataSiswaController;
 use App\Http\Controllers\Admin\FormPendataanController;
 use App\Http\Controllers\Admin\ImportBatchController;
+use App\Http\Controllers\Admin\ImportDataController;
 use App\Http\Controllers\Admin\ImportEkskulAdminController;
 use App\Http\Controllers\Admin\ImportGuruController;
 use App\Http\Controllers\Admin\ImportKehadiranAdminController;
@@ -133,6 +134,11 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin.only'])->grou
     Route::delete('/import/{jenis}/hapus-semua', [ImportBatchController::class, 'destroyAllForYear'])
         ->whereIn('jenis', ['nilai', 'kehadiran', 'ekskul'])->name('import.batch.destroy-all');
 
+    // Import Data (halaman gabungan)
+    Route::get('/import-data', [ImportDataController::class, 'index'])->name('import-data');
+    Route::get('/import-data/template/{jenis}', [ImportDataController::class, 'downloadTemplate'])
+        ->whereIn('jenis', ['siswa', 'guru', 'nilai', 'kehadiran', 'ekskul'])->name('import-data.template');
+
     // Import Siswa
     Route::get('/import/siswa', [DataSiswaController::class, 'importView'])->name('import.siswa');
     Route::get('/import/siswa/template', [ImportTemplateController::class, 'download'])->defaults('jenis', 'siswa')->name('import.siswa.template');
@@ -242,6 +248,11 @@ Route::prefix('guru')->name('guru.')->middleware(['auth', 'role.web'])->group(fu
     Route::post('/import/start-batch', [ImportBatchController::class, 'startBatch'])->name('import.start-batch');
     Route::post('/import/save-batch', [ImportBatchController::class, 'saveBatch'])->name('import.save-batch');
     Route::post('/import/fail-batch', [ImportBatchController::class, 'failBatch'])->name('import.fail-batch');
+
+    // Import Data (halaman gabungan)
+    Route::get('/import-data', [ImportDataController::class, 'index'])->name('import-data');
+    Route::get('/import-data/template/{jenis}', [ImportDataController::class, 'downloadTemplate'])
+        ->whereIn('jenis', ['siswa', 'guru', 'nilai', 'kehadiran', 'ekskul'])->name('import-data.template');
 
     // Import Nilai (import nilai.png - guru)
     Route::get('/import-nilai', [ImportNilaiGuruController::class, 'index'])->name('import-nilai');

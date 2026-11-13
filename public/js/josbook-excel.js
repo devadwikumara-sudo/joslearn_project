@@ -543,11 +543,7 @@
 
     // ─── Pembaca biodata berdasarkan judul kolom ──────────────────────────────
     function realRows(w, columnOverrides = {}) {
-<<<<<<< HEAD
         const sheetRows = w.SheetNames.filter(name => !/^(?:kontrol\s*induk|petunjuk)$/i.test(String(name).trim())).map(name => ({
-=======
-        const sheetRows = w.SheetNames.map(name => ({
->>>>>>> 497b07e27e50c1c03a318e4e1e5f3c83921f699c
             name,
             rows: readRows(w.Sheets[name])
         }));
@@ -1730,13 +1726,7 @@
 
             // 2. Analisis Fleksibel — semua sheet (skip Kontrol Induk untuk siswa)
             const rd = n => readRows(w.Sheets[n]);
-<<<<<<< HEAD
             const sheetNames = w.SheetNames.filter(name => !/^(?:kontrol\s*induk|petunjuk)$/i.test(String(name).trim()));
-=======
-            const sheetNames = I.t === 'siswa'
-                ? w.SheetNames.filter(name => !/kontrol\s*induk/i.test(name))
-                : w.SheetNames;
->>>>>>> 497b07e27e50c1c03a318e4e1e5f3c83921f699c
             const allAnalyzed = sheetNames.map(n => analyze(n, rd(n), I.t)).filter(Boolean);
 
             let use = allAnalyzed;
@@ -1857,11 +1847,14 @@
         const appBaseMeta = document.querySelector('meta[name="app-base-url"]');
         const appBaseUrl = appBaseMeta ? appBaseMeta.getAttribute('content').replace(/\/+$/, '') : '';
         const importRolePath = endpoint.includes('/guru/') ? 'guru' : 'admin';
-        const importPage = {
-            nilai: importRolePath === 'guru' ? 'import-nilai' : 'import/nilai',
-            hadir: importRolePath === 'guru' ? 'import-ketidakhadiran' : 'import/kehadiran',
-            ekskul: importRolePath === 'guru' ? 'import-ekskul' : 'import/ekskul'
-        };
+        const importType = I.t === 'hadir' ? 'kehadiran' : I.t;
+        const importTypeLabel = {
+            guru: 'Guru',
+            nilai: 'Nilai',
+            hadir: 'Kehadiran',
+            ekskul: 'Ekskul'
+        }[I.t] || 'Data';
+        const reloadImportUrl = `${appBaseUrl}/${importRolePath}/import-data?jenis=${encodeURIComponent(importType)}`;
 
         if (!endpoint) {
             alert('Alamat layanan import tidak tersedia. Muat ulang halaman lalu coba lagi.');
@@ -1944,12 +1937,8 @@
                                 ${targetKelas ? `<a href="${appBaseUrl}/admin/data-siswa?kelas=${encodeURIComponent(targetKelas)}" class="btn" style="padding:6px 10px;font-size:12px;text-decoration:none">Lihat Kelas ${escapeHtml(targetKelas)}</a>` : ''}
                                 <a href="${appBaseUrl}/admin/alumni?aj=${encodeURIComponent('Alumni (Lulus)')}" class="btn o" style="padding:6px 10px;font-size:12px;text-decoration:none">Lihat Alumni &amp; Kontrol Induk</a>
                                 <a href="${appBaseUrl}/admin/pelacakan-alumni" class="btn o" style="padding:6px 10px;font-size:12px;text-decoration:none">Periksa Pelacakan Alumni</a>
-                            ` : I.t === 'nilai' ? `
-                                <a href="${appBaseUrl}/${importRolePath}/${importPage.nilai}" class="btn a" style="padding:6px 12px;font-size:12px;text-decoration:none;font-weight:600">🔄 Selesai &amp; Muat Ulang Data Nilai</a>
-                            ` : I.t === 'hadir' ? `
-                                <a href="${appBaseUrl}/${importRolePath}/${importPage.hadir}" class="btn a" style="padding:6px 12px;font-size:12px;text-decoration:none;font-weight:600">🔄 Selesai &amp; Muat Ulang Data Kehadiran</a>
                             ` : `
-                                <a href="${appBaseUrl}/${importRolePath}/${importPage.ekskul}" class="btn a" style="padding:6px 12px;font-size:12px;text-decoration:none;font-weight:600">🔄 Selesai &amp; Muat Ulang Data Ekskul</a>
+                                <a href="${reloadImportUrl}" class="btn a" style="padding:6px 12px;font-size:12px;text-decoration:none;font-weight:600">🔄 Selesai &amp; Muat Ulang Data ${escapeHtml(importTypeLabel)}</a>
                             `}
                             <button type="button" class="btn o" onclick="resetImportPreview()">⬆ Import File Lain</button>
                         </div>
