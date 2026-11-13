@@ -154,12 +154,16 @@ class W6GuruExperienceTest extends TestCase
             ->assertSee('Ganjil')
             ->assertSee('Dashboard')
             ->assertSee('Input Nilai Mapel')
-            ->assertSee('Import Nilai')
+            ->assertSee('Import Data')
             ->assertSee('Log Aktivitas')
             ->assertSee('Setting')
             ->assertDontSee('Wali Kelas X-1')
+            ->assertDontSee('Import Nilai')
             ->assertDontSee('Import Kehadiran')
-            ->assertDontSee('Import Ekskul');
+            ->assertDontSee('Import Ekskul')
+            ->assertSee(route('guru.import-data'), false)
+            ->assertDontSee(route('guru.import-nilai'), false)
+            ->assertDontSee(route('guru.kenaikan-kelas'), false);
     }
 
     public function test_homeroom_teacher_home_shows_active_students_and_homeroom_menu_only(): void
@@ -175,13 +179,17 @@ class W6GuruExperienceTest extends TestCase
             ->assertSee('Wali Kelas X-1')
             ->assertSee('1 siswa aktif')
             ->assertSee('Dashboard')
-            ->assertSee('Import Kehadiran')
-            ->assertSee('Import Ekskul')
+            ->assertSee('Import Data')
+            ->assertSee('Kenaikan Kelas')
             ->assertSee('Log Aktivitas')
             ->assertSee('Setting')
             ->assertDontSee('Guru Mapel')
             ->assertDontSee('Input Nilai Mapel')
-            ->assertDontSee('Import Nilai');
+            ->assertDontSee('Import Nilai')
+            ->assertDontSee('Import Kehadiran')
+            ->assertDontSee('Import Ekskul')
+            ->assertSee(route('guru.import-data'), false)
+            ->assertSee(route('guru.kenaikan-kelas'), false);
     }
 
     public function test_teacher_with_both_assignments_sees_both_home_cards_and_menus(): void
@@ -196,9 +204,12 @@ class W6GuruExperienceTest extends TestCase
             ->assertSee('Guru Mapel')
             ->assertSee('Wali Kelas X-1')
             ->assertSee('Input Nilai Mapel')
-            ->assertSee('Import Nilai')
-            ->assertSee('Import Kehadiran')
-            ->assertSee('Import Ekskul');
+            ->assertSee('Import Data')
+            ->assertSee('Kenaikan Kelas')
+            ->assertDontSee('Import Nilai')
+            ->assertDontSee('Import Kehadiran')
+            ->assertDontSee('Import Ekskul');
+        $this->assertSame(1, substr_count($response->getContent(), route('guru.import-data')));
     }
 
     public function test_unassigned_teacher_sees_notice_and_is_denied_assignment_routes(): void
@@ -207,13 +218,16 @@ class W6GuruExperienceTest extends TestCase
         $this->actingAs($teacher)
             ->get(route('guru.beranda'))
             ->assertOk()
-            ->assertSee('Belum ada penugasan, hubungi admin');
+            ->assertSee('Belum ada penugasan, hubungi admin')
+            ->assertDontSee('Import Data');
 
         foreach ([
             'guru.input-nilai-mapel',
             'guru.import-nilai',
             'guru.import-ketidakhadiran',
             'guru.import-ekskul',
+            'guru.import-data',
+            'guru.kenaikan-kelas',
         ] as $routeName) {
             $this->get(route($routeName))->assertForbidden();
         }

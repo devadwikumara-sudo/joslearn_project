@@ -1056,8 +1056,32 @@ class ImportStudentMatchingTest extends TestCase
             ->assertViewHas('allowedTypes', ['siswa', 'guru', 'nilai', 'kehadiran', 'ekskul'])
             ->assertViewHas('type', 'siswa')
             ->assertSee('Import Data')
+            ->assertSee('Data Siswa & Form Pendataan')
+            ->assertSee('Kenaikan Kelas & Mutasi')
+            ->assertSee('Alumni & Pelacakan Alumni')
+            ->assertSee('Laporan & Log Aktivitas')
+            ->assertSee('Master Data, Kualitas, Sampah & Setting')
             ->assertSee(route('admin.import-data', ['jenis' => 'nilai']), false)
             ->assertSee(route('admin.import-data.template', ['jenis' => 'siswa']), false);
+        $this->assertSame(8, substr_count($response->getContent(), 'data-menu-group='));
+        foreach ([
+            'admin.dashboard',
+            'admin.data-siswa',
+            'admin.form-pendataan',
+            'admin.data-guru',
+            'admin.kenaikan-kelas',
+            'admin.mutasi-siswa',
+            'admin.alumni',
+            'admin.pelacakan-alumni',
+            'admin.laporan',
+            'admin.log-aktivitas',
+            'admin.master-kelas',
+            'admin.cek-kualitas-data',
+            'admin.sampah',
+            'admin.setting',
+        ] as $routeName) {
+            $this->assertStringContainsString(route($routeName), $response->getContent());
+        }
 
         $this->get(route('admin.import-data', ['jenis' => 'nilai']))
             ->assertOk()
