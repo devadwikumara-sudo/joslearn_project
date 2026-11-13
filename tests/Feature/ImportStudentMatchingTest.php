@@ -1185,6 +1185,22 @@ class ImportStudentMatchingTest extends TestCase
             ->assertViewHas('siswa', fn ($siswa): bool => $siswa->count() === 1);
     }
 
+    public function test_input_grade_page_excludes_a_student_marked_as_graduated_even_if_history_is_active(): void
+    {
+        $guru = $this->buatAkunGuru('guru-lulus-nilai');
+        $this->tugaskanMapel($guru, 1, 1, 1);
+        DB::table('siswa_biodata')->where('id', 1)->update(['tahun_lulus' => '2026']);
+        DB::table('siswa_riwayat_kelas')->where('id', 2)->update(['status' => 'Lulus']);
+
+        $response = $this->actingAs($guru)->withoutMiddleware()->get(route('guru.input-nilai-mapel', [
+            'kelas' => 'X-1',
+            'semester' => 'Ganjil',
+        ]));
+
+        $response->assertOk()
+            ->assertViewHas('siswa', fn ($siswa): bool => $siswa->isEmpty());
+    }
+
     public function test_admin_column_correction_is_learned_and_reused_for_the_next_import(): void
     {
         $correction = [

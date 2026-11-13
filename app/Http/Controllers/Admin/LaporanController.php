@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\SekolahKelas;
 use App\Models\SekolahTahunAjaran;
+use App\Models\SiswaBiodata;
 use App\Models\SiswaKehadiran;
 use App\Models\SiswaNilai;
 use App\Models\SiswaRiwayatKelas;
@@ -74,7 +75,9 @@ class LaporanController extends Controller
         foreach ($kelasList as $kelas) {
             $riwayatIds = SiswaRiwayatKelas::where('tahun_ajaran_id', $taId)
                 ->where('kelas_id', $kelas->id)
+                ->where('status', 'Aktif')
                 ->whereNull('deleted_at')
+                ->whereIn('siswa_id', SiswaBiodata::aktif($taId)->select('id'))
                 ->pluck('id')
                 ->toArray();
             $siswaCount = count($riwayatIds);

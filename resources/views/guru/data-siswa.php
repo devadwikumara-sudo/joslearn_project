@@ -29,7 +29,7 @@
 
     <select name="st" aria-label="Pilih status">
         <option value="">Semua status</option>
-        @foreach(['Aktif', 'Pindah keluar', 'Keluar', 'Lulus'] as $status)
+        @foreach(['Aktif'] as $status)
             <option value="{{ $status }}" {{ $filters['st'] === $status ? 'selected' : '' }}>{{ $status }}</option>
         @endforeach
     </select>

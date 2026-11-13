@@ -72,7 +72,7 @@
 
         <select name="st">
             <option value="">Semua status</option>
-            @foreach(['Aktif', 'Pindah keluar', 'Keluar', 'Lulus'] as $st)
+            @foreach(['Aktif'] as $st)
                 <option value="{{ $st }}" {{ $statusFilter === $st ? 'selected' : '' }}>{{ $st }}</option>
             @endforeach
         </select>
@@ -255,7 +255,7 @@
                             <label>Status tujuan
                                 <select name="target_status" style="width:100%">
                                     <option value="">Pertahankan status masing-masing</option>
-                                    @foreach(['Aktif', 'Pindah keluar', 'Keluar', 'Lulus'] as $st)
+                                    @foreach(['Aktif'] as $st)
                                         <option value="{{ $st }}">{{ $st }}</option>
                                     @endforeach
                                 </select>

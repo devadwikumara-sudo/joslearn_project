@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Auth\Pengguna;
+use App\Models\SiswaBiodata;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -223,6 +224,33 @@ class TeacherClassPromotionTest extends TestCase
             'keputusan_kenaikan' => null,
         ]);
         $this->assertDatabaseHas('catatan_aktivitas', ['aksi' => 'batalkan_kenaikan']);
+    }
+
+    public function test_final_class_graduation_is_excluded_from_the_active_student_scope(): void
+    {
+        [$year, , $sourceClass, , $teacher, $student] = $this->seedPromotionData();
+        DB::table('sekolah_kelas')->where('id', $sourceClass)->update([
+            'nama' => 'XII-1',
+            'tingkat' => 'XII',
+        ]);
+        $user = $this->createUser('guru', 'guru-xii', $teacher);
+
+        $this->actingAs($user)->post(route('guru.kenaikan-kelas.proses'), [
+            'kelas_asal' => 'XII-1',
+            'keputusan' => [$student => 'Lulus'],
+        ])->assertRedirect(route('guru.kenaikan-kelas', ['kelas' => 'XII-1']));
+
+        $this->assertDatabaseHas('siswa_riwayat_kelas', [
+            'siswa_id' => $student,
+            'tahun_ajaran_id' => $year,
+            'status' => 'Lulus',
+        ]);
+        $this->assertDatabaseHas('siswa_biodata', [
+            'id' => $student,
+            'tahun_lulus' => '2026',
+            'alasan_keluar' => 'Lulus',
+        ]);
+        $this->assertFalse(SiswaBiodata::aktif()->whereKey($student)->exists());
     }
 
     public function test_wali_cannot_promote_or_cancel_another_class(): void

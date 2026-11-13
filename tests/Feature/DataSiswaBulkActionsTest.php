@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\Admin\DashboardAdminController;
 use App\Http\Controllers\Admin\DataSiswaController;
+use App\Http\Controllers\Admin\LaporanController;
 use App\Models\Auth\Pengguna;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Request;
@@ -46,6 +48,17 @@ class DataSiswaBulkActionsTest extends TestCase
             $table->string('nisn')->nullable();
             $table->string('nomor_induk')->nullable();
             $table->string('nama_lengkap');
+            $table->string('jenis_kelamin')->nullable();
+            $table->string('nik')->nullable();
+            $table->string('tempat_lahir')->nullable();
+            $table->date('tanggal_lahir')->nullable();
+            $table->string('agama')->nullable();
+            $table->string('nama_ayah')->nullable();
+            $table->string('nama_ibu')->nullable();
+            $table->string('alamat_jalan')->nullable();
+            $table->string('tahun_lulus', 4)->nullable();
+            $table->string('alasan_keluar')->nullable();
+            $table->date('tanggal_keluar')->nullable();
             $table->softDeletes();
             $table->timestamps();
         });
@@ -65,16 +78,22 @@ class DataSiswaBulkActionsTest extends TestCase
         });
         Schema::create('sekolah_mapel', function (Blueprint $table): void {
             $table->id();
+            $table->string('kode')->nullable();
+            $table->string('nama')->nullable();
         });
         Schema::create('siswa_nilai', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('riwayat_kelas_id');
             $table->unsignedBigInteger('mapel_id');
             $table->string('semester');
+            $table->decimal('nilai_angka', 5, 2)->nullable();
         });
         Schema::create('siswa_kehadiran', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('riwayat_kelas_id');
+            $table->unsignedInteger('sakit')->default(0);
+            $table->unsignedInteger('izin')->default(0);
+            $table->unsignedInteger('alpa')->default(0);
         });
         Schema::create('siswa_ekskul', function (Blueprint $table): void {
             $table->id();
@@ -91,6 +110,15 @@ class DataSiswaBulkActionsTest extends TestCase
             $table->string('alamat_ip')->nullable();
             $table->timestamp('created_at')->nullable();
         });
+        Schema::create('guru_biodata', function (Blueprint $table): void {
+            $table->id();
+            $table->softDeletes();
+            $table->timestamps();
+        });
+        Schema::create('sekolah_identitas', function (Blueprint $table): void {
+            $table->unsignedTinyInteger('id')->primary();
+            $table->string('nama')->nullable();
+        });
 
         DB::table('sekolah_tahun_ajaran')->insert([
             ['id' => 1, 'nama' => '2025/2026', 'sedang_berjalan' => false],
@@ -106,13 +134,13 @@ class DataSiswaBulkActionsTest extends TestCase
     public function test_selected_delete_only_trashes_selected_students_inside_the_filter(): void
     {
         $admin = $this->createAccount('admin');
-        $selectedStudentId = $this->createStudent('Dipilih', 1, 1);
-        $otherClassStudentId = $this->createStudent('Kelas lain', 1, 2);
-        $unselectedStudentId = $this->createStudent('Tidak dipilih', 1, 1);
+        $selectedStudentId = $this->createStudent('Dipilih', 2, 1);
+        $otherClassStudentId = $this->createStudent('Kelas lain', 2, 2);
+        $unselectedStudentId = $this->createStudent('Tidak dipilih', 2, 1);
 
         $response = $this->actingAs($admin)->from(route('admin.data-siswa'))
             ->delete(route('admin.data-siswa.bulk-delete'), [
-                'tahun_ajaran' => '1',
+                'tahun_ajaran' => '2',
                 'kelas' => 'X-1',
                 'konfirmasi' => 'hapus',
                 'siswa_ids' => [$selectedStudentId, $otherClassStudentId],
@@ -291,6 +319,10 @@ class DataSiswaBulkActionsTest extends TestCase
         $firstStudentId = $this->createStudent('Kelas X-1', 2, 1);
         $secondStudentId = $this->createStudent('Kelas X-2', 2, 2);
         $previousYearStudentId = $this->createStudent('Tahun sebelumnya', 1, 1);
+        $graduatedStudentId = $this->createStudent('Siswa Lulus', 2, 1);
+        $transferredStudentId = $this->createStudent('Siswa Pindah', 2, 2);
+        DB::table('siswa_biodata')->where('id', $graduatedStudentId)->update(['tahun_lulus' => '2026']);
+        DB::table('siswa_riwayat_kelas')->where('siswa_id', $transferredStudentId)->update(['status' => 'Pindah keluar']);
 
         $view = app(DataSiswaController::class)->index(Request::create('/admin/data-siswa'));
         $siswaList = $view->getData()['siswaList'];
@@ -300,6 +332,49 @@ class DataSiswaBulkActionsTest extends TestCase
         $this->assertSame(2, $siswaList->total());
         $this->assertSame([$firstStudentId, $secondStudentId], $listedIds);
         $this->assertNotContains($previousYearStudentId, $listedIds);
+        $this->assertNotContains($graduatedStudentId, $listedIds);
+        $this->assertNotContains($transferredStudentId, $listedIds);
+    }
+
+    public function test_admin_export_excludes_graduated_and_transferred_students(): void
+    {
+        $admin = $this->createAccount('admin');
+        $this->createStudent('Siswa Aktif', 2, 1);
+        $graduatedStudentId = $this->createStudent('Siswa Lulus', 2, 1);
+        $transferredStudentId = $this->createStudent('Siswa Pindah', 2, 2);
+        DB::table('siswa_biodata')->where('id', $graduatedStudentId)->update(['tahun_lulus' => '2026']);
+        DB::table('siswa_riwayat_kelas')->where('siswa_id', $transferredStudentId)->update(['status' => 'Pindah keluar']);
+
+        $response = $this->actingAs($admin)->get(route('admin.data-siswa.export'));
+        $response->assertOk();
+        $content = $response->streamedContent();
+
+        $this->assertStringContainsString('Siswa Aktif', $content);
+        $this->assertStringNotContainsString('Siswa Lulus', $content);
+        $this->assertStringNotContainsString('Siswa Pindah', $content);
+    }
+
+    public function test_dashboard_report_and_data_siswa_count_the_same_active_students(): void
+    {
+        $this->createStudent('Siswa Aktif Satu', 2, 1);
+        $this->createStudent('Siswa Aktif Dua', 2, 2);
+        $graduatedStudentId = $this->createStudent('Siswa Lulus', 2, 1);
+        $transferredStudentId = $this->createStudent('Siswa Pindah', 2, 2);
+        $exitedStudentId = $this->createStudent('Siswa Keluar', 2, 1);
+        DB::table('siswa_biodata')->where('id', $graduatedStudentId)->update(['tahun_lulus' => '2026']);
+        DB::table('siswa_riwayat_kelas')->where('siswa_id', $transferredStudentId)->update(['status' => 'Pindah keluar']);
+        DB::table('siswa_biodata')->where('id', $exitedStudentId)->update(['tanggal_keluar' => '2026-10-01']);
+
+        $dashboard = app(DashboardAdminController::class)->index();
+        $report = app(LaporanController::class)->index(Request::create('/admin/laporan', 'GET', [
+            'ta' => '2026/2027',
+        ]));
+        $dataSiswa = app(DataSiswaController::class)->index(Request::create('/admin/data-siswa'));
+
+        $this->assertSame(2, $dashboard->getData()['totalSiswaAktif']);
+        $this->assertSame(2, array_sum(array_column($dashboard->getData()['komposisiKelas'], 'total')));
+        $this->assertSame(2, $report->getData()['totalSiswa']);
+        $this->assertSame(2, $dataSiswa->getData()['siswaList']->total());
     }
 
     private function createAccount(string $role): Pengguna

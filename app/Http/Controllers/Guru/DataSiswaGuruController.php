@@ -98,7 +98,7 @@ class DataSiswaGuruController extends Controller
 
     public function show(int $id, Request $request, AcademicRecordAccess $access): View
     {
-        $siswa = SiswaBiodata::with(['riwayatKelas' => function ($query): void {
+        $siswa = SiswaBiodata::aktif()->with(['riwayatKelas' => function ($query): void {
             $query->with(['kelas', 'tahunAjaran', 'nilai.mapel', 'kehadiran', 'ekskul'])->orderByDesc('tahun_ajaran_id');
         }])->findOrFail($id);
         $academicManagePermissions = [];
@@ -112,7 +112,7 @@ class DataSiswaGuruController extends Controller
     /** @param array{tahun_ajaran?: int|null, kelas?: string, q?: string, st?: string} $filters */
     private function filteredStudents(array $filters): Builder
     {
-        $query = SiswaBiodata::query();
+        $query = SiswaBiodata::aktif();
         $historyFilters = $filters;
 
         if ($historyFilters['tahun_ajaran'] !== null || $historyFilters['kelas'] !== '' || $historyFilters['st'] !== '') {
@@ -161,7 +161,7 @@ class DataSiswaGuruController extends Controller
             'tahun_ajaran' => ['nullable', 'integer', 'exists:sekolah_tahun_ajaran,id'],
             'kelas' => ['nullable', 'string', 'exists:sekolah_kelas,nama'],
             'q' => ['nullable', 'string', 'max:150'],
-            'st' => ['nullable', 'in:Aktif,Pindah keluar,Keluar,Lulus'],
+            'st' => ['nullable', 'in:Aktif'],
         ]);
 
         $tahunAjaranId = $filters['tahun_ajaran'] ?? SekolahTahunAjaran::where('sedang_berjalan', true)->value('id');

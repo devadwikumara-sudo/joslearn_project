@@ -10,6 +10,7 @@ use App\Models\SekolahTahunAjaran;
 use App\Models\SiswaNilai;
 use App\Models\SiswaRiwayatKelas;
 use App\Services\AksesGuru;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -53,7 +54,7 @@ class InputNilaiMapelController extends Controller
                     ->where('tahun_ajaran_id', $tahunAjaranId)
                     ->where('kelas_id', $kelasTerpilih->id)
                     ->where('status', 'Aktif')
-                    ->whereHas('siswa')
+                    ->whereHas('siswa', fn (Builder $query) => $query->aktif())
                     ->with([
                         'siswa',
                         'nilai' => fn ($query) => $query
@@ -105,7 +106,7 @@ class InputNilaiMapelController extends Controller
             ->where('tahun_ajaran_id', $tahunAjaranId)
             ->where('kelas_id', $kelas->id)
             ->where('status', 'Aktif')
-            ->whereHas('siswa')
+            ->whereHas('siswa', fn (Builder $query) => $query->aktif())
             ->get()
             ->keyBy('id');
         $nilaiInput = $data['nilai'] ?? [];

@@ -74,6 +74,30 @@ class SiswaBiodata extends Model
         });
     }
 
+    public function scopeAktif(Builder $query, ?int $tahunAjaranId = null): Builder
+    {
+        $graduatedStudents = static::query()
+            ->graduated()
+            ->select('id');
+
+        return $query
+            ->whereNull('tanggal_keluar')
+            ->whereNotIn($query->qualifyColumn('id'), $graduatedStudents)
+            ->whereHas('riwayatKelas', function (Builder $historyQuery) use ($tahunAjaranId): void {
+                $historyQuery->where('status', 'Aktif');
+
+                if ($tahunAjaranId !== null) {
+                    $historyQuery->where('tahun_ajaran_id', $tahunAjaranId);
+
+                    return;
+                }
+
+                $historyQuery->whereHas('tahunAjaran', function (Builder $yearQuery): void {
+                    $yearQuery->where('sedang_berjalan', true);
+                });
+            });
+    }
+
     public function isGraduated(): bool
     {
         if (filled($this->tahun_lulus) || $this->hasGraduationReason()) {

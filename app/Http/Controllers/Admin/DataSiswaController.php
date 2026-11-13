@@ -108,12 +108,16 @@ class DataSiswaController extends Controller
     public function export(Request $request): StreamedResponse
     {
         $taAktifId = $this->selectedAcademicYearId($request);
-        $siswaList = SiswaBiodata::with(['riwayatKelas' => function ($query) use ($taAktifId) {
-            if ($taAktifId !== null) {
-                $query->where('tahun_ajaran_id', $taAktifId);
-            }
-            $query->with('kelas')->orderByDesc('tahun_ajaran_id');
-        }])->orderBy('nama_lengkap')->get();
+        $kelasSelected = (string) $request->input('kelas', '');
+        $statusFilter = trim((string) $request->input('st', ''));
+        $search = trim((string) $request->input('q', ''));
+        $siswaList = $this->studentScopeQuery($taAktifId, $kelasSelected, $statusFilter, $search)
+            ->with(['riwayatKelas' => function (Relation $query) use ($taAktifId, $kelasSelected, $statusFilter): void {
+                $this->applyHistoryFilters($query, $taAktifId, $kelasSelected, $statusFilter);
+                $query->with('kelas')->orderByDesc('tahun_ajaran_id');
+            }])
+            ->orderBy('nama_lengkap')
+            ->get();
 
         return response()->streamDownload(function () use ($siswaList): void {
             $output = fopen('php://output', 'w');
@@ -257,7 +261,7 @@ class DataSiswaController extends Controller
 
     private function studentWithDetails(int $id): SiswaBiodata
     {
-        return SiswaBiodata::with([
+        return SiswaBiodata::aktif()->with([
             'riwayatKelas' => function ($query): void {
                 $query->with(['kelas', 'tahunAjaran', 'nilai.mapel', 'kehadiran', 'ekskul'])->orderBy('tahun_ajaran_id');
             },
@@ -267,7 +271,7 @@ class DataSiswaController extends Controller
 
     private function studentScopeQuery(?int $tahunAjaranId, string $kelas, string $status, string $search): Builder
     {
-        $query = SiswaBiodata::query();
+        $query = SiswaBiodata::aktif();
         if ($tahunAjaranId !== null || ($kelas !== '' && $kelas !== '*') || $status !== '') {
             $query->whereHas('riwayatKelas', function (Builder $historyQuery) use ($tahunAjaranId, $kelas, $status): void {
                 $this->applyHistoryFilters($historyQuery, $tahunAjaranId, $kelas, $status);
@@ -305,12 +309,12 @@ class DataSiswaController extends Controller
         $validated = $request->validate([
             'tahun_ajaran' => ['required', 'integer', 'exists:sekolah_tahun_ajaran,id'],
             'kelas' => ['nullable', 'string', 'max:64'],
-            'st' => ['nullable', 'in:Aktif,Pindah keluar,Keluar,Lulus'],
+            'st' => ['nullable', 'in:Aktif'],
             'q' => ['nullable', 'string', 'max:150'],
             'siswa_ids' => ['sometimes', 'array', 'min:1'],
             'siswa_ids.*' => ['required', 'integer', 'distinct', 'exists:siswa_biodata,id'],
             'target_kelas' => ['required', 'string', 'exists:sekolah_kelas,nama'],
-            'target_status' => ['nullable', 'in:Aktif,Pindah keluar,Keluar,Lulus'],
+            'target_status' => ['nullable', 'in:Aktif'],
         ]);
 
         $sourceYearId = (int) $validated['tahun_ajaran'];
@@ -464,7 +468,7 @@ class DataSiswaController extends Controller
         $validated = $request->validate([
             'tahun_ajaran' => ['required', 'string'],
             'kelas' => ['nullable', 'string', 'max:64'],
-            'st' => ['nullable', 'in:Aktif,Pindah keluar,Keluar,Lulus'],
+            'st' => ['nullable', 'in:Aktif'],
             'q' => ['nullable', 'string', 'max:150'],
             'konfirmasi' => ['required', 'in:hapus'],
             'siswa_ids' => ['sometimes', 'array', 'min:1'],

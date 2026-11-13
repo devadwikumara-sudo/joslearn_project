@@ -24,8 +24,17 @@ class DashboardAdminController extends Controller
         // 2. Query Siswa Aktif pada Tahun Ajaran Ini
         $riwayatQuery = SiswaRiwayatKelas::whereNull('deleted_at')
             ->where('tahun_ajaran_id', $taAktifObj?->id ?? 0);
-        $siswaAktifIds = (clone $riwayatQuery)->where('status', 'Aktif')->pluck('siswa_id')->toArray();
+        $siswaAktifIds = SiswaBiodata::aktif()
+            ->whereHas('riwayatKelas', function ($query) use ($taAktifObj): void {
+                $query->where('tahun_ajaran_id', $taAktifObj?->id ?? 0)
+                    ->where('status', 'Aktif');
+            })
+            ->pluck('id')
+            ->all();
         $totalSiswaAktif = count($siswaAktifIds);
+        $riwayatAktifQuery = (clone $riwayatQuery)
+            ->where('status', 'Aktif')
+            ->whereIn('siswa_id', $siswaAktifIds);
 
         // 3. Guru & Alumni & Sampah
         $totalGuru = GuruBiodata::count();
@@ -69,7 +78,7 @@ class DashboardAdminController extends Controller
         $missingFieldsCount = 0;
 
         // Dapatkan kelas terkini per siswa
-        $kelasMap = (clone $riwayatQuery)->where('status', 'Aktif')
+        $kelasMap = (clone $riwayatAktifQuery)
             ->with('kelas:id,nama')
             ->get(['siswa_id', 'kelas_id'])
             ->mapWithKeys(fn (SiswaRiwayatKelas $riwayat): array => [
@@ -107,7 +116,7 @@ class DashboardAdminController extends Controller
         // 7. Komposisi per Kelas
         $allKelas = SekolahKelas::orderBy('nama')->pluck('nama')->toArray();
         if (empty($allKelas)) {
-            $allKelas = (clone $riwayatQuery)->where('status', 'Aktif')
+            $allKelas = (clone $riwayatAktifQuery)
                 ->with('kelas:id,nama')
                 ->get(['kelas_id'])
                 ->pluck('kelas.nama')
@@ -126,7 +135,7 @@ class DashboardAdminController extends Controller
                 continue;
             }
 
-            $idsInK = (clone $riwayatQuery)->where('status', 'Aktif')->where('kelas_id', $kelasId)->pluck('siswa_id')->toArray();
+            $idsInK = (clone $riwayatAktifQuery)->where('kelas_id', $kelasId)->pluck('siswa_id')->toArray();
             $countK = count($idsInK);
             $studentsInK = $siswaAktifList->whereIn('id', $idsInK);
             $lInK = $studentsInK->filter(fn ($s) => strtoupper(trim($s->jenis_kelamin ?? '')) === 'L' || str_starts_with(strtoupper(trim($s->jenis_kelamin ?? '')), 'LAKI'))->count();
@@ -175,7 +184,7 @@ class DashboardAdminController extends Controller
             ->join('sekolah_tahun_ajaran as tahun', 'tahun.id', '=', 'riwayat.tahun_ajaran_id')
             ->whereNull('riwayat.deleted_at')
             ->where('riwayat.status', 'Lulus')
-            ->selectRaw('RIGHT(tahun.nama, 4) as thn, COUNT(DISTINCT riwayat.siswa_id) as total')
+            ->selectRaw('SUBSTR(tahun.nama, -4) as thn, COUNT(DISTINCT riwayat.siswa_id) as total')
             ->groupBy('thn')
             ->orderByDesc('thn')
             ->pluck('total', 'thn')

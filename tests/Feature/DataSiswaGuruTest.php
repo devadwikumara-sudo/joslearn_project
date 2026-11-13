@@ -47,6 +47,9 @@ class DataSiswaGuruTest extends TestCase
             $table->string('nisn')->nullable();
             $table->string('nomor_induk')->nullable();
             $table->string('nama_lengkap');
+            $table->string('tahun_lulus', 4)->nullable();
+            $table->string('alasan_keluar')->nullable();
+            $table->date('tanggal_keluar')->nullable();
             $table->string('jenis_kelamin')->nullable();
             $table->string('tempat_lahir')->nullable();
             $table->date('tanggal_lahir')->nullable();
@@ -98,6 +101,22 @@ class DataSiswaGuruTest extends TestCase
         $content = $response->streamedContent();
         $this->assertStringContainsString('Siswa Satu', $content);
         $this->assertStringNotContainsString('Siswa Dua', $content);
+    }
+
+    public function test_teacher_student_list_excludes_graduated_and_transferred_students(): void
+    {
+        $this->createStudent('Siswa Lulus', 1);
+        DB::table('siswa_biodata')->where('nama_lengkap', 'Siswa Lulus')->update(['tahun_lulus' => '2026']);
+        $transferredStudentId = $this->createStudent('Siswa Pindah', 1);
+        DB::table('siswa_riwayat_kelas')->where('siswa_id', $transferredStudentId)->update(['status' => 'Pindah keluar']);
+
+        $this->actingAs($this->createAccount('guru'))
+            ->get(route('guru.data-siswa'))
+            ->assertOk()
+            ->assertSee('Siswa Satu')
+            ->assertSee('Siswa Dua')
+            ->assertDontSee('Siswa Lulus')
+            ->assertDontSee('Siswa Pindah');
     }
 
     public function test_selected_pdf_only_contains_selected_students_matching_current_filters(): void
