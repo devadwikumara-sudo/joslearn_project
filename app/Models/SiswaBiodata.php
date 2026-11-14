@@ -98,6 +98,31 @@ class SiswaBiodata extends Model
             });
     }
 
+    public function scopeAlumni(Builder $query): Builder
+    {
+        $graduatedStudents = static::query()
+            ->graduated()
+            ->select('id');
+        $activeStudents = static::query()
+            ->aktif()
+            ->select('id');
+
+        return $query
+            ->whereNotIn($query->qualifyColumn('id'), $activeStudents)
+            ->where(function (Builder $alumniQuery) use ($graduatedStudents): void {
+                $alumniQuery->graduated()
+                    ->orWhere(function (Builder $exitQuery) use ($graduatedStudents): void {
+                        $exitQuery->where(function (Builder $statusQuery): void {
+                            $statusQuery->whereIn('alasan_keluar', ['Pindah', 'Keluar', 'Pindah keluar'])
+                                ->orWhereNotNull('tanggal_keluar')
+                                ->orWhereHas('riwayatKelas', function (Builder $historyQuery): void {
+                                    $historyQuery->whereIn('status', ['Pindah keluar', 'Keluar']);
+                                });
+                        })->whereNotIn('siswa_biodata.id', $graduatedStudents);
+                    });
+            });
+    }
+
     public function isGraduated(): bool
     {
         if (filled($this->tahun_lulus) || $this->hasGraduationReason()) {

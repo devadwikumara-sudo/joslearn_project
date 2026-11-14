@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\AlumniController;
 use App\Http\Controllers\Admin\DataSiswaController;
 use App\Models\Auth\Pengguna;
 use App\Models\Guru\GuruBiodata;
+use App\Models\SiswaBiodata;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -41,6 +42,7 @@ class ImportStudentMatchingTest extends TestCase
             'siswa_ekskul',
             'siswa_riwayat_kelas',
             'siswa_berkas',
+            'siswa_pelacakan_alumni',
             'catatan_aktivitas',
             'sekolah_pengaturan',
             'sekolah_mapel',
@@ -161,6 +163,15 @@ class ImportStudentMatchingTest extends TestCase
         Schema::create('siswa_berkas', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('siswa_id');
+        });
+        Schema::create('siswa_pelacakan_alumni', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('siswa_id');
+            $table->string('jenis');
+            $table->string('nama_tempat')->nullable();
+            $table->string('keterangan')->nullable();
+            $table->string('tahun', 4)->nullable();
+            $table->timestamps();
         });
 
         Schema::create('siswa_nilai', function (Blueprint $table): void {
@@ -365,6 +376,7 @@ class ImportStudentMatchingTest extends TestCase
             'siswa_ekskul',
             'siswa_riwayat_kelas',
             'siswa_berkas',
+            'siswa_pelacakan_alumni',
             'catatan_aktivitas',
             'sekolah_mapel',
             'sekolah_kelas',
@@ -1075,7 +1087,6 @@ class ImportStudentMatchingTest extends TestCase
             ->assertSee('Kenaikan Kelas')
             ->assertSee('Mutasi Siswa')
             ->assertSee('Alumni')
-            ->assertSee('Pelacakan Alumni')
             ->assertSee('Laporan')
             ->assertSee('Master Kelas')
             ->assertSee('Cek Kualitas Data')
@@ -1084,7 +1095,9 @@ class ImportStudentMatchingTest extends TestCase
             ->assertDontSee('Tempat Sampah')
             ->assertSee(route('admin.import', ['tab' => 'nilai']), false)
             ->assertSee(route('admin.import.template', ['jenis' => 'siswa']), false);
-        $this->assertSame(13, substr_count($response->getContent(), 'data-menu="'));
+        $this->assertSame(12, substr_count($response->getContent(), 'data-menu="'));
+        $this->assertSame(1, substr_count($response->getContent(), 'data-menu="alumni"'));
+        $this->assertStringNotContainsString('data-menu="pelacakan"', $response->getContent());
         $this->assertSame(1, substr_count($response->getContent(), 'data-menu="setting"'));
         $this->assertStringNotContainsString('data-menu-group=', $response->getContent());
         $this->assertStringNotContainsString('josbook-sidebar-subnav', $response->getContent());
@@ -1096,7 +1109,6 @@ class ImportStudentMatchingTest extends TestCase
             'admin.kenaikan-kelas',
             'admin.mutasi-siswa',
             'admin.alumni',
-            'admin.pelacakan-alumni',
             'admin.laporan',
             'admin.master-kelas',
             'admin.cek-kualitas-data',
@@ -1634,6 +1646,183 @@ class ImportStudentMatchingTest extends TestCase
         $this->assertSame(1, $dataSiswa->getData()['siswaList']->total());
         $this->assertSame(2, $alumni->getData()['alumni']->total());
         $this->assertSame([], array_values(array_intersect($activeIds, $alumniIds)));
+    }
+
+    public function test_alumni_page_combines_graduates_and_exits_with_control_and_tracking_statuses(): void
+    {
+        DB::table('siswa_biodata')->where('id', 1)->update([
+            'tahun_lulus' => '2025',
+            'alasan_keluar' => 'Lulus',
+            'nomor_hp' => '081234567890',
+            'kegiatan_setelah_lulus' => 'Kuliah · Kampus Contoh',
+        ]);
+        DB::table('siswa_riwayat_kelas')->where('siswa_id', 1)->update(['status' => 'Lulus']);
+        DB::table('siswa_biodata')->where('id', 2)->update([
+            'alasan_keluar' => 'Pindah keluar',
+            'tanggal_keluar' => '2025-06-30',
+            'sekolah_tujuan' => 'SMA Contoh',
+        ]);
+        DB::table('siswa_pelacakan_alumni')->insert([
+            'siswa_id' => 1,
+            'jenis' => 'Kuliah',
+            'nama_tempat' => 'Kampus Contoh',
+            'keterangan' => 'Jurusan Informatika',
+            'tahun' => '2026',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $graduates = $this->actingAs($this->admin)
+            ->get(route('admin.alumni', [
+                'aj' => 'Alumni (Lulus)',
+                'tab' => 'pelacakan',
+                'siswa' => 1,
+            ]));
+
+        $graduates->assertOk()
+            ->assertViewHas('alumni', fn ($alumni): bool => $alumni->total() === 1)
+            ->assertSee('Nama Sama')
+            ->assertSee('Status Kontrol Induk')
+            ->assertSee('Status Pelacakan')
+            ->assertSee('Sudah dilacak')
+            ->assertSee('id="alumni-side-panel"', false)
+            ->assertSee('Kegiatan Setelah Lulus')
+            ->assertSee('Riwayat Pelacakan')
+            ->assertSee('Jurusan Informatika')
+            ->assertDontSee('<<<<<<< HEAD')
+            ->assertDontSee('>>>>>>>');
+
+        $exits = $this->get(route('admin.alumni', ['aj' => 'Pindah / Keluar']));
+
+        $exits->assertOk()
+            ->assertViewHas('alumni', fn ($alumni): bool => $alumni->total() === 1)
+            ->assertSee('Belum dilacak')
+            ->assertDontSee('Kampus Contoh');
+    }
+
+    public function test_legacy_tracking_page_redirects_to_alumni_with_tracking_context(): void
+    {
+        $this->actingAs($this->admin)
+            ->get(route('admin.pelacakan-alumni', ['lcy' => '2025', 'page' => 2]))
+            ->assertRedirect(route('admin.alumni', [
+                'tab' => 'pelacakan',
+                'aj' => 'Alumni (Lulus)',
+                'ay' => '2025',
+                'page' => 2,
+            ]));
+    }
+
+    public function test_tracking_panel_actions_save_and_delete_history_and_update_activity_log(): void
+    {
+        DB::table('siswa_biodata')->where('id', 1)->update([
+            'tahun_lulus' => '2025',
+            'alasan_keluar' => 'Lulus',
+        ]);
+
+        $alumniUrl = route('admin.alumni', [
+            'tab' => 'pelacakan',
+            'aj' => 'Alumni (Lulus)',
+            'siswa' => 1,
+        ]);
+        $storeResponse = $this->actingAs($this->admin)
+            ->from($alumniUrl)
+            ->post(route('admin.pelacakan-alumni.store'), [
+                'siswa_id' => 1,
+                'jenis' => 'Kuliah',
+                'nama_tempat' => 'Kampus Contoh',
+                'tahun' => '2026',
+                'keterangan' => 'Jurusan Informatika',
+            ]);
+
+        $storeResponse->assertRedirect($alumniUrl);
+        $this->assertDatabaseHas('siswa_pelacakan_alumni', [
+            'siswa_id' => 1,
+            'jenis' => 'Kuliah',
+            'nama_tempat' => 'Kampus Contoh',
+            'tahun' => '2026',
+            'keterangan' => 'Jurusan Informatika',
+        ]);
+        $this->assertDatabaseHas('siswa_biodata', [
+            'id' => 1,
+            'kegiatan_setelah_lulus' => 'Kuliah · Kampus Contoh',
+        ]);
+        $this->assertDatabaseHas('catatan_aktivitas', [
+            'aksi' => 'lacak_alumni',
+            'objek_id' => 1,
+        ]);
+
+        $trackingId = (int) DB::table('siswa_pelacakan_alumni')->value('id');
+        $deleteResponse = $this->from($alumniUrl)
+            ->delete(route('admin.pelacakan-alumni.destroy', $trackingId));
+
+        $deleteResponse->assertRedirect($alumniUrl);
+        $this->assertDatabaseMissing('siswa_pelacakan_alumni', ['id' => $trackingId]);
+        $this->assertDatabaseHas('siswa_biodata', [
+            'id' => 1,
+            'kegiatan_setelah_lulus' => null,
+        ]);
+        $this->assertDatabaseHas('catatan_aktivitas', [
+            'aksi' => 'hapus_pelacakan_alumni',
+            'objek_id' => 1,
+        ]);
+    }
+
+    public function test_tracking_cannot_be_added_for_an_active_student(): void
+    {
+        $this->actingAs($this->admin)
+            ->post(route('admin.pelacakan-alumni.store'), [
+                'siswa_id' => 2,
+                'jenis' => 'Kuliah',
+                'nama_tempat' => 'Kampus Contoh',
+                'tahun' => '2026',
+            ])
+            ->assertNotFound();
+
+        $this->assertDatabaseMissing('siswa_pelacakan_alumni', ['siswa_id' => 2]);
+    }
+
+    public function test_cancelling_graduation_restores_active_status_and_records_activity(): void
+    {
+        DB::table('siswa_biodata')->where('id', 1)->update([
+            'tahun_lulus' => '2025',
+            'alasan_keluar' => 'Lulus',
+            'tanggal_keluar' => '2025-06-30',
+            'kelas_keluar' => 'XII-1',
+        ]);
+        DB::table('siswa_riwayat_kelas')->where('siswa_id', 1)->update(['status' => 'Lulus']);
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.alumni.cancel-graduation', 1), [
+                'aj' => 'Alumni (Lulus)',
+                'ay' => '',
+                'aq' => '',
+            ])
+            ->assertRedirect(route('admin.alumni', [
+                'tab' => 'kontrol-induk',
+                'aj' => 'Alumni (Lulus)',
+            ]));
+
+        $this->assertDatabaseHas('siswa_biodata', [
+            'id' => 1,
+            'tahun_lulus' => null,
+            'alasan_keluar' => null,
+            'tanggal_keluar' => null,
+            'kelas_keluar' => null,
+        ]);
+        $this->assertDatabaseHas('siswa_riwayat_kelas', [
+            'siswa_id' => 1,
+            'tahun_ajaran_id' => 1,
+            'status' => 'Aktif',
+        ]);
+        $this->assertDatabaseHas('catatan_aktivitas', [
+            'aksi' => 'batalkan_kelulusan',
+            'objek_id' => 1,
+        ]);
+        $this->assertSame(2, SiswaBiodata::aktif()->count());
+        $this->assertDatabaseMissing('siswa_biodata', [
+            'id' => 1,
+            'tahun_lulus' => '2025',
+        ]);
     }
 
     public function test_server_accepts_comma_decimal_long_scores_and_rejects_out_of_range_values(): void

@@ -25,6 +25,7 @@ class TeacherClassPromotionTest extends TestCase
         'siswa_ekskul',
         'siswa_riwayat_kelas',
         'siswa_biodata',
+        'siswa_pelacakan_alumni',
         'guru_wali_kelas',
         'guru_mengajar',
         'sekolah_mapel',
@@ -147,6 +148,15 @@ class TeacherClassPromotionTest extends TestCase
         Schema::create('siswa_berkas', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('siswa_id');
+        });
+        Schema::create('siswa_pelacakan_alumni', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('siswa_id');
+            $table->string('jenis');
+            $table->string('nama_tempat')->nullable();
+            $table->string('keterangan')->nullable();
+            $table->string('tahun', 4)->nullable();
+            $table->timestamps();
         });
         Schema::create('siswa_nilai', function (Blueprint $table): void {
             $table->id();

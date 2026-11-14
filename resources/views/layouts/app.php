@@ -80,12 +80,7 @@
 
                 <a href="{{ route('admin.alumni') }}" class="{{ request()->routeIs('admin.alumni*') ? 'on' : '' }}" data-menu="alumni">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 011.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"></path></svg>
-                    <span>Alumni &amp; Kontrol Induk</span>
-                </a>
-
-                <a href="{{ route('admin.pelacakan-alumni') }}" class="{{ request()->routeIs('admin.pelacakan-alumni*') ? 'on' : '' }}" data-menu="pelacakan">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 4a7 7 0 100 14 7 7 0 000-14zM21 21l-4.35-4.35"></path></svg>
-                    <span>Pelacakan Alumni</span>
+                    <span>Alumni</span>
                 </a>
 
                 <a href="{{ route('admin.laporan') }}" class="{{ request()->routeIs('admin.laporan*') ? 'on' : '' }}" data-menu="laporan">

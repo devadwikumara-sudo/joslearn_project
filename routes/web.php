@@ -185,9 +185,18 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin.only'])->grou
     Route::get('/alumni/export', [AlumniController::class, 'export'])->name('alumni.export');
     Route::get('/alumni/{id}', [AlumniController::class, 'show'])->name('alumni.show');
     Route::put('/alumni/{id}', [AlumniController::class, 'update'])->name('alumni.update');
+    Route::post('/alumni/{id}/batalkan-kelulusan', [AlumniController::class, 'cancelGraduation'])->name('alumni.cancel-graduation');
 
-    // Pelacakan Alumni (pelacakan alumni.png)
-    Route::get('/pelacakan-alumni', [PelacakanAlumniController::class, 'index'])->name('pelacakan-alumni');
+    // URL halaman lama mengarah ke panel Pelacakan pada halaman Alumni gabungan.
+    Route::get('/pelacakan-alumni', function (Request $request) {
+        return redirect()->route('admin.alumni', array_filter([
+            'tab' => 'pelacakan',
+            'aj' => 'Alumni (Lulus)',
+            'ay' => $request->query('lcy'),
+            'aq' => $request->query('aq'),
+            'page' => $request->query('page'),
+        ], static fn ($value): bool => $value !== null && $value !== ''));
+    })->name('pelacakan-alumni');
     Route::post('/pelacakan-alumni', [PelacakanAlumniController::class, 'store'])->name('pelacakan-alumni.store');
     Route::delete('/pelacakan-alumni/{id}', [PelacakanAlumniController::class, 'destroy'])->name('pelacakan-alumni.destroy');
 

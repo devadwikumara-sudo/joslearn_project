@@ -6,102 +6,142 @@ use App\Http\Controllers\Controller;
 use App\Models\Admin\CatatanAktivitas;
 use App\Models\SekolahTahunAjaran;
 use App\Models\SiswaBiodata;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AlumniController extends Controller
 {
+    private const TYPE_GRADUATED = 'Alumni (Lulus)';
+
+    private const TYPE_EXIT = 'Pindah / Keluar';
+
+    private const TYPES = [
+        self::TYPE_GRADUATED => 'Lulus',
+        self::TYPE_EXIT => 'Pindah/Keluar',
+    ];
+
     public function index(Request $request): View
     {
-        $taAktifObj = SekolahTahunAjaran::where('sedang_berjalan', 1)->first()
-            ?? SekolahTahunAjaran::latest('id')->first();
-        $taAktif = $taAktifObj ? $taAktifObj->nama : '2024/2025';
+        $aj = $this->selectedType($request);
+        $ay = $this->queryString($request, 'ay');
+        $aq = trim($this->queryString($request, 'aq'));
+        $panelTab = $request->query('tab') === 'pelacakan' ? 'pelacakan' : 'kontrol-induk';
+        $selectedStudentId = $request->integer('siswa') ?: null;
 
-        $JN = ['Alumni (Lulus)', 'Pindah / Keluar', 'Semua peserta didik'];
-        $aj = $request->input('aj', $JN[0]);
-        $ay = $request->input('ay', '');
-        $aq = trim($request->input('aq', ''));
-
-        // Ambil daftar tahun lulus yang tersedia untuk filter dropdown
-        $tahunList = SiswaBiodata::whereNotNull('tahun_lulus')
+        $tahunList = SiswaBiodata::query()
+            ->graduated()
+            ->whereNotNull('tahun_lulus')
             ->where('tahun_lulus', '!=', '')
             ->distinct()
             ->pluck('tahun_lulus')
             ->toArray();
-
-        $tahunKeluarList = SiswaBiodata::whereNotNull('tanggal_keluar')
+        $tahunKeluarList = SiswaBiodata::query()
+            ->alumni()
+            ->whereNotIn('siswa_biodata.id', SiswaBiodata::graduated()->select('id'))
+            ->whereNotNull('tanggal_keluar')
             ->selectRaw('SUBSTR(tanggal_keluar, 1, 4) as thn')
             ->distinct()
             ->pluck('thn')
             ->filter()
-            ->map(fn ($y) => (string) $y)
+            ->map(static fn ($year): string => (string) $year)
             ->toArray();
-
         $ys = array_values(array_unique(array_filter(array_merge($tahunList, $tahunKeluarList))));
         rsort($ys);
-        if (empty($ys)) {
+        if ($ys === []) {
             $ys = [(string) date('Y'), (string) (date('Y') - 1), (string) (date('Y') - 2)];
         }
 
-        $query = SiswaBiodata::query();
-
-        // Filter Jenis Siswa
-        if ($aj === 'Alumni (Lulus)') {
-            $query->graduated();
-        } elseif ($aj === 'Pindah / Keluar') {
-            $query->where(function ($q) {
-                $q->whereIn('alasan_keluar', ['Pindah', 'Keluar', 'Pindah keluar'])
-                    ->orWhereNotNull('tanggal_keluar')
-                    ->orWhereHas('riwayatKelas', function ($rq) {
-                        $rq->whereIn('status', ['Pindah keluar', 'Keluar']);
-                    });
-            })->whereNotIn($query->qualifyColumn('id'), SiswaBiodata::aktif()->select('id'));
-        }
-
-        // Filter Tahun
-        if ($ay !== '') {
-            $query->where(function ($q) use ($ay) {
-                $q->where('tahun_lulus', $ay)
-                    ->orWhereRaw('SUBSTR(tanggal_keluar, 1, 4) = ?', [$ay]);
-            });
-        }
-
-        // Filter Search
-        if ($aq !== '') {
-            $query->where(function ($q) use ($aq) {
-                $q->where('nama_lengkap', 'like', "%{$aq}%")
-                    ->orWhere('nomor_induk', 'like', "%{$aq}%")
-                    ->orWhere('nisn', 'like', "%{$aq}%");
-            });
-        }
-
+        $query = $this->filteredAlumniQuery($aj, $ay, $aq);
         $totalFiltered = (clone $query)->count();
-
         $alumni = $query->with([
-            'riwayatKelas' => function ($rq) {
-                $rq->with(['kelas', 'tahunAjaran', 'nilai.mapel', 'kehadiran', 'ekskul'])->latest('id');
+            'riwayatKelas' => static function ($query): void {
+                $query->with(['kelas', 'tahunAjaran', 'nilai.mapel', 'kehadiran', 'ekskul'])->latest('id');
             },
             'berkas',
+            'pelacakan',
         ])
-            ->orderBy('nomor_induk', 'asc')
+            ->withCount('pelacakan')
+            ->orderBy('nomor_induk')
+            ->orderBy('id')
             ->paginate(25)
             ->withQueryString();
 
-        return view('admin.alumni', compact(
-            'JN',
-            'aj',
-            'ay',
-            'aq',
-            'ys',
-            'totalFiltered',
-            'alumni',
-            'taAktif'
-        ));
+        if ($selectedStudentId === null && $panelTab === 'pelacakan') {
+            $selectedStudentId = $alumni->first()?->id;
+        }
+
+        foreach ($alumni as $siswa) {
+            $isGraduated = $siswa->isGraduated();
+            $latestHistory = $siswa->riwayatKelas->first();
+            $latestTracking = $siswa->pelacakan->last();
+            $studentStatus = $isGraduated
+                ? 'Lulus'
+                : ($siswa->alasan_keluar ?: (in_array($latestHistory?->status, ['Pindah keluar', 'Keluar'], true) ? $latestHistory->status : 'Keluar'));
+
+            $siswa->setAttribute('status_alumni', $studentStatus);
+            $siswa->setAttribute('status_kontrol_induk', $this->controlIndukCompleteness($siswa, $isGraduated));
+            $siswa->setAttribute(
+                'status_pelacakan',
+                $latestTracking
+                    ? trim($latestTracking->jenis.' · '.$latestTracking->nama_tempat.' ('.$latestTracking->tahun.')')
+                    : 'Belum dilacak'
+            );
+        }
+
+        $allGraduates = SiswaBiodata::graduated()
+            ->with('pelacakan')
+            ->get(['id', 'tahun_lulus', 'tanggal_keluar']);
+        $trackingStats = [
+            'total' => $allGraduates->count(),
+            'dilacak' => 0,
+            'kuliah' => 0,
+            'bekerja' => 0,
+        ];
+        foreach ($allGraduates as $graduate) {
+            $latestTracking = $graduate->pelacakan->last();
+            if ($latestTracking) {
+                $trackingStats['dilacak']++;
+                if ($latestTracking->jenis === 'Kuliah') {
+                    $trackingStats['kuliah']++;
+                }
+                if ($latestTracking->jenis === 'Bekerja') {
+                    $trackingStats['bekerja']++;
+                }
+            }
+        }
+
+        $panelQuery = array_filter([
+            'tab' => $panelTab,
+            'aj' => $aj,
+            'ay' => $ay,
+            'aq' => $aq,
+            'page' => $request->query('page'),
+            'siswa' => $selectedStudentId,
+        ], static fn ($value): bool => $value !== null && $value !== '');
+
+        $selectedAlumni = $alumni->firstWhere('id', $selectedStudentId);
+
+        return view('admin.alumni', [
+            'aj' => $aj,
+            'ay' => $ay,
+            'aq' => $aq,
+            'ys' => $ys,
+            'types' => self::TYPES,
+            'totalFiltered' => $totalFiltered,
+            'alumni' => $alumni,
+            'trackingStats' => $trackingStats,
+            'panelTab' => $panelTab,
+            'selectedStudentId' => $selectedStudentId,
+            'selectedAlumni' => $selectedAlumni,
+            'panelQuery' => $panelQuery,
+        ]);
     }
 
-    public function show(int $id)
+    public function show(int $id): RedirectResponse
     {
         return redirect()->route('admin.data-siswa.show', $id);
     }
@@ -151,60 +191,93 @@ class AlumniController extends Controller
             ]);
         });
 
-        return redirect()
-            ->route('admin.alumni', array_filter([
-                'aj' => $request->input('aj'),
-                'ay' => $request->input('ay'),
-                'aq' => $request->input('aq'),
-            ], static fn ($value): bool => $value !== null && $value !== ''))
+        return redirect()->route('admin.alumni', array_filter([
+            'tab' => $this->selectedPanelTab($request->input('tab')),
+            'aj' => $this->selectedType($request),
+            'ay' => $request->input('ay'),
+            'aq' => $request->input('aq'),
+            'page' => $request->integer('page') ?: null,
+            'siswa' => $id,
+        ], static fn ($value): bool => $value !== null && $value !== ''))
             ->with('success', "Kontrol Induk {$siswa->nama_lengkap} berhasil diperbarui.");
     }
 
-    public function export(Request $request)
+    public function cancelGraduation(Request $request, int $id): RedirectResponse
     {
-        $aj = $request->input('aj', 'Alumni (Lulus)');
-        $ay = $request->input('ay', '');
-        $aq = trim($request->input('aq', ''));
+        $siswa = SiswaBiodata::with('riwayatKelas')->findOrFail($id);
+        abort_unless($siswa->isGraduated(), 404);
 
-        $query = SiswaBiodata::query();
+        $tahunAjaranAktif = SekolahTahunAjaran::query()
+            ->where('sedang_berjalan', true)
+            ->first();
+        $riwayatAktif = $tahunAjaranAktif
+            ? $siswa->riwayatKelas()
+                ->where('tahun_ajaran_id', $tahunAjaranAktif->id)
+                ->whereNull('deleted_at')
+                ->latest('id')
+                ->first()
+            : null;
 
-        if ($aj === 'Alumni (Lulus)') {
-            $query->graduated();
-        } elseif ($aj === 'Pindah / Keluar') {
-            $query->where(function ($q) {
-                $q->whereIn('alasan_keluar', ['Pindah', 'Keluar', 'Pindah keluar'])
-                    ->orWhereNotNull('tanggal_keluar')
-                    ->orWhereHas('riwayatKelas', function ($rq) {
-                        $rq->whereIn('status', ['Pindah keluar', 'Keluar']);
-                    });
-            })->whereNotIn($query->qualifyColumn('id'), SiswaBiodata::aktif()->select('id'));
+        if (! $riwayatAktif) {
+            return back()->withErrors([
+                'kelulusan' => 'Kelulusan tidak dapat dibatalkan karena siswa belum memiliki riwayat pada tahun ajaran aktif.',
+            ]);
         }
 
-        if ($ay !== '') {
-            $query->where(function ($q) use ($ay) {
-                $q->where('tahun_lulus', $ay)
-                    ->orWhereRaw('SUBSTR(tanggal_keluar, 1, 4) = ?', [$ay]);
-            });
-        }
+        DB::transaction(function () use ($request, $siswa, $riwayatAktif): void {
+            $siswa->riwayatKelas()
+                ->where('status', 'Lulus')
+                ->update(['status' => 'Aktif']);
+            $riwayatAktif->update(['status' => 'Aktif']);
+            $siswa->update([
+                'tahun_lulus' => null,
+                'alasan_keluar' => null,
+                'tanggal_keluar' => null,
+                'kelas_keluar' => null,
+                'sekolah_tujuan' => null,
+                'kegiatan_setelah_lulus' => null,
+            ]);
 
-        if ($aq !== '') {
-            $query->where(function ($q) use ($aq) {
-                $q->where('nama_lengkap', 'like', "%{$aq}%")
-                    ->orWhere('nomor_induk', 'like', "%{$aq}%")
-                    ->orWhere('nisn', 'like', "%{$aq}%");
-            });
-        }
+            CatatanAktivitas::create([
+                'pengguna_id' => auth()->id(),
+                'peran' => auth()->user()->peran ?? 'admin',
+                'aksi' => 'batalkan_kelulusan',
+                'keterangan' => "Membatalkan kelulusan siswa: {$siswa->nama_lengkap} ({$siswa->nisn})",
+                'objek_tipe' => 'siswa',
+                'objek_id' => $siswa->id,
+                'alamat_ip' => $request->ip(),
+            ]);
+        });
 
-        $rows = $query->orderBy('nomor_induk', 'asc')->get();
+        return redirect()->route('admin.alumni', array_filter([
+            'tab' => 'kontrol-induk',
+            'aj' => $this->selectedType($request),
+            'ay' => $request->input('ay'),
+            'aq' => $request->input('aq'),
+            'page' => $request->integer('page') ?: null,
+        ], static fn ($value): bool => $value !== null && $value !== ''))
+            ->with('success', "Kelulusan {$siswa->nama_lengkap} berhasil dibatalkan.");
+    }
+
+    public function export(Request $request): StreamedResponse
+    {
+        $rows = $this->filteredAlumniQuery(
+            $this->selectedType($request),
+            $this->queryString($request, 'ay'),
+            trim($this->queryString($request, 'aq'))
+        )
+            ->with(['riwayatKelas', 'pelacakan'])
+            ->orderBy('nomor_induk')
+            ->orderBy('id')
+            ->get();
 
         $headers = [
             'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="kontrol-induk-alumni-'.date('Ymd-His').'.csv"',
+            'Content-Disposition' => 'attachment; filename="alumni-kontrol-induk-'.date('Ymd-His').'.csv"',
         ];
 
-        $callback = function () use ($rows) {
+        $callback = function () use ($rows): void {
             $output = fopen('php://output', 'w');
-            // Write BOM for Excel UTF-8 support
             fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
 
             fputcsv($output, [
@@ -213,37 +286,115 @@ class AlumniController extends Controller
                 'Tanggal Keluar', 'Keluar Kelas', 'Sekolah Tujuan', 'Nomor Peserta PSAJ',
                 'Nomor SKL', 'Nomor Ijazah Nasional', 'Tgl Pengesahan Ijazah',
                 'Nomor Transkrip Nilai', 'Melanjutkan Studi / Bekerja', 'Tahun Lulus', 'Status',
+                'Kelengkapan Kontrol Induk', 'Status Pelacakan',
             ]);
 
-            $no = 1;
-            foreach ($rows as $s) {
-                $status = $s->tahun_lulus ? 'Lulus' : ($s->alasan_keluar ?: 'Alumni');
+            foreach ($rows as $index => $siswa) {
+                $latestTracking = $siswa->pelacakan->last();
+                $isGraduated = $siswa->isGraduated();
+                $masukKelas = trim(($siswa->kelas_diterima ?: '').($siswa->rombel_diterima ? '-'.$siswa->rombel_diterima : ''));
+                $trackingStatus = $latestTracking
+                    ? trim($latestTracking->jenis.' · '.$latestTracking->nama_tempat.' ('.$latestTracking->tahun.')')
+                    : 'Belum dilacak';
+
                 fputcsv($output, [
-                    $no++,
-                    $s->nomor_induk ?: '-',
-                    $s->nama_lengkap ?: '-',
-                    $s->nisn ?: '-',
-                    $s->jenis_registrasi ?: '-',
-                    $s->tanggal_diterima ?: '-',
-                    ($s->kelas_diterima ?: '').($s->rombel_diterima ? '-'.$s->rombel_diterima : ''),
-                    $s->sekolah_asal ?: '-',
-                    $s->alasan_keluar ?: '-',
-                    $s->tanggal_keluar ?: '-',
-                    $s->kelas_keluar ?: '-',
-                    $s->sekolah_tujuan ?: '-',
-                    $s->nomor_peserta_psaj ?: '-',
-                    $s->nomor_skl ?: '-',
-                    $s->nomor_ijazah_sma ?: '-',
-                    $s->tanggal_ijazah_sma ?: '-',
-                    $s->nomor_transkrip ?: '-',
-                    $s->kegiatan_setelah_lulus ?: '-',
-                    $s->tahun_lulus ?: ($s->tanggal_keluar ? substr($s->tanggal_keluar, 0, 4) : '-'),
-                    $status,
+                    $index + 1,
+                    $siswa->nomor_induk ?: '-',
+                    $siswa->nama_lengkap ?: '-',
+                    $siswa->nisn ?: '-',
+                    $siswa->jenis_registrasi ?: '-',
+                    $siswa->tanggal_diterima ?: '-',
+                    $masukKelas ?: '-',
+                    $siswa->sekolah_asal ?: '-',
+                    $siswa->alasan_keluar ?: '-',
+                    $siswa->tanggal_keluar ?: '-',
+                    $siswa->kelas_keluar ?: '-',
+                    $siswa->sekolah_tujuan ?: '-',
+                    $siswa->nomor_peserta_psaj ?: '-',
+                    $siswa->nomor_skl ?: '-',
+                    $siswa->nomor_ijazah_sma ?: '-',
+                    $siswa->tanggal_ijazah_sma ?: '-',
+                    $siswa->nomor_transkrip ?: '-',
+                    $siswa->kegiatan_setelah_lulus ?: '-',
+                    $siswa->tahun_lulus ?: ($siswa->tanggal_keluar ? substr($siswa->tanggal_keluar, 0, 4) : '-'),
+                    $isGraduated ? 'Lulus' : ($siswa->alasan_keluar ?: 'Pindah/Keluar'),
+                    $this->controlIndukCompleteness($siswa, $isGraduated).'%',
+                    $trackingStatus,
                 ]);
             }
             fclose($output);
         };
 
         return response()->stream($callback, 200, $headers);
+    }
+
+    private function filteredAlumniQuery(string $type, string $year, string $search): Builder
+    {
+        $query = $type === self::TYPE_EXIT
+            ? SiswaBiodata::query()
+                ->alumni()
+                ->whereNotIn('siswa_biodata.id', SiswaBiodata::graduated()->select('id'))
+            : SiswaBiodata::query()->graduated();
+
+        if ($year !== '') {
+            $query->where(function (Builder $query) use ($year): void {
+                $query->where('tahun_lulus', $year)
+                    ->orWhereRaw('SUBSTR(tanggal_keluar, 1, 4) = ?', [$year]);
+            });
+        }
+
+        if ($search !== '') {
+            $query->where(function (Builder $query) use ($search): void {
+                $query->where('nama_lengkap', 'like', "%{$search}%")
+                    ->orWhere('nomor_induk', 'like', "%{$search}%")
+                    ->orWhere('nisn', 'like', "%{$search}%");
+            });
+        }
+
+        return $query;
+    }
+
+    private function selectedType(Request $request): string
+    {
+        $type = $request->input('aj', self::TYPE_GRADUATED);
+
+        return is_string($type) && array_key_exists($type, self::TYPES)
+            ? $type
+            : self::TYPE_GRADUATED;
+    }
+
+    private function selectedPanelTab(mixed $tab): string
+    {
+        return $tab === 'pelacakan' ? 'pelacakan' : 'kontrol-induk';
+    }
+
+    private function queryString(Request $request, string $key): string
+    {
+        $value = $request->input($key, '');
+
+        return is_string($value) ? $value : '';
+    }
+
+    private function controlIndukCompleteness(SiswaBiodata $siswa, bool $isGraduated): int
+    {
+        $fields = ['alasan_keluar', 'tanggal_keluar', 'kelas_keluar'];
+        if ($isGraduated) {
+            $fields = array_merge($fields, [
+                'nomor_peserta_psaj',
+                'nomor_skl',
+                'nomor_ijazah_sma',
+                'tanggal_ijazah_sma',
+                'nomor_transkrip',
+            ]);
+        } else {
+            $fields[] = 'sekolah_tujuan';
+        }
+
+        $filled = count(array_filter(
+            $fields,
+            static fn (string $field): bool => filled($siswa->{$field})
+        ));
+
+        return (int) round(($filled / count($fields)) * 100);
     }
 }

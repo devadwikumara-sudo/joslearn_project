@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Alumni & Kontrol Induk — JosBook Admin')
+@section('title', 'Alumni — JosBook Admin')
 
 @push('styles')
 <style>
@@ -46,13 +46,32 @@
     .student-profile-item a{color:var(--p)}
     .student-profile-note{grid-column:1/-1}
     .student-profile-empty{margin:0;color:var(--mu);font-size:11px}
+    .alumni-stats{margin-bottom:12px}
+    .alumni-row{cursor:pointer}
+    .alumni-row:hover{background:#f3f7fc}
+    .alumni-side-backdrop{position:fixed;inset:0;z-index:1100;background:rgba(9,24,43,.42)}
+    .alumni-side-panel{position:fixed;top:0;right:0;z-index:1101;display:flex;flex-direction:column;width:min(560px,100%);height:100dvh;background:#f5f8fc;box-shadow:-18px 0 55px #06172f33}
+    .alumni-side-head{display:flex;align-items:flex-start;gap:12px;padding:18px;border-bottom:1px solid var(--ln);background:#fff}
+    .alumni-side-head h3{margin:0;color:var(--p);font-size:17px}
+    .alumni-side-head p{margin:4px 0 0;color:var(--mu);font-size:12px}
+    .alumni-side-close{margin-left:auto}
+    .alumni-side-tabs{display:flex;gap:8px;padding:12px 18px;border-bottom:1px solid var(--ln);background:#fff}
+    .alumni-side-tabs a{padding:8px 12px;border:1px solid var(--ln);border-radius:8px;color:var(--p);font-size:12px;font-weight:700;text-decoration:none}
+    .alumni-side-tabs a.on{background:var(--p);border-color:var(--p);color:#fff}
+    .alumni-side-body{overflow-y:auto;padding:16px}
+    .alumni-tracking-row{display:flex;align-items:flex-start;gap:10px;padding:12px 0;border-bottom:1px solid #e8edf3}
+    .alumni-tracking-row form{margin-left:auto}
+    .alumni-side-form{margin-top:14px;padding:14px;border:1px solid var(--ln);border-radius:12px;background:#fff}
+    .alumni-side-form label{display:block;margin:8px 0 4px;color:var(--mu);font-size:11px;font-weight:700}
+    .alumni-side-form input,.alumni-side-form select{width:100%}
+    .alumni-side-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
     @media(max-width:600px){.alumni-modal{padding:8px}.alumni-modal-box{max-height:96vh;border-radius:14px}.alumni-modal-head{padding:14px}.alumni-modal-body{padding:12px}.alumni-detail-grid,.alumni-form-grid,.student-profile-grid{grid-template-columns:1fr}.alumni-identity{align-items:flex-start;padding:15px}.alumni-identity h4{font-size:16px}.alumni-identity .bd{margin-left:auto}.student-profile-identity{align-items:flex-start;padding:13px}.student-profile-identity h4{font-size:15px}}
 </style>
 @endpush
 
 @section('content')
-<h2>Alumni &amp; Kontrol Induk</h2>
-<p class="sub">Registrasi masuk dan keluar (Kontrol Induk), kelulusan, dan arsip alumni dalam satu tempat · {{ $totalFiltered }} data · klik Lihat untuk membuka detail tanpa meninggalkan halaman</p>
+<h2>Alumni</h2>
+<p class="sub">Data lulus dan pindah/keluar, kontrol induk, serta pelacakan alumni · {{ $totalFiltered }} data · klik baris untuk membuka panel samping</p>
 
 @if(session('success'))
 <div class="note ok">{{ session('success') }}</div>
@@ -61,11 +80,18 @@
 <div class="note err" role="alert">{{ $errors->first() }}</div>
 @endif
 
+<div class="g g4 alumni-stats">
+    <div class="card st"><span>Alumni lulus</span><b>{{ $trackingStats['total'] }}</b></div>
+    <div class="card st"><span>Sudah dilacak</span><b>{{ $trackingStats['dilacak'] }}</b></div>
+    <div class="card st"><span>Kuliah</span><b>{{ $trackingStats['kuliah'] }}</b></div>
+    <div class="card st"><span>Bekerja</span><b>{{ $trackingStats['bekerja'] }}</b></div>
+</div>
+
 <form method="GET" action="{{ route('admin.alumni') }}">
     <div class="bar">
         <select name="aj" onchange="this.form.submit()">
-            @foreach($JN as $item)
-            <option value="{{ $item }}" {{ $aj === $item ? 'selected' : '' }}>{{ $item }}</option>
+            @foreach($types as $value => $label)
+            <option value="{{ $value }}" {{ $aj === $value ? 'selected' : '' }}>{{ $label }}</option>
             @endforeach
         </select>
         <select name="ay" onchange="this.form.submit()">
@@ -80,10 +106,6 @@
         <a href="{{ route('admin.alumni.export', ['aj' => $aj, 'ay' => $ay, 'aq' => $aq]) }}" class="btn">⬇ Ekspor Excel (Kontrol Induk + biodata)</a>
     </div>
 </form>
-
-<div class="note">
-    Lihat, edit Kontrol Induk, dan pratinjau cetak terbuka di jendela pada halaman ini. Alumni yang belum diketahui kelanjutan studinya tetap tampil di Pelacakan Alumni sebagai <b>Belum dilacak</b>.
-</div>
 
 <div class="card wide">
     <div class="tw">
@@ -110,7 +132,8 @@
                     <th>Melanjutkan Studi / Bekerja</th>
                     <th>Tahun Lulus</th>
                     <th>Status</th>
-                    <th>Kelengkapan</th>
+                    <th>Status Kontrol Induk</th>
+                    <th>Status Pelacakan</th>
                     <th style="min-width:210px">Aksi</th>
                 </tr>
             </thead>
@@ -119,23 +142,11 @@
                 @php
                     $latestRiwayat = $s->riwayatKelas->first();
                     $isGraduated = $s->isGraduated();
-                    $status = $isGraduated ? 'Lulus' : ($latestRiwayat->status ?? ($s->alasan_keluar ?: 'Alumni'));
+                    $status = $s->status_alumni;
                     $statusClass = $status === 'Lulus' ? 'ok' : (in_array($status, ['Pindah keluar', 'Keluar', 'Pindah']) ? 'w' : '');
-                    
-                    // Cek kelengkapan data kontrol induk
-                    $checkFields = ['alasan_keluar', 'tanggal_keluar', 'kelas_keluar'];
-                    if ($status === 'Lulus') {
-                        $checkFields = array_merge($checkFields, ['nomor_peserta_psaj', 'nomor_skl', 'nomor_ijazah_sma', 'tanggal_ijazah_sma', 'nomor_transkrip']);
-                    } else {
-                        $checkFields[] = 'sekolah_tujuan';
-                    }
-                    $filled = 0;
-                    foreach ($checkFields as $f) {
-                        if (!empty($s->{$f})) $filled++;
-                    }
-                    $pct = count($checkFields) > 0 ? round(($filled / count($checkFields)) * 100) : 100;
                     $thnLulusDisplay = $s->tahun_lulus ?: ($s->tanggal_keluar ? substr($s->tanggal_keluar, 0, 4) : '-');
                     $masukKelas = trim(($s->kelas_diterima ?: '') . ($s->rombel_diterima ? '-' . $s->rombel_diterima : ''));
+                    $panelUrl = route('admin.alumni', array_merge($panelQuery, ['siswa' => $s->id]));
                     $studentDetails = [
                         'id' => $s->id,
                         'nama_lengkap' => $s->nama_lengkap,
@@ -159,16 +170,21 @@
                         'nomor_transkrip' => $s->nomor_transkrip,
                         'tahun_lulus' => $s->tahun_lulus,
                         'kegiatan_setelah_lulus' => $s->kegiatan_setelah_lulus,
+                        'nomor_hp' => $s->nomor_hp,
+                        'alamat_jalan' => $s->alamat_jalan,
+                        'status_kontrol_induk' => $s->status_kontrol_induk,
+                        'status_pelacakan' => $s->status_pelacakan,
                         'edit_url' => route('admin.alumni.update', $s->id),
                         'full_edit_url' => route('admin.form-pendataan.edit', $s->id),
                         'pdf_url' => route('admin.data-siswa.pdf', $s->id),
-                        'tracking_url' => route('admin.pelacakan-alumni', array_filter([
-                            'lcy' => $thnLulusDisplay !== '-' ? ($s->tahun_lulus ?: $thnLulusDisplay) : null,
+                        'tracking_url' => route('admin.alumni', array_merge($panelQuery, [
+                            'tab' => 'pelacakan',
+                            'siswa' => $s->id,
                         ])),
                     ];
                     $studentJson = json_encode($studentDetails, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
                 @endphp
-                <tr>
+                <tr class="alumni-row" data-panel-url="{{ $panelUrl }}" tabindex="0" role="link" aria-label="Buka panel {{ $s->nama_lengkap }}">
                     <td>{{ $alumni->firstItem() + $idx }}</td>
                     <td>{{ $s->nomor_induk ?: '-' }}</td>
                     <td>
@@ -200,16 +216,17 @@
                     <td>{{ $thnLulusDisplay }}</td>
                     <td><span class="bd {{ $statusClass }}">{{ $status }}</span></td>
                     <td>
-                        @if($pct >= 100)
+                        @if($s->status_kontrol_induk >= 100)
                             <span class="bd ok">Lengkap</span>
                         @else
-                            <span class="bd w">{{ $pct }}%</span>
+                            <span class="bd w">{{ $s->status_kontrol_induk }}%</span>
                         @endif
                     </td>
+                    <td><span class="bd {{ $s->pelacakan_count ? 'ok' : 'w' }}">{{ $s->status_pelacakan }}</span></td>
                     <td style="white-space:nowrap">
-                        <button type="button" class="btn" data-alumni="{{ $studentJson }}" onclick="openAlumniDetail(this)">Lihat</button>
-                        <button type="button" class="btn a" data-alumni="{{ $studentJson }}" onclick="openAlumniEdit(this)">✏ Edit</button>
-                        <button type="button" class="btn o" data-alumni="{{ $studentJson }}" onclick="openAlumniPdf(this)">⬇ PDF</button>
+                        <button type="button" class="btn" data-alumni="{{ $studentJson }}" onclick="event.stopPropagation();openAlumniDetail(this)">Lihat</button>
+                        <button type="button" class="btn a" data-alumni="{{ $studentJson }}" onclick="event.stopPropagation();openAlumniEdit(this)">✏ Edit</button>
+                        <button type="button" class="btn o" data-alumni="{{ $studentJson }}" onclick="event.stopPropagation();openAlumniPdf(this)">⬇ PDF</button>
                         @if($isGraduated && empty($s->kegiatan_setelah_lulus))
                             <a href="{{ $studentDetails['tracking_url'] }}" class="btn o" title="Catat kelanjutan alumni">Lacak</a>
                         @endif
@@ -219,21 +236,17 @@
                             <button type="submit" class="btn x">🗑</button>
                         </form>
                         <template class="alumni-profile-template">
-<<<<<<< HEAD
                             @include('admin.siswa-detail-content', [
                                 'siswa' => $s,
                                 'includeGraduationDetails' => false,
                                 'canManageAcademicRecords' => false,
                             ])
-=======
-                            @include('admin.siswa-detail-content', ['siswa' => $s, 'includeGraduationDetails' => false])
->>>>>>> 497b07e27e50c1c03a318e4e1e5f3c83921f699c
                         </template>
                     </td>
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="22" style="text-align:center;padding:24px;color:var(--mu)">
+                    <td colspan="23" style="text-align:center;padding:24px;color:var(--mu)">
                         Tidak ada data siswa yang cocok dengan filter.
                     </td>
                 </tr>
@@ -248,6 +261,156 @@
     </div>
     @endif
 </div>
+
+@if($selectedAlumni)
+    @php
+        $panelClosedUrl = route('admin.alumni', array_diff_key($panelQuery, ['siswa' => true]));
+        $controlPanelUrl = route('admin.alumni', array_merge($panelQuery, ['tab' => 'kontrol-induk']));
+        $trackingPanelUrl = route('admin.alumni', array_merge($panelQuery, ['tab' => 'pelacakan']));
+        $contactAddress = collect([
+            $selectedAlumni->alamat_jalan,
+            $selectedAlumni->alamat_rt_rw,
+            $selectedAlumni->alamat_desa,
+            $selectedAlumni->alamat_kecamatan,
+            $selectedAlumni->alamat_kabupaten,
+        ])->filter()->implode(', ');
+    @endphp
+    <a class="alumni-side-backdrop" href="{{ $panelClosedUrl }}" aria-label="Tutup panel Alumni"></a>
+    <aside id="alumni-side-panel" class="alumni-side-panel" role="dialog" aria-modal="true" aria-labelledby="alumni-side-title">
+        <div class="alumni-side-head">
+            <div>
+                <h3 id="alumni-side-title">{{ $selectedAlumni->nama_lengkap }}</h3>
+                <p>NISN {{ $selectedAlumni->nisn ?: '-' }} · Induk {{ $selectedAlumni->nomor_induk ?: '-' }}</p>
+            </div>
+            <a class="btn o alumni-side-close" href="{{ $panelClosedUrl }}" aria-label="Tutup panel">&times;</a>
+        </div>
+        <nav class="alumni-side-tabs" aria-label="Detail alumni">
+            <a href="{{ $controlPanelUrl }}" class="{{ $panelTab === 'kontrol-induk' ? 'on' : '' }}">Kontrol Induk</a>
+            <a href="{{ $trackingPanelUrl }}" class="{{ $panelTab === 'pelacakan' ? 'on' : '' }}">Pelacakan</a>
+        </nav>
+        <div class="alumni-side-body">
+            @if($panelTab === 'pelacakan')
+                <section class="alumni-detail-section">
+                    <h4>Kontak alumni</h4>
+                    <div class="alumni-detail-grid">
+                        <div class="alumni-detail-item"><span>Nomor HP</span><b>{{ $selectedAlumni->nomor_hp ?: '-' }}</b></div>
+                        <div class="alumni-detail-item"><span>Alamat</span><b>{{ $contactAddress ?: '-' }}</b></div>
+                    </div>
+                    <p style="margin:12px 0 0"><b>Kegiatan Setelah Lulus:</b> {{ $selectedAlumni->kegiatan_setelah_lulus ?: 'Belum diketahui' }}</p>
+                </section>
+
+                <section class="alumni-detail-section">
+                    <h4>Riwayat Pelacakan</h4>
+                    @forelse($selectedAlumni->pelacakan->sortByDesc('id') as $tracking)
+                        <div class="alumni-tracking-row">
+                            <div>
+                                <b>{{ $tracking->jenis }} · {{ $tracking->nama_tempat ?: '-' }}</b>
+                                <div style="color:var(--mu);font-size:11px">{{ $tracking->tahun ?: '-' }} · {{ $tracking->keterangan ?: 'Tanpa catatan' }}</div>
+                            </div>
+                            <form method="POST" action="{{ route('admin.pelacakan-alumni.destroy', $tracking->id) }}" onsubmit="return confirm('Hapus riwayat pelacakan ini?')">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="btn x" aria-label="Hapus riwayat pelacakan">Hapus</button>
+                            </form>
+                        </div>
+                    @empty
+                        <p class="student-profile-empty">Belum ada riwayat pelacakan.</p>
+                    @endforelse
+                </section>
+
+                <form class="alumni-side-form" method="POST" action="{{ route('admin.pelacakan-alumni.store') }}">
+                    @csrf
+                    <input type="hidden" name="siswa_id" value="{{ $selectedAlumni->id }}">
+                    <h4 style="margin:0;color:var(--p)">Catat kegiatan lanjutan</h4>
+                    <label for="tracking-kind">Kegiatan</label>
+                    <select id="tracking-kind" name="jenis" required>
+                        <option value="Kuliah">Kuliah</option>
+                        <option value="Bekerja">Bekerja</option>
+                        <option value="Wirausaha">Wirausaha</option>
+                        <option value="Mencari kerja">Mencari kerja</option>
+                        <option value="Lainnya">Lainnya</option>
+                    </select>
+                    <label for="tracking-place">Kampus / instansi / perusahaan</label>
+                    <input id="tracking-place" name="nama_tempat" maxlength="150" required>
+                    <label for="tracking-year">Tahun</label>
+                    <input id="tracking-year" type="number" name="tahun" value="{{ date('Y') }}" min="1900" max="2099" required>
+                    <label for="tracking-note">Catatan</label>
+                    <input id="tracking-note" name="keterangan" maxlength="255">
+                    <div class="alumni-side-actions">
+                        <button type="submit" class="btn a">Simpan pelacakan</button>
+                    </div>
+                </form>
+            @else
+                <section class="alumni-detail-section">
+                    <h4>Kontak dan status</h4>
+                    <div class="alumni-detail-grid">
+                        <div class="alumni-detail-item"><span>Nomor HP</span><b>{{ $selectedAlumni->nomor_hp ?: '-' }}</b></div>
+                        <div class="alumni-detail-item"><span>Alamat</span><b>{{ $contactAddress ?: '-' }}</b></div>
+                        <div class="alumni-detail-item"><span>Status</span><b>{{ $selectedAlumni->status_alumni }}</b></div>
+                        <div class="alumni-detail-item"><span>Kelengkapan Kontrol Induk</span><b>{{ $selectedAlumni->status_kontrol_induk }}%</b></div>
+                    </div>
+                </section>
+                <section class="alumni-detail-section">
+                    <h4>Data Kontrol Induk</h4>
+                    <div class="alumni-detail-grid">
+                        <div class="alumni-detail-item"><span>Jenis registrasi</span><b>{{ $selectedAlumni->jenis_registrasi ?: '-' }}</b></div>
+                        <div class="alumni-detail-item"><span>Tanggal diterima</span><b>{{ $selectedAlumni->tanggal_diterima ?: '-' }}</b></div>
+                        <div class="alumni-detail-item"><span>Kelas diterima</span><b>{{ trim(($selectedAlumni->kelas_diterima ?: '').($selectedAlumni->rombel_diterima ? '-'.$selectedAlumni->rombel_diterima : '')) ?: '-' }}</b></div>
+                        <div class="alumni-detail-item"><span>Sekolah asal</span><b>{{ $selectedAlumni->sekolah_asal ?: '-' }}</b></div>
+                        <div class="alumni-detail-item"><span>Alasan keluar</span><b>{{ $selectedAlumni->alasan_keluar ?: '-' }}</b></div>
+                        <div class="alumni-detail-item"><span>Tanggal keluar</span><b>{{ $selectedAlumni->tanggal_keluar ?: '-' }}</b></div>
+                        <div class="alumni-detail-item"><span>Kelas keluar</span><b>{{ $selectedAlumni->kelas_keluar ?: '-' }}</b></div>
+                        <div class="alumni-detail-item"><span>Sekolah tujuan</span><b>{{ $selectedAlumni->sekolah_tujuan ?: '-' }}</b></div>
+                        <div class="alumni-detail-item"><span>Tahun lulus</span><b>{{ $selectedAlumni->tahun_lulus ?: '-' }}</b></div>
+                        <div class="alumni-detail-item"><span>Nomor peserta PSAJ</span><b>{{ $selectedAlumni->nomor_peserta_psaj ?: '-' }}</b></div>
+                        <div class="alumni-detail-item"><span>Nomor SKL</span><b>{{ $selectedAlumni->nomor_skl ?: '-' }}</b></div>
+                        <div class="alumni-detail-item"><span>Nomor ijazah</span><b>{{ $selectedAlumni->nomor_ijazah_sma ?: '-' }}</b></div>
+                        <div class="alumni-detail-item"><span>Tanggal ijazah</span><b>{{ $selectedAlumni->tanggal_ijazah_sma ?: '-' }}</b></div>
+                        <div class="alumni-detail-item"><span>Nomor transkrip</span><b>{{ $selectedAlumni->nomor_transkrip ?: '-' }}</b></div>
+                        <div class="alumni-detail-item"><span>Kegiatan lanjutan</span><b>{{ $selectedAlumni->kegiatan_setelah_lulus ?: 'Belum diketahui' }}</b></div>
+                    </div>
+                    <div class="alumni-side-actions">
+                        <button type="button" class="btn a" data-alumni="{{ json_encode([
+                            'id' => $selectedAlumni->id,
+                            'nama_lengkap' => $selectedAlumni->nama_lengkap,
+                            'nisn' => $selectedAlumni->nisn,
+                            'jenis_registrasi' => $selectedAlumni->jenis_registrasi,
+                            'tanggal_diterima' => $selectedAlumni->tanggal_diterima,
+                            'kelas_diterima' => $selectedAlumni->kelas_diterima,
+                            'rombel_diterima' => $selectedAlumni->rombel_diterima,
+                            'sekolah_asal' => $selectedAlumni->sekolah_asal,
+                            'alasan_keluar' => $selectedAlumni->alasan_keluar,
+                            'tanggal_keluar' => $selectedAlumni->tanggal_keluar,
+                            'kelas_keluar' => $selectedAlumni->kelas_keluar,
+                            'sekolah_tujuan' => $selectedAlumni->sekolah_tujuan,
+                            'tahun_lulus' => $selectedAlumni->tahun_lulus,
+                            'nomor_peserta_psaj' => $selectedAlumni->nomor_peserta_psaj,
+                            'nomor_skl' => $selectedAlumni->nomor_skl,
+                            'nomor_ijazah_sma' => $selectedAlumni->nomor_ijazah_sma,
+                            'tanggal_ijazah_sma' => $selectedAlumni->tanggal_ijazah_sma,
+                            'nomor_transkrip' => $selectedAlumni->nomor_transkrip,
+                            'kegiatan_setelah_lulus' => $selectedAlumni->kegiatan_setelah_lulus,
+                            'edit_url' => route('admin.alumni.update', $selectedAlumni->id),
+                            'full_edit_url' => route('admin.form-pendataan.edit', $selectedAlumni->id),
+                        ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) }}" onclick="openAlumniEdit(this)">Edit Kontrol Induk</button>
+                        <a class="btn o" href="{{ route('admin.form-pendataan.edit', $selectedAlumni->id) }}">Edit biodata lengkap</a>
+                        <a class="btn o" href="{{ route('admin.data-siswa.pdf', $selectedAlumni->id) }}" target="_blank" rel="noopener">Cetak PDF</a>
+                    </div>
+                </section>
+                @if($selectedAlumni->isGraduated())
+                    <form class="alumni-side-form" method="POST" action="{{ route('admin.alumni.cancel-graduation', $selectedAlumni->id) }}" onsubmit="return confirm('Batalkan kelulusan dan kembalikan siswa menjadi aktif?')">
+                        @csrf
+                        <input type="hidden" name="aj" value="{{ $aj }}">
+                        <input type="hidden" name="ay" value="{{ $ay }}">
+                        <input type="hidden" name="aq" value="{{ $aq }}">
+                        <input type="hidden" name="page" value="{{ $alumni->currentPage() }}">
+                        <button type="submit" class="btn o">Batalkan kelulusan</button>
+                    </form>
+                @endif
+            @endif
+        </div>
+    </aside>
+@endif
 
 <div id="alumni-detail-modal" class="alumni-modal" role="dialog" aria-modal="true" aria-labelledby="alumni-detail-title" onclick="closeAlumniModal(event, this)">
     <div class="alumni-modal-box">
@@ -425,6 +588,20 @@ function closeAlumniModal(event, modal) {
     }
     if (!document.querySelector('.alumni-modal.on')) document.body.style.overflow = '';
 }
+
+document.querySelectorAll('.alumni-row').forEach((row) => {
+    const openPanel = () => window.location.assign(row.dataset.panelUrl);
+    row.addEventListener('click', (event) => {
+        if (event.target.closest('a,button,form,input,select')) return;
+        openPanel();
+    });
+    row.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            openPanel();
+        }
+    });
+});
 
 document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') {
