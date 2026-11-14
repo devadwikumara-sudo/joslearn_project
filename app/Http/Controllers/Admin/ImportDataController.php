@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Admin\ImportUnggahan;
 use App\Models\Auth\Pengguna;
 use App\Models\Guru\GuruBiodata;
 use App\Models\SekolahKelas;
@@ -25,8 +26,12 @@ class ImportDataController extends Controller
         'ekskul' => 'Ekskul',
     ];
 
-    public function index(Request $request, AksesGuru $aksesGuru, ImportBatchHistory $importBatchHistory): View|RedirectResponse
-    {
+    public function index(
+        Request $request,
+        AksesGuru $aksesGuru,
+        ImportBatchHistory $importBatchHistory,
+        ImportBatchController $importBatchController
+    ): View|RedirectResponse {
         $user = $request->user();
         abort_unless($user instanceof Pengguna, 403);
 
@@ -34,11 +39,12 @@ class ImportDataController extends Controller
         abort_unless($allowedTypes !== [], 403);
 
         $isAdmin = $user->peran === 'admin';
-        $indexRoute = $isAdmin ? 'admin.import-data' : 'guru.import-data';
+        $indexRoute = $isAdmin ? 'admin.import' : 'guru.import-data';
         $type = (string) $request->query('tab', $request->query('jenis', $allowedTypes[0]));
         abort_unless(isset(self::TYPES[$type]), 404);
         abort_unless(in_array($type, $allowedTypes, true), 403);
         $tab = $type;
+        $tabView = in_array($type, ['nilai', 'kehadiran', 'ekskul'], true) ? 'academic' : $type;
 
         if ($request->query->has('jenis') && ! $request->query->has('tab')) {
             $query = $request->query->all();
@@ -46,6 +52,16 @@ class ImportDataController extends Controller
             $query['tab'] = $type;
 
             return redirect()->route($indexRoute, $query);
+        }
+
+        $batchDetail = null;
+        if ($request->query->has('batch')) {
+            abort_unless($isAdmin && in_array($type, ['nilai', 'kehadiran', 'ekskul'], true), 404);
+            $batchId = filter_var($request->query('batch'), FILTER_VALIDATE_INT);
+            abort_unless(is_int($batchId), 404);
+            $batch = ImportUnggahan::query()->findOrFail($batchId);
+            abort_unless($batch->jenis === $type, 404);
+            $batchDetail = $importBatchController->managedBatchDetails($batch, $request->boolean('edit'));
         }
 
         $tahunAjaranList = SekolahTahunAjaran::query()->orderBy('nama')->get(['id', 'nama', 'sedang_berjalan']);
@@ -77,7 +93,7 @@ class ImportDataController extends Controller
                 ->values();
         }
 
-        $templateRoute = $isAdmin ? 'admin.import-data.template' : 'guru.import-data.template';
+        $templateRoute = $isAdmin ? 'admin.import.template' : 'guru.import-data.template';
         $typeLabel = self::TYPES[$type];
         $typeJs = $type === 'kehadiran' ? 'hadir' : $type;
         $availableTypes = array_intersect_key(self::TYPES, array_flip($allowedTypes));
@@ -104,6 +120,7 @@ class ImportDataController extends Controller
         return view('admin.import.data', compact(
             'allowedTypes',
             'availableTypes',
+            'batchDetail',
             'batches',
             'indexRoute',
             'isAdmin',
@@ -113,6 +130,7 @@ class ImportDataController extends Controller
             'tahunAjaranList',
             'tahunAjaranTerpilihId',
             'tab',
+            'tabView',
             'templateRoute',
             'totalGuru',
             'type',

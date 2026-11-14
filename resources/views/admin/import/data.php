@@ -16,5 +16,9 @@
     @endforeach
 </nav>
 
-@include('admin.import.tabs.'.$tab)
+@include('admin.import.tabs.'.$tabView)
+
+@if($batchDetail !== null)
+    @include('admin.import._batch-detail', $batchDetail)
+@endif
 @endsection

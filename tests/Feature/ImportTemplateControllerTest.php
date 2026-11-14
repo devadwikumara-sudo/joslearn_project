@@ -5,9 +5,9 @@ namespace Tests\Feature;
 use App\Models\Auth\Pengguna;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
-use PhpOffice\PhpSpreadsheet\IOFactory;
 use Tests\TestCase;
 
 #[RunTestsInSeparateProcesses]
@@ -42,7 +42,7 @@ class ImportTemplateControllerTest extends TestCase
     public static function activeTemplateRoutes(): array
     {
         return [
-            'siswa' => ['admin.import.siswa.template', [
+            'siswa' => ['siswa', [
                 'NISN', 'NIS', 'Nama', 'Kelas', 'Tahun Ajaran', 'Jenis Kelamin',
                 'Tempat Lahir', 'Tanggal Lahir', 'Agama', 'NIK', 'Kewarganegaraan',
                 'Alamat', 'RT/RW', 'Kelurahan', 'Kecamatan', 'Kabupaten', 'Provinsi',
@@ -53,19 +53,19 @@ class ImportTemplateControllerTest extends TestCase
                 'Pendidikan Ibu', 'Pekerjaan Ibu', 'Penghasilan Ibu', 'HP Ibu',
                 'Nama Wali', 'Status Siswa',
             ]],
-            'guru' => ['admin.import.guru.template', [
+            'guru' => ['guru', [
                 'Nama', 'NIP', 'NUPTK', 'NIK', 'Jenis Kelamin', 'Tempat Lahir',
                 'Tanggal Lahir', 'Pendidikan', 'Status Kepegawaian', 'Mulai Bertugas',
                 'Nomor HP', 'Alamat',
             ]],
-            'nilai' => ['admin.import.nilai.template', ['NISN', 'Nama', 'Kelas', 'Semester', 'Mata Pelajaran', 'Nilai Akhir']],
-            'kehadiran' => ['admin.import.kehadiran.template', ['NISN', 'Nama', 'Kelas', 'Semester', 'Sakit (hari)', 'Izin (hari)', 'Alpa (hari)', 'Kokurikuler']],
-            'ekskul' => ['admin.import.ekskul.template', ['NISN', 'Nama', 'Kelas', 'Semester', 'Nama Ekskul', 'Predikat']],
+            'nilai' => ['nilai', ['NISN', 'Nama', 'Kelas', 'Semester', 'Mata Pelajaran', 'Nilai Akhir']],
+            'kehadiran' => ['kehadiran', ['NISN', 'Nama', 'Kelas', 'Semester', 'Sakit (hari)', 'Izin (hari)', 'Alpa (hari)', 'Kokurikuler']],
+            'ekskul' => ['ekskul', ['NISN', 'Nama', 'Kelas', 'Semester', 'Nama Ekskul', 'Predikat']],
         ];
     }
 
     #[DataProvider('activeTemplateRoutes')]
-    public function test_active_template_route_downloads_a_valid_xlsx_with_expected_headers(string $routeName, array $expectedHeaders): void
+    public function test_active_template_route_downloads_a_valid_xlsx_with_expected_headers(string $type, array $expectedHeaders): void
     {
         $admin = Pengguna::create([
             'peran' => 'admin',
@@ -74,7 +74,7 @@ class ImportTemplateControllerTest extends TestCase
             'aktif' => true,
         ]);
 
-        $response = $this->actingAs($admin)->get(route($routeName));
+        $response = $this->actingAs($admin)->get(route('admin.import.template', ['jenis' => $type]));
 
         $response->assertOk();
         $this->assertStringContainsString(

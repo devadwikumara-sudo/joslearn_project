@@ -80,7 +80,7 @@ class DataSiswaController extends Controller
 
     public function importView(): RedirectResponse
     {
-        return redirect()->route('admin.import-data', ['tab' => 'siswa']);
+        return redirect()->route('admin.import', ['tab' => 'siswa']);
     }
 
     public function export(Request $request): StreamedResponse

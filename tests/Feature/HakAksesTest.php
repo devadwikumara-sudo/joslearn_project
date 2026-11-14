@@ -56,6 +56,8 @@ class HakAksesTest extends TestCase
             ['get', '/admin/data-guru'],
             ['post', '/admin/data-guru'],
             ['delete', '/admin/data-guru/1'],
+            ['get', '/admin/import'],
+            ['get', '/admin/import/template/nilai'],
             ['get', '/admin/import/siswa'],
             ['get', '/admin/import/guru'],
             ['post', '/admin/setting/cadangan/unduh'],

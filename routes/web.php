@@ -9,9 +9,6 @@ use App\Http\Controllers\Admin\DataSiswaController;
 use App\Http\Controllers\Admin\FormPendataanController;
 use App\Http\Controllers\Admin\ImportBatchController;
 use App\Http\Controllers\Admin\ImportDataController;
-use App\Http\Controllers\Admin\ImportEkskulAdminController;
-use App\Http\Controllers\Admin\ImportKehadiranAdminController;
-use App\Http\Controllers\Admin\ImportNilaiAdminController;
 use App\Http\Controllers\Admin\ImportTemplateController;
 use App\Http\Controllers\Admin\KenaikanKelasController;
 use App\Http\Controllers\Admin\LaporanController;
@@ -31,6 +28,7 @@ use App\Http\Controllers\Guru\ImportNilaiGuruController;
 use App\Http\Controllers\Guru\InputNilaiMapelController;
 use App\Http\Controllers\Guru\LogAktivitasGuruController;
 use App\Http\Controllers\Guru\SettingGuruController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 // ─── ALUR LOGIN & AUTENTIKASI GURU & ADMIN ───────────────────────────────────
@@ -134,36 +132,47 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin.only'])->grou
         ->whereIn('jenis', ['nilai', 'kehadiran', 'ekskul'])->name('import.batch.destroy-all');
 
     // Import Data (halaman gabungan)
-    Route::get('/import-data', [ImportDataController::class, 'index'])->name('import-data');
+    Route::get('/import', [ImportDataController::class, 'index'])->name('import');
+    Route::get('/import/template/{jenis}', [ImportDataController::class, 'downloadTemplate'])
+        ->whereIn('jenis', ['siswa', 'guru', 'nilai', 'kehadiran', 'ekskul'])->name('import.template');
+    Route::get('/import-data', function (Request $request) {
+        $query = $request->query();
+        if (isset($query['jenis']) && ! isset($query['tab'])) {
+            $query['tab'] = $query['jenis'];
+            unset($query['jenis']);
+        }
+
+        return redirect()->route('admin.import', $query);
+    })->name('import-data');
     Route::get('/import-data/template/{jenis}', [ImportDataController::class, 'downloadTemplate'])
         ->whereIn('jenis', ['siswa', 'guru', 'nilai', 'kehadiran', 'ekskul'])->name('import-data.template');
 
     // Import Siswa
-    Route::get('/import/siswa', fn () => redirect()->route('admin.import-data', ['tab' => 'siswa']))
+    Route::get('/import/siswa', fn () => redirect()->route('admin.import', ['tab' => 'siswa']))
         ->name('import.siswa');
     Route::get('/import/siswa/template', [ImportTemplateController::class, 'download'])->defaults('jenis', 'siswa')->name('import.siswa.template');
     Route::get('/import/guru/template', [ImportTemplateController::class, 'download'])->defaults('jenis', 'guru')->name('import.guru.template');
 
     // Import Nilai (import nilai.png)
-    Route::get('/import/nilai', fn () => redirect()->route('admin.import-data', ['tab' => 'nilai']))
+    Route::get('/import/nilai', fn () => redirect()->route('admin.import', ['tab' => 'nilai']))
         ->name('import.nilai');
-    Route::post('/import/nilai', [ImportNilaiAdminController::class, 'store'])->name('import.nilai.store');
-    Route::post('/import/nilai/upload', [ImportNilaiAdminController::class, 'store'])->name('import.nilai.upload');
+    Route::post('/import/nilai', fn () => redirect()->route('admin.import', ['tab' => 'nilai']))->name('import.nilai.store');
+    Route::post('/import/nilai/upload', fn () => redirect()->route('admin.import', ['tab' => 'nilai']))->name('import.nilai.upload');
     Route::get('/import/nilai/template', [ImportTemplateController::class, 'download'])->defaults('jenis', 'nilai')->name('import.nilai.template');
-    Route::post('/import/nilai/confirm', [ImportNilaiAdminController::class, 'confirm'])->name('import.nilai.confirm');
+    Route::post('/import/nilai/confirm', fn () => redirect()->route('admin.import', ['tab' => 'nilai']))->name('import.nilai.confirm');
 
     // Import Ekskul (import ekskul.png)
-    Route::get('/import/ekskul', fn () => redirect()->route('admin.import-data', ['tab' => 'ekskul']))
+    Route::get('/import/ekskul', fn () => redirect()->route('admin.import', ['tab' => 'ekskul']))
         ->name('import.ekskul');
-    Route::post('/import/ekskul', [ImportEkskulAdminController::class, 'store'])->name('import.ekskul.store');
-    Route::post('/import/ekskul/upload', [ImportEkskulAdminController::class, 'store'])->name('import.ekskul.upload');
+    Route::post('/import/ekskul', fn () => redirect()->route('admin.import', ['tab' => 'ekskul']))->name('import.ekskul.store');
+    Route::post('/import/ekskul/upload', fn () => redirect()->route('admin.import', ['tab' => 'ekskul']))->name('import.ekskul.upload');
     Route::get('/import/ekskul/template', [ImportTemplateController::class, 'download'])->defaults('jenis', 'ekskul')->name('import.ekskul.template');
 
     // Import Kehadiran (import kehadiran.png)
-    Route::get('/import/kehadiran', fn () => redirect()->route('admin.import-data', ['tab' => 'kehadiran']))
+    Route::get('/import/kehadiran', fn () => redirect()->route('admin.import', ['tab' => 'kehadiran']))
         ->name('import.kehadiran');
-    Route::post('/import/kehadiran', [ImportKehadiranAdminController::class, 'store'])->name('import.kehadiran.store');
-    Route::post('/import/kehadiran/upload', [ImportKehadiranAdminController::class, 'store'])->name('import.kehadiran.upload');
+    Route::post('/import/kehadiran', fn () => redirect()->route('admin.import', ['tab' => 'kehadiran']))->name('import.kehadiran.store');
+    Route::post('/import/kehadiran/upload', fn () => redirect()->route('admin.import', ['tab' => 'kehadiran']))->name('import.kehadiran.upload');
     Route::get('/import/kehadiran/template', [ImportTemplateController::class, 'download'])->defaults('jenis', 'kehadiran')->name('import.kehadiran.template');
 
     // Kenaikan Kelas (kenaikan kelas.png)
@@ -208,7 +217,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin.only'])->grou
     Route::post('/kenaikan-kelas/{id}/batalkan', [KenaikanKelasController::class, 'batalkan'])->name('kenaikan-kelas.batalkan');
 
     // Import Guru (admin)
-    Route::get('/import/guru', fn () => redirect()->route('admin.import-data', ['tab' => 'guru']))
+    Route::get('/import/guru', fn () => redirect()->route('admin.import', ['tab' => 'guru']))
         ->name('import.guru');
 
     // Tempat Sampah

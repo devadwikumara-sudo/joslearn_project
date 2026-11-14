@@ -264,8 +264,7 @@ test('shows active and graduated student totals after saving', async () => {
 
     await runImport();
 
-    assert.match(preview.innerHTML, /1 siswa aktif/);
-    assert.match(preview.innerHTML, /1 siswa lulus/);
+    assert.match(preview.innerHTML, /1 siswa aktif masuk Data Siswa, 1 siswa lulus masuk Alumni/);
     assert.match(preview.innerHTML, /\/test\/admin\/data-siswa/);
     assert.match(preview.innerHTML, /\/test\/admin\/alumni/);
     assert.ok(requests.some(({endpoint}) => endpoint.endsWith('/save-batch')));
@@ -286,7 +285,7 @@ test('reloads an academic import on the same tab after saving', async () => {
 
     await runImport();
 
-    assert.match(preview.innerHTML, /\/test\/admin\/import-data\?tab=nilai/);
+    assert.match(preview.innerHTML, /\/test\/admin\/import\?tab=nilai/);
 });
 
 test('aggregates student status totals across saved chunks', async () => {
@@ -314,8 +313,7 @@ test('aggregates student status totals across saved chunks', async () => {
 
     await runImport();
 
-    assert.match(preview.innerHTML, /2 siswa aktif/);
-    assert.match(preview.innerHTML, /2 siswa lulus/);
+    assert.match(preview.innerHTML, /2 siswa aktif masuk Data Siswa, 2 siswa lulus masuk Alumni/);
     assert.equal(requests.filter(({endpoint}) => endpoint.endsWith('/save-batch')).length, 2);
 });
 

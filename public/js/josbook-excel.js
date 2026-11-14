@@ -1870,7 +1870,8 @@
             hadir: 'Kehadiran',
             ekskul: 'Ekskul'
         }[I.t] || 'Data';
-        const reloadImportUrl = `${appBaseUrl}/${importRolePath}/import-data?tab=${encodeURIComponent(importType)}`;
+        const importPagePath = importRolePath === 'admin' ? 'import' : 'import-data';
+        const reloadImportUrl = `${appBaseUrl}/${importRolePath}/${importPagePath}?tab=${encodeURIComponent(importType)}`;
 
         if (!endpoint) {
             alert('Alamat layanan import tidak tersedia. Muat ulang halaman lalu coba lagi.');
@@ -1938,7 +1939,7 @@
                 graduated_count: graduatedCount,
                 errors,
                 message: I.t === 'siswa'
-                    ? `Berhasil mengimpor ${count} data siswa: ${activeCount} siswa aktif untuk Data Siswa dan ${graduatedCount} siswa lulus untuk Alumni${skipped ? ` (${skipped} baris gagal/dilewati)` : ''}.`
+                    ? `Berhasil mengimpor ${count} data siswa: ${activeCount} siswa aktif masuk Data Siswa, ${graduatedCount} siswa lulus masuk Alumni${skipped ? ` (${skipped} baris gagal/dilewati)` : ''}.`
                     : `Berhasil mengimpor ${count} data ${I.t}${skipped ? ` (${skipped} baris gagal/dilewati)` : ''}.`
             };
             const container = document.getElementById('josbook-import-preview-area');

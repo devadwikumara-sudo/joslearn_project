@@ -196,10 +196,24 @@ class ImportBatchManagementTest extends TestCase
         ]);
 
         $this->actingAs($admin)
-            ->get(route('admin.import.batch.show', $batchId))
+            ->get(route('admin.import.batch.show', ['batch' => $batchId, 'edit' => 1]))
+            ->assertRedirect(route('admin.import', [
+                'tab' => 'nilai',
+                'batch' => $batchId,
+                'tahun_ajaran_id' => $yearId,
+                'edit' => 1,
+            ]));
+
+        $this->get(route('admin.import', [
+            'tab' => 'nilai',
+            'batch' => $batchId,
+            'tahun_ajaran_id' => $yearId,
+            'edit' => 1,
+        ]))
             ->assertOk()
             ->assertSee('Baris file yang diimpor')
-            ->assertSee('0012345678');
+            ->assertSee('0012345678')
+            ->assertSee('name="nilai_angka"', false);
 
         $this->put(route('admin.import.batch.records.update', [$batchId, $recordId]), [
             'nilai_angka' => 91,
@@ -220,7 +234,7 @@ class ImportBatchManagementTest extends TestCase
         $this->createNilaiRecord($historyId, 80, $batchId);
 
         $this->actingAs($admin)
-            ->get(route('admin.import-data', ['tab' => 'nilai', 'tahun_ajaran_id' => $yearId]))
+            ->get(route('admin.import', ['tab' => 'nilai', 'tahun_ajaran_id' => $yearId]))
             ->assertOk()
             ->assertSee('Data hasil impor 2026/2027')
             ->assertSee('X-1')

@@ -28,7 +28,6 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
-use Illuminate\View\View;
 
 class ImportBatchController extends Controller
 {
@@ -174,30 +173,52 @@ class ImportBatchController extends Controller
         return response()->json(['success' => true]);
     }
 
-    public function showManagedBatch(ImportUnggahan $batch): View
+    public function showManagedBatch(Request $request, ImportUnggahan $batch): RedirectResponse
     {
         $this->academicTableForType($batch->jenis);
 
+        $query = [
+            'tab' => $batch->jenis,
+            'batch' => $batch->id,
+        ];
+        if ($batch->tahun_ajaran_id !== null) {
+            $query['tahun_ajaran_id'] = $batch->tahun_ajaran_id;
+        }
+        if ($request->boolean('edit')) {
+            $query['edit'] = 1;
+        }
+
+        return redirect()->route('admin.import', $query);
+    }
+
+    /**
+     * @return array{
+     *     batch: ImportUnggahan,
+     *     rows: Collection<int, ImportBaris>,
+     *     records: Collection,
+     *     tahunAjaran: ?SekolahTahunAjaran,
+     *     kelas: ?SekolahKelas,
+     *     editing: bool
+     * }
+     */
+    public function managedBatchDetails(ImportUnggahan $batch, bool $editing): array
+    {
+        $this->academicTableForType($batch->jenis);
         $rows = ImportBaris::query()
             ->where('unggahan_id', $batch->id)
             ->orderBy('nomor_baris_excel')
             ->get();
-        $records = $this->recordsForBatch($batch);
-        $tahunAjaran = $batch->tahun_ajaran_id === null
-            ? null
-            : SekolahTahunAjaran::query()->find($batch->tahun_ajaran_id);
-        $kelas = $batch->kelas_id === null
-            ? null
-            : SekolahKelas::query()->find($batch->kelas_id);
+        $tahunAjaran = $batch->tahun_ajaran_id === null ? null : SekolahTahunAjaran::query()->find($batch->tahun_ajaran_id);
+        $kelas = $batch->kelas_id === null ? null : SekolahKelas::query()->find($batch->kelas_id);
 
-        return view('admin.import.batch-detail', [
+        return [
             'batch' => $batch,
             'rows' => $rows,
-            'records' => $records,
+            'records' => $this->recordsForBatch($batch),
             'tahunAjaran' => $tahunAjaran,
             'kelas' => $kelas,
-            'editing' => request()->boolean('edit') && $batch->status === 'selesai',
-        ]);
+            'editing' => $editing && $batch->status === 'selesai',
+        ];
     }
 
     public function updateManagedRecord(Request $request, ImportUnggahan $batch, int $record): RedirectResponse
@@ -248,8 +269,17 @@ class ImportBatchController extends Controller
             'created_at' => now(),
         ]);
 
+        $query = [
+            'tab' => $batch->jenis,
+            'batch' => $batch->id,
+            'edit' => 1,
+        ];
+        if ($batch->tahun_ajaran_id !== null) {
+            $query['tahun_ajaran_id'] = $batch->tahun_ajaran_id;
+        }
+
         return redirect()
-            ->route('admin.import.batch.show', ['batch' => $batch->id, 'edit' => 1])
+            ->route('admin.import', $query)
             ->with('success', 'Baris hasil impor berhasil diperbarui.');
     }
 

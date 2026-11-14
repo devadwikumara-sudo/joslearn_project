@@ -1061,7 +1061,7 @@ class ImportStudentMatchingTest extends TestCase
 
     public function test_admin_import_page_offers_all_import_types(): void
     {
-        $response = $this->actingAs($this->admin)->withoutMiddleware()->get(route('admin.import-data'));
+        $response = $this->actingAs($this->admin)->withoutMiddleware()->get(route('admin.import'));
 
         $response->assertOk()
             ->assertViewHas('allowedTypes', ['siswa', 'guru', 'nilai', 'kehadiran', 'ekskul'])
@@ -1082,8 +1082,8 @@ class ImportStudentMatchingTest extends TestCase
             ->assertSee('Cek Kualitas Data')
             ->assertSee('Tempat Sampah')
             ->assertSee('Setting')
-            ->assertSee(route('admin.import-data', ['tab' => 'nilai']), false)
-            ->assertSee(route('admin.import-data.template', ['jenis' => 'siswa']), false);
+            ->assertSee(route('admin.import', ['tab' => 'nilai']), false)
+            ->assertSee(route('admin.import.template', ['jenis' => 'siswa']), false);
         $this->assertSame(15, substr_count($response->getContent(), 'data-menu="'));
         $this->assertStringNotContainsString('data-menu-group=', $response->getContent());
         $this->assertStringNotContainsString('josbook-sidebar-subnav', $response->getContent());
@@ -1106,7 +1106,7 @@ class ImportStudentMatchingTest extends TestCase
             $this->assertStringContainsString(route($routeName), $response->getContent());
         }
 
-        $this->get(route('admin.import-data', ['tab' => 'nilai']))
+        $this->get(route('admin.import', ['tab' => 'nilai']))
             ->assertOk()
             ->assertViewHas('type', 'nilai')
             ->assertViewHas('tab', 'nilai')
@@ -1119,16 +1119,22 @@ class ImportStudentMatchingTest extends TestCase
 
     public function test_legacy_admin_import_url_redirects_to_the_selected_tab(): void
     {
-        $this->actingAs($this->admin)->withoutMiddleware()
-            ->get(route('admin.import.nilai'))
-            ->assertRedirect(route('admin.import-data', ['tab' => 'nilai']));
+        $this->actingAs($this->admin)->withoutMiddleware();
+
+        foreach (['siswa', 'guru', 'nilai', 'kehadiran', 'ekskul'] as $type) {
+            $this->get(route('admin.import.'.$type))
+                ->assertRedirect(route('admin.import', ['tab' => $type]));
+        }
     }
 
     public function test_legacy_import_data_query_parameter_redirects_to_tab(): void
     {
         $this->actingAs($this->admin)->withoutMiddleware()
             ->get(route('admin.import-data', ['jenis' => 'nilai']))
-            ->assertRedirect(route('admin.import-data', ['tab' => 'nilai']));
+            ->assertRedirect(route('admin.import', ['tab' => 'nilai']));
+
+        $this->get(route('admin.import', ['jenis' => 'nilai']))
+            ->assertRedirect(route('admin.import', ['tab' => 'nilai']));
     }
 
     public function test_legacy_teacher_import_url_redirects_after_assignment_check(): void
@@ -1675,7 +1681,7 @@ class ImportStudentMatchingTest extends TestCase
 
     public function test_downloaded_grade_template_can_be_filled_and_imported_through_the_batch_endpoint(): void
     {
-        $download = $this->actingAs($this->admin)->get(route('admin.import.nilai.template'));
+        $download = $this->actingAs($this->admin)->get(route('admin.import.template', ['jenis' => 'nilai']));
         $download->assertOk();
 
         $path = tempnam(sys_get_temp_dir(), 'josbook-template-');

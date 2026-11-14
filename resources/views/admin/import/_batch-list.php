@@ -69,9 +69,9 @@
                         </td>
                         <td>
                             <div class="bar">
-                                <a class="btn o" href="{{ route('admin.import.batch.show', $batch) }}">Lihat</a>
+                                <a class="btn o" href="{{ route('admin.import', ['tab' => $type, 'tahun_ajaran_id' => $tahunTerpilih?->id, 'batch' => $batch->id]) }}">Lihat</a>
                                 @if($batchCanBeEdited)
-                                    <a class="btn o" href="{{ route('admin.import.batch.show', ['batch' => $batch->id, 'edit' => 1]) }}">Edit</a>
+                                    <a class="btn o" href="{{ route('admin.import', ['tab' => $type, 'tahun_ajaran_id' => $tahunTerpilih?->id, 'batch' => $batch->id, 'edit' => 1]) }}">Edit</a>
                                 @else
                                     <button type="button" class="btn o" disabled title="Data batch ini belum memiliki jejak record yang aman untuk diedit.">Edit</button>
                                 @endif

@@ -1,31 +1,22 @@
-@extends('layouts.app')
-
-@section('title', 'Detail Batch Import — JosBook Admin')
-
-@section('content')
-<h2>Detail batch import #{{ $batch->id }}</h2>
+<div class="card" style="margin-top:14px">
+    <h3>Detail batch import #{{ $batch->id }}</h3>
 <p class="sub">
     {{ ucfirst($batch->jenis) }} · {{ $tahunAjaran?->nama ?? 'Tahun ajaran tidak tercatat' }} ·
     {{ $kelas?->nama ?? 'Kelas tercatat per baris' }} · {{ $batch->nama_file }}
 </p>
 
 <div class="bar" style="margin-bottom:14px">
-    <a class="btn o" href="{{ route('admin.import-data', ['tab' => $batch->jenis, 'tahun_ajaran_id' => $batch->tahun_ajaran_id]) }}">Kembali</a>
+    <a class="btn o" href="{{ route('admin.import', ['tab' => $batch->jenis, 'tahun_ajaran_id' => $batch->tahun_ajaran_id]) }}">Tutup detail</a>
     @if($records->isNotEmpty())
         @if($editing)
-            <a class="btn o" href="{{ route('admin.import.batch.show', $batch) }}">Selesai edit</a>
+            <a class="btn o" href="{{ route('admin.import', ['tab' => $batch->jenis, 'tahun_ajaran_id' => $batch->tahun_ajaran_id, 'batch' => $batch->id]) }}">Selesai edit</a>
         @else
-            <a class="btn o" href="{{ route('admin.import.batch.show', ['batch' => $batch->id, 'edit' => 1]) }}">Edit data batch</a>
+            <a class="btn o" href="{{ route('admin.import', ['tab' => $batch->jenis, 'tahun_ajaran_id' => $batch->tahun_ajaran_id, 'batch' => $batch->id, 'edit' => 1]) }}">Edit data batch</a>
         @endif
     @endif
 </div>
-
-@if(session('success'))
-    <p class="success" role="status">{{ session('success') }}</p>
-@endif
-
-<div class="card">
-    <h3>Baris file yang diimpor</h3>
+    <div class="card">
+        <h3>Baris file yang diimpor</h3>
     <div class="tw">
         <table>
             <thead>
@@ -50,10 +41,10 @@
             </tbody>
         </table>
     </div>
-</div>
+    </div>
 
-<div class="card" style="margin-top:14px">
-    <h3>Data hasil tersimpan</h3>
+    <div class="card" style="margin-top:14px">
+        <h3>Data hasil tersimpan</h3>
     @if($records->isEmpty())
         <p class="sub">Tidak ada record yang dapat dipetakan secara aman ke batch ini. Batch W13 lama tetap dapat dilihat, tetapi datanya tidak bisa diedit atau dihapus lewat aksi batch.</p>
     @else
@@ -154,5 +145,5 @@
             </table>
         </div>
     @endif
+    </div>
 </div>
-@endsection
