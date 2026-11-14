@@ -316,6 +316,72 @@ class DataSiswaBulkActionsTest extends TestCase
             ->assertDontSee('<option value="Keluar"', false);
     }
 
+    public function test_data_siswa_renders_the_shared_create_form_in_a_side_panel(): void
+    {
+        $admin = $this->createAccount('admin');
+
+        $response = $this->actingAs($admin)->get(route('admin.data-siswa', [
+            'panel' => 'form',
+            'mode' => 'create',
+        ]));
+
+        $response->assertOk()
+            ->assertSee('id="student-form-panel"', false)
+            ->assertSee('Tambah Siswa')
+            ->assertSee('name="foto_file"', false)
+            ->assertSee('name="berkas[kk]"', false)
+            ->assertSee('Data Ayah Kandung')
+            ->assertSee('Lampiran Berkas');
+    }
+
+    public function test_legacy_form_routes_redirect_to_data_siswa_panel(): void
+    {
+        $admin = $this->createAccount('admin');
+        $studentId = $this->createStudent('Siswa Aktif', 2, 1);
+        $createPanelUrl = route('admin.data-siswa', [
+            'panel' => 'form',
+            'mode' => 'create',
+        ]);
+        $editPanelUrl = route('admin.data-siswa', [
+            'panel' => 'form',
+            'mode' => 'edit',
+            'siswa' => $studentId,
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.form-pendataan'))
+            ->assertRedirect($createPanelUrl);
+        $this->get(route('admin.data-siswa.create'))
+            ->assertRedirect($createPanelUrl);
+        $this->get(route('admin.form-pendataan.edit', $studentId))
+            ->assertRedirect($editPanelUrl);
+        $this->get(route('admin.data-siswa.edit', $studentId))
+            ->assertRedirect($editPanelUrl);
+    }
+
+    public function test_validation_error_reopens_form_panel_with_previous_input(): void
+    {
+        $admin = $this->createAccount('admin');
+        $formUrl = route('admin.data-siswa', [
+            'panel' => 'form',
+            'mode' => 'create',
+        ]);
+
+        $this->actingAs($admin)
+            ->from($formUrl)
+            ->followingRedirects()
+            ->post(route('admin.data-siswa.store'), [
+                '_form_panel' => '1',
+                '_form_mode' => 'create',
+                'nama_lengkap' => 'Nama Tetap Tersimpan',
+                'nisn' => 'invalid',
+            ])
+            ->assertOk()
+            ->assertSee('id="student-form-panel"', false)
+            ->assertSee('value="Nama Tetap Tersimpan"', false)
+            ->assertSee('role="alert"', false);
+    }
+
     public function test_bulk_delete_requires_explicit_confirmation(): void
     {
         $this->actingAs($this->createAccount('admin'));

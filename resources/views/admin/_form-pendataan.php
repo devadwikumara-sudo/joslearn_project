@@ -1,9 +1,8 @@
-@extends('layouts.app')
-
-@section('title', ($edit ? 'Edit Data Siswa' : 'Form Pendataan · Siswa Baru') . ' — ' . (auth()->user()?->peran === 'guru' ? 'JosBook Guru' : 'JosBook Admin'))
-
-@section('content')
 @php
+    $edit = $formData['edit'];
+    $kelasList = $formData['kelasList'];
+    $tahunAjaranList = $formData['tahunAjaranList'];
+    $tahunAjaranTerpilih = $formData['tahunAjaranTerpilih'];
     $tahunAjaranForm = old('tahun_ajaran', $tahunAjaranTerpilih);
     $riwayatTerpilih = $edit?->riwayatKelas->firstWhere('tahunAjaran.nama', $tahunAjaranForm);
     $lampiranBerkas = [
@@ -12,33 +11,64 @@
         'ijazah_smp' => ['Ijazah SMP', 'ijazah_smp_ada'],
         'surat_pindah' => ['Surat Pindah', 'surat_pindah_ada'],
     ];
-        $isGuru = auth()->user()?->peran === 'guru';
-        $formAction = $edit
-            ? route($isGuru ? 'guru.data-siswa.update' : 'admin.form-pendataan.update', $edit->id)
-            : route('admin.form-pendataan.store');
-        $cancelUrl = route($isGuru ? 'guru.data-siswa' : 'admin.data-siswa');
+    $formAction = $edit
+        ? route('admin.data-siswa.update', $edit->id)
+        : route('admin.data-siswa.store');
+    $cancelUrl = $formCloseUrl;
 @endphp
-<h2>Form Pendataan · Siswa {{ $edit ? 'Edit' : 'Baru' }}</h2>
-@if($errors->any())
-    <div class="note err" role="alert" style="margin-bottom:14px">{{ $errors->first() }}</div>
-@endif
-@if(count($tahunAjaranList) === 0)
-    <div class="note err" role="alert" style="margin-bottom:14px">
-        Pilihan tahun ajaran belum tersedia. Jalankan pembaruan data master sebelum menyimpan siswa.
+@push('styles')
+<style>
+    .student-form-backdrop{position:fixed;inset:0;z-index:1100;background:rgba(9,24,43,.62);backdrop-filter:blur(3px)}
+    .student-form-panel{position:fixed;top:0;right:0;z-index:1101;display:flex;flex-direction:column;width:min(940px,100%);height:100dvh;background:#f5f8fc;box-shadow:-18px 0 55px #06172f33}
+    .student-form-head{display:flex;align-items:center;gap:14px;padding:16px 20px;background:#fff;border-bottom:1px solid var(--ln)}
+    .student-form-head h3{margin:0;color:var(--p);font-size:17px}
+    .student-form-head p{margin:3px 0 0;color:var(--mu);font-size:12px}
+    .student-form-close{margin-left:auto;width:36px;height:36px;border:1px solid var(--ln);border-radius:50%;background:#fff;color:var(--p);font-size:20px;text-align:center;text-decoration:none}
+    .student-form-body{overflow-y:auto;padding:16px}
+    @media(max-width:600px){.student-form-body{padding:8px}.student-form-head{padding:12px}}
+</style>
+@endpush
+
+<a class="student-form-backdrop" href="{{ $cancelUrl }}" aria-label="Tutup form pendataan"></a>
+<aside id="student-form-panel" class="student-form-panel" role="dialog" aria-modal="true" aria-labelledby="student-form-title">
+    <div class="student-form-head">
+        <div>
+            <h3 id="student-form-title">{{ $edit ? 'Ubah Data Siswa' : 'Tambah Siswa' }}</h3>
+            @if($edit)
+                <p>{{ $edit->nama_lengkap }} · NISN {{ $edit->nisn }}</p>
+            @else
+                <p>Lengkapi biodata, riwayat, dan dokumen peserta didik.</p>
+            @endif
+        </div>
+        <a class="student-form-close" href="{{ $cancelUrl }}" aria-label="Tutup panel">&times;</a>
     </div>
-@endif
-<p class="sub">
-    @if($edit)
-        Mengubah data siswa <b>{{ $edit->nama_lengkap }}</b> · NISN {{ $edit->nisn }}. Data pribadi berlaku untuk seluruh tahun ajaran.
-    @else
-        Halaman ini khusus input siswa baru. Untuk mengubah data siswa yang sudah ada, klik <b>Edit</b> di Data Siswa atau Alumni.
-    @endif
-</p>
+    <div class="student-form-body">
+        @if($errors->any())
+            <div class="note err" role="alert" style="margin-bottom:14px">{{ $errors->first() }}</div>
+        @endif
+        @if(session('error'))
+            <div class="note err" role="alert" style="margin-bottom:14px">{{ session('error') }}</div>
+        @endif
+        @if(count($tahunAjaranList) === 0)
+            <div class="note err" role="alert" style="margin-bottom:14px">
+                Pilihan tahun ajaran belum tersedia. Jalankan pembaruan data master sebelum menyimpan siswa.
+            </div>
+        @endif
+        <p class="sub">
+            @if($edit)
+                Data pribadi berlaku untuk seluruh tahun ajaran.
+            @else
+                Isi bagian yang diperlukan, lalu simpan data siswa.
+            @endif
+        </p>
 
 <form action="{{ $formAction }}" method="POST" enctype="multipart/form-data">
     @csrf
+    <input type="hidden" name="_form_panel" value="1">
+    <input type="hidden" name="_form_mode" value="{{ $edit ? 'edit' : 'create' }}">
     @if($edit)
         @method('PUT')
+        <input type="hidden" name="_form_siswa" value="{{ $edit->id }}">
     @endif
 
     <div class="card">
@@ -63,7 +93,7 @@
             <div class="note" style="margin-top:0;margin-bottom:14px;display:flex;gap:14px;align-items:center;flex-wrap:wrap">
                 <div style="width:72px;height:96px;background:#e2e8f0;border-radius:6px;border:1px dashed #94a3b8;display:flex;align-items:center;justify-content:center;overflow:hidden">
                     @if($edit && $edit->foto)
-                        <img id="preview-foto" src="{{ route($isGuru ? 'guru.data-siswa.foto' : 'admin.data-siswa.foto', $edit->id) }}" style="width:100%;height:100%;object-fit:cover">
+                        <img id="preview-foto" src="{{ route('admin.data-siswa.foto', $edit->id) }}" style="width:100%;height:100%;object-fit:cover">
                     @else
                         <img id="preview-foto" style="width:100%;height:100%;object-fit:cover;display:none">
                         <span id="label-foto" style="font-size:11px;color:#64748b;text-align:center">Pas foto<br>3×4</span>
@@ -512,7 +542,7 @@
                         @if($berkasTersimpan)
                             <p class="sub" style="margin:0 0 8px;font-size:11px">
                                 File tersimpan:
-                                <a href="{{ route($isGuru ? 'guru.data-siswa.berkas' : 'admin.data-siswa.berkas', [$edit->id, $jenisBerkas]) }}">{{ $berkasTersimpan->nama_file }}</a>
+                                <a href="{{ route('admin.data-siswa.berkas', [$edit->id, $jenisBerkas]) }}">{{ $berkasTersimpan->nama_file }}</a>
                             </p>
                         @else
                             <p class="sub" style="margin:0 0 8px;font-size:11px">Belum ada file yang diunggah.</p>
@@ -536,10 +566,14 @@
         </div>
     </div>
 </form>
+    </div>
+</aside>
 
 @push('scripts')
 <script>
 (function() {
+    var formPanel = document.getElementById('student-form-panel');
+    if (!formPanel) return;
     var tabs = document.querySelectorAll('.tab-btn');
     var panes = document.querySelectorAll('.tab-pane');
     var btnPrev = document.getElementById('btn-prev');
@@ -562,6 +596,16 @@
 
         if (btnPrev) btnPrev.style.display = currentIndex > 0 ? 'inline-block' : 'none';
         if (btnNext) btnNext.style.display = currentIndex < tabs.length - 1 ? 'inline-block' : 'none';
+    }
+
+    var failedFields = {!! json_encode(array_keys($errors->getMessages()), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!};
+    var failedInput = Array.from(formPanel.querySelectorAll('[name]')).find(function(input) {
+        var fieldName = input.name.replace(/\[([^\]]+)\]/g, '.$1');
+        return failedFields.includes(fieldName);
+    });
+    if (failedInput) {
+        var failedPane = failedInput.closest('.tab-pane');
+        if (failedPane) showTab(Array.from(panes).indexOf(failedPane));
     }
 
     tabs.forEach(function(t, i) {
@@ -604,4 +648,3 @@
 })();
 </script>
 @endpush
-@endsection

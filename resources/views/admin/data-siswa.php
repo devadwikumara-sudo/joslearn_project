@@ -97,7 +97,7 @@
     <div class="student-page-actions">
         <a href="{{ route('admin.data-siswa.export', ['tahun_ajaran' => $tahunAjaranTerpilihId]) }}" class="btn o">Ekspor Excel</a>
         <a href="{{ route('admin.import.siswa') }}" class="btn o">Import Excel</a>
-        <a href="{{ route('admin.form-pendataan') }}" class="btn">+ Tambah siswa</a>
+        <a href="{{ route('admin.data-siswa', array_merge(request()->query(), ['panel' => 'form', 'mode' => 'create'])) }}" class="btn">+ Tambah siswa</a>
         @if($kelasSelected === '' || $kelasSelected === '*')
             <button type="button" class="btn x" disabled title="Pilih satu kelas terlebih dahulu">Hapus semua kelas ini</button>
         @endif
@@ -168,6 +168,11 @@
                     $rk = $s->riwayatKelas->first();
                     $kelasNama = $rk?->kelas?->nama ?? 'Belum ditetapkan';
                     $statusNama = $rk?->status ?? 'Belum diatur';
+                    $formEditUrl = route('admin.data-siswa', array_merge(request()->query(), [
+                        'panel' => 'form',
+                        'mode' => 'edit',
+                        'siswa' => $s->id,
+                    ]));
                     $badgeClass = in_array($statusNama, ['Aktif', 'Lulus'], true)
                         ? 'ok'
                         : (in_array($statusNama, ['Pindah keluar', 'Belum diatur'], true) ? 'w' : 'e');
@@ -187,7 +192,7 @@
                         <button
                             type="button"
                             data-pdf-url="{{ route('admin.data-siswa.pdf', $s->id) }}"
-                            data-edit-url="{{ route('admin.form-pendataan.edit', $s->id) }}"
+                            data-edit-url="{{ $formEditUrl }}"
                             class="btn o"
                             style="padding:3px 8px;font-size:12px"
                             aria-haspopup="dialog"
@@ -202,7 +207,7 @@
                             ])
                         </template>
                         <a href="{{ route('admin.data-siswa.pdf', $s->id) }}" class="btn a" style="padding:3px 8px;font-size:12px">⬇ PDF</a>
-                        <a href="{{ route('admin.form-pendataan.edit', $s->id) }}" class="btn o" style="padding:3px 8px;font-size:12px">Edit</a>
+                        <a href="{{ $formEditUrl }}" class="btn o" style="padding:3px 8px;font-size:12px">Ubah</a>
                         <button type="button" class="btn o" style="padding:3px 8px;font-size:12px" title="Pindah kelas" aria-label="Pindah kelas {{ $s->nama_lengkap }}" onclick="openBulkMovePanel([{{ $s->id }}])">⇄</button>
                         <form action="{{ route('admin.data-siswa.destroy', $s->id) }}" method="POST" style="display:inline" onsubmit="return confirm('Pindahkan data {{ $s->nama_lengkap }} ke tempat sampah?')">
                             @csrf
@@ -281,6 +286,13 @@
     </div>
     @endif
 </div>
+
+@if($formOpen && $formData)
+    @include('admin._form-pendataan', [
+        'formData' => $formData,
+        'formCloseUrl' => $formCloseUrl,
+    ])
+@endif
 
 <div id="student-detail-modal" class="student-detail-modal" role="dialog" aria-modal="true" aria-labelledby="student-detail-title" onclick="closeStudentDetail(event, this)">
     <div class="student-detail-box">

@@ -17,7 +17,6 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
-use Illuminate\View\View;
 use RuntimeException;
 
 class FormPendataanController extends Controller
@@ -98,46 +97,51 @@ class FormPendataanController extends Controller
         'kegiatan_setelah_lulus' => 255,
     ];
 
-    public function index(): View
+    public function index(): RedirectResponse
     {
-        $tahunAjaranList = $this->academicYearOptions();
-        $kelasList = SekolahKelas::orderBy('nama')->pluck('nama')->all();
-        sort($kelasList, SORT_NATURAL);
-        $tahunAjaranTerpilih = SekolahTahunAjaran::where('sedang_berjalan', 1)->value('nama')
-            ?? $tahunAjaranList[0]
-            ?? null;
-
-        return view('admin.form-pendataan', [
-            'edit' => null,
-            'kelasList' => $kelasList,
-            'tahunAjaranList' => $tahunAjaranList,
-            'tahunAjaranTerpilih' => $tahunAjaranTerpilih,
+        return redirect()->route('admin.data-siswa', [
+            'panel' => 'form',
+            'mode' => 'create',
         ]);
     }
 
-    public function edit(int $id): View
+    public function edit(int $id): RedirectResponse
+    {
+        return redirect()->route('admin.data-siswa', [
+            'panel' => 'form',
+            'mode' => 'edit',
+            'siswa' => $id,
+        ]);
+    }
+
+    /**
+     * @return array{
+     *     edit: ?SiswaBiodata,
+     *     kelasList: array<int, string>,
+     *     tahunAjaranList: array<int, string>,
+     *     tahunAjaranTerpilih: ?string
+     * }
+     */
+    public function formOptions(?SiswaBiodata $siswa = null): array
     {
         $tahunAjaranList = $this->academicYearOptions();
         $kelasList = SekolahKelas::orderBy('nama')->pluck('nama')->all();
         sort($kelasList, SORT_NATURAL);
-        $siswa = SiswaBiodata::with(['berkas', 'riwayatKelas' => function ($query) {
-            $query->with(['kelas', 'tahunAjaran'])->orderByDesc('tahun_ajaran_id');
-        }])->findOrFail($id);
         $tahunAjaranAktif = SekolahTahunAjaran::where('sedang_berjalan', 1)->first();
-        $tahunAjaranTerpilih = $siswa->riwayatKelas
-            ->firstWhere('tahun_ajaran_id', $tahunAjaranAktif?->id)
+        $tahunAjaranTerpilih = $siswa?->riwayatKelas
+            ?->firstWhere('tahun_ajaran_id', $tahunAjaranAktif?->id)
             ?->tahunAjaran?->nama
-            ?? $siswa->riwayatKelas->first()?->tahunAjaran?->nama
+            ?? $siswa?->riwayatKelas?->first()?->tahunAjaran?->nama
             ?? $tahunAjaranAktif?->nama
             ?? $tahunAjaranList[0]
             ?? null;
 
-        return view('admin.form-pendataan', [
+        return [
             'edit' => $siswa,
             'kelasList' => $kelasList,
             'tahunAjaranList' => $tahunAjaranList,
             'tahunAjaranTerpilih' => $tahunAjaranTerpilih,
-        ]);
+        ];
     }
 
     public function store(Request $request): RedirectResponse

@@ -30,6 +30,8 @@ class StudentAttachmentDownloadTest extends TestCase
             $table->boolean('akta_ada')->default(false);
             $table->boolean('ijazah_smp_ada')->default(false);
             $table->boolean('surat_pindah_ada')->default(false);
+            $table->boolean('foto_ada')->default(false);
+            $table->string('foto')->nullable();
             $table->softDeletes();
             $table->timestamps();
         });
@@ -135,11 +137,12 @@ class StudentAttachmentDownloadTest extends TestCase
         ]);
         DB::table('sekolah_kelas')->insert(['nama' => 'X-1']);
 
-        $response = $this->withoutMiddleware()->post(route('admin.form-pendataan.store'), [
+        $response = $this->withoutMiddleware()->post(route('admin.data-siswa.store'), [
             'nama_lengkap' => 'Siswa Uji',
             'nisn' => '1234567890',
             'kelas' => 'X-1',
             'tahun_ajaran' => '2025/2026',
+            'foto_file' => UploadedFile::fake()->image('pas-foto.jpg'),
             'berkas' => [
                 'kk' => UploadedFile::fake()->create('kartu-keluarga.pdf', 32, 'application/pdf'),
             ],
@@ -155,5 +158,9 @@ class StudentAttachmentDownloadTest extends TestCase
         $this->assertSame('kartu-keluarga.pdf', $attachment->nama_file);
         Storage::disk('local')->assertExists($attachment->lokasi);
         $this->assertTrue((bool) DB::table('siswa_biodata')->value('kk_ada'));
+
+        $photoPath = DB::table('siswa_biodata')->value('foto');
+        $this->assertNotNull($photoPath);
+        Storage::disk('local')->assertExists($photoPath);
     }
 }

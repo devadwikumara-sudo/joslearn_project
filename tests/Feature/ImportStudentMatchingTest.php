@@ -1082,7 +1082,7 @@ class ImportStudentMatchingTest extends TestCase
             ->assertSee('Import Data')
             ->assertSee('Dashboard')
             ->assertSee('Data Siswa')
-            ->assertSee('Form Pendataan')
+            ->assertDontSee('Form Pendataan')
             ->assertSee('Data Guru')
             ->assertSee('Kenaikan Kelas')
             ->assertSee('Mutasi Siswa')
@@ -1095,7 +1095,7 @@ class ImportStudentMatchingTest extends TestCase
             ->assertDontSee('Tempat Sampah')
             ->assertSee(route('admin.import', ['tab' => 'nilai']), false)
             ->assertSee(route('admin.import.template', ['jenis' => 'siswa']), false);
-        $this->assertSame(12, substr_count($response->getContent(), 'data-menu="'));
+        $this->assertSame(11, substr_count($response->getContent(), 'data-menu="'));
         $this->assertSame(1, substr_count($response->getContent(), 'data-menu="alumni"'));
         $this->assertStringNotContainsString('data-menu="pelacakan"', $response->getContent());
         $this->assertSame(1, substr_count($response->getContent(), 'data-menu="setting"'));
@@ -1104,7 +1104,6 @@ class ImportStudentMatchingTest extends TestCase
         foreach ([
             'admin.dashboard',
             'admin.data-siswa',
-            'admin.form-pendataan',
             'admin.data-guru',
             'admin.kenaikan-kelas',
             'admin.mutasi-siswa',
