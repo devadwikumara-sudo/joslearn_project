@@ -116,7 +116,10 @@ class DataSiswaGuruTest extends TestCase
             ->assertSee('Siswa Satu')
             ->assertSee('Siswa Dua')
             ->assertDontSee('Siswa Lulus')
-            ->assertDontSee('Siswa Pindah');
+            ->assertDontSee('Siswa Pindah')
+            ->assertDontSee('<option value="Lulus"', false)
+            ->assertDontSee('<option value="Pindah keluar"', false)
+            ->assertDontSee('<option value="Keluar"', false);
     }
 
     public function test_selected_pdf_only_contains_selected_students_matching_current_filters(): void

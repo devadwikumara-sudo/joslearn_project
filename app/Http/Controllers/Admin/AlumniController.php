@@ -1,15 +1,15 @@
 <?php
+
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\View\View;
-use Illuminate\Support\Facades\DB;
-use App\Models\SiswaBiodata;
-use App\Models\SiswaRiwayatKelas;
-use App\Models\SekolahTahunAjaran;
 use App\Models\Admin\CatatanAktivitas;
+use App\Models\SekolahTahunAjaran;
+use App\Models\SiswaBiodata;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\View\View;
 
 class AlumniController extends Controller
 {
@@ -32,17 +32,17 @@ class AlumniController extends Controller
             ->toArray();
 
         $tahunKeluarList = SiswaBiodata::whereNotNull('tanggal_keluar')
-            ->selectRaw('YEAR(tanggal_keluar) as thn')
+            ->selectRaw('SUBSTR(tanggal_keluar, 1, 4) as thn')
             ->distinct()
             ->pluck('thn')
             ->filter()
-            ->map(fn($y) => (string)$y)
+            ->map(fn ($y) => (string) $y)
             ->toArray();
 
         $ys = array_values(array_unique(array_filter(array_merge($tahunList, $tahunKeluarList))));
         rsort($ys);
         if (empty($ys)) {
-            $ys = [(string)date('Y'), (string)(date('Y') - 1), (string)(date('Y') - 2)];
+            $ys = [(string) date('Y'), (string) (date('Y') - 1), (string) (date('Y') - 2)];
         }
 
         $query = SiswaBiodata::query();
@@ -51,43 +51,43 @@ class AlumniController extends Controller
         if ($aj === 'Alumni (Lulus)') {
             $query->graduated();
         } elseif ($aj === 'Pindah / Keluar') {
-            $query->where(function($q) {
+            $query->where(function ($q) {
                 $q->whereIn('alasan_keluar', ['Pindah', 'Keluar', 'Pindah keluar'])
-                  ->orWhereNotNull('tanggal_keluar')
-                  ->orWhereHas('riwayatKelas', function($rq) {
-                      $rq->whereIn('status', ['Pindah keluar', 'Keluar']);
-                  });
-            });
+                    ->orWhereNotNull('tanggal_keluar')
+                    ->orWhereHas('riwayatKelas', function ($rq) {
+                        $rq->whereIn('status', ['Pindah keluar', 'Keluar']);
+                    });
+            })->whereNotIn($query->qualifyColumn('id'), SiswaBiodata::aktif()->select('id'));
         }
 
         // Filter Tahun
         if ($ay !== '') {
-            $query->where(function($q) use ($ay) {
+            $query->where(function ($q) use ($ay) {
                 $q->where('tahun_lulus', $ay)
-                  ->orWhereRaw('YEAR(tanggal_keluar) = ?', [$ay]);
+                    ->orWhereRaw('SUBSTR(tanggal_keluar, 1, 4) = ?', [$ay]);
             });
         }
 
         // Filter Search
         if ($aq !== '') {
-            $query->where(function($q) use ($aq) {
+            $query->where(function ($q) use ($aq) {
                 $q->where('nama_lengkap', 'like', "%{$aq}%")
-                  ->orWhere('nomor_induk', 'like', "%{$aq}%")
-                  ->orWhere('nisn', 'like', "%{$aq}%");
+                    ->orWhere('nomor_induk', 'like', "%{$aq}%")
+                    ->orWhere('nisn', 'like', "%{$aq}%");
             });
         }
 
         $totalFiltered = (clone $query)->count();
 
         $alumni = $query->with([
-            'riwayatKelas' => function($rq) {
+            'riwayatKelas' => function ($rq) {
                 $rq->with(['kelas', 'tahunAjaran', 'nilai.mapel', 'kehadiran', 'ekskul'])->latest('id');
             },
             'berkas',
         ])
-        ->orderBy('nomor_induk', 'asc')
-        ->paginate(25)
-        ->withQueryString();
+            ->orderBy('nomor_induk', 'asc')
+            ->paginate(25)
+            ->withQueryString();
 
         return view('admin.alumni', compact(
             'JN',
@@ -171,27 +171,27 @@ class AlumniController extends Controller
         if ($aj === 'Alumni (Lulus)') {
             $query->graduated();
         } elseif ($aj === 'Pindah / Keluar') {
-            $query->where(function($q) {
+            $query->where(function ($q) {
                 $q->whereIn('alasan_keluar', ['Pindah', 'Keluar', 'Pindah keluar'])
-                  ->orWhereNotNull('tanggal_keluar')
-                  ->orWhereHas('riwayatKelas', function($rq) {
-                      $rq->whereIn('status', ['Pindah keluar', 'Keluar']);
-                  });
-            });
+                    ->orWhereNotNull('tanggal_keluar')
+                    ->orWhereHas('riwayatKelas', function ($rq) {
+                        $rq->whereIn('status', ['Pindah keluar', 'Keluar']);
+                    });
+            })->whereNotIn($query->qualifyColumn('id'), SiswaBiodata::aktif()->select('id'));
         }
 
         if ($ay !== '') {
-            $query->where(function($q) use ($ay) {
+            $query->where(function ($q) use ($ay) {
                 $q->where('tahun_lulus', $ay)
-                  ->orWhereRaw('YEAR(tanggal_keluar) = ?', [$ay]);
+                    ->orWhereRaw('SUBSTR(tanggal_keluar, 1, 4) = ?', [$ay]);
             });
         }
 
         if ($aq !== '') {
-            $query->where(function($q) use ($aq) {
+            $query->where(function ($q) use ($aq) {
                 $q->where('nama_lengkap', 'like', "%{$aq}%")
-                  ->orWhere('nomor_induk', 'like', "%{$aq}%")
-                  ->orWhere('nisn', 'like', "%{$aq}%");
+                    ->orWhere('nomor_induk', 'like', "%{$aq}%")
+                    ->orWhere('nisn', 'like', "%{$aq}%");
             });
         }
 
@@ -199,10 +199,10 @@ class AlumniController extends Controller
 
         $headers = [
             'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="kontrol-induk-alumni-' . date('Ymd-His') . '.csv"',
+            'Content-Disposition' => 'attachment; filename="kontrol-induk-alumni-'.date('Ymd-His').'.csv"',
         ];
 
-        $callback = function() use ($rows) {
+        $callback = function () use ($rows) {
             $output = fopen('php://output', 'w');
             // Write BOM for Excel UTF-8 support
             fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
@@ -212,7 +212,7 @@ class AlumniController extends Controller
                 'Tanggal Masuk', 'Masuk Kelas', 'Sekolah Asal SMP', 'Keluar Karena',
                 'Tanggal Keluar', 'Keluar Kelas', 'Sekolah Tujuan', 'Nomor Peserta PSAJ',
                 'Nomor SKL', 'Nomor Ijazah Nasional', 'Tgl Pengesahan Ijazah',
-                'Nomor Transkrip Nilai', 'Melanjutkan Studi / Bekerja', 'Tahun Lulus', 'Status'
+                'Nomor Transkrip Nilai', 'Melanjutkan Studi / Bekerja', 'Tahun Lulus', 'Status',
             ]);
 
             $no = 1;
@@ -225,7 +225,7 @@ class AlumniController extends Controller
                     $s->nisn ?: '-',
                     $s->jenis_registrasi ?: '-',
                     $s->tanggal_diterima ?: '-',
-                    ($s->kelas_diterima ?: '') . ($s->rombel_diterima ? '-' . $s->rombel_diterima : ''),
+                    ($s->kelas_diterima ?: '').($s->rombel_diterima ? '-'.$s->rombel_diterima : ''),
                     $s->sekolah_asal ?: '-',
                     $s->alasan_keluar ?: '-',
                     $s->tanggal_keluar ?: '-',
@@ -238,7 +238,7 @@ class AlumniController extends Controller
                     $s->nomor_transkrip ?: '-',
                     $s->kegiatan_setelah_lulus ?: '-',
                     $s->tahun_lulus ?: ($s->tanggal_keluar ? substr($s->tanggal_keluar, 0, 4) : '-'),
-                    $status
+                    $status,
                 ]);
             }
             fclose($output);

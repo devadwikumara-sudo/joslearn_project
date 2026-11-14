@@ -60,7 +60,7 @@ class KenaikanKelasController extends Controller
 
         // Ambil siswa aktif di kelas asal
         $kelasAsalId = $kelasObj?->id ?? 0;
-        $siswaList = SiswaBiodata::aktif()
+        $siswaList = SiswaBiodata::aktif((int) $taAktifId)
             ->whereHas('riwayatKelas', function ($q) use ($kelasAsalId, $taAktifId) {
                 $q->where('kelas_id', $kelasAsalId)
                     ->where('tahun_ajaran_id', $taAktifId)
@@ -162,7 +162,7 @@ class KenaikanKelasController extends Controller
                 ->where('kelas_id', $kelasAsalId)
                 ->where('status', 'Aktif')
                 ->whereNull('deleted_at')
-                ->whereHas('siswa', fn (Builder $query) => $query->aktif())
+                ->whereHas('siswa', fn (Builder $query) => $query->aktif($taAktifId))
                 ->first();
             abort_unless($rkLama && $rkLama->siswa, 422, 'Siswa yang dipilih bukan siswa aktif di kelas asal.');
             $riwayatAsalBySiswa[$siswaId] = $rkLama;

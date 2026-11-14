@@ -10,6 +10,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class DataSiswaBulkActionsTest extends TestCase
@@ -267,6 +268,52 @@ class DataSiswaBulkActionsTest extends TestCase
             'siswa_id' => $studentId,
             'tahun_ajaran_id' => 2,
         ]);
+    }
+
+    #[DataProvider('nonActiveTargetStatuses')]
+    public function test_bulk_move_rejects_non_active_target_statuses(string $targetStatus): void
+    {
+        $studentId = $this->createStudent('Siswa Aktif', 2, 1);
+
+        $response = $this->actingAs($this->createAccount('admin'))
+            ->post(route('admin.data-siswa.bulk-update'), [
+                'tahun_ajaran' => 2,
+                'kelas' => 'X-1',
+                'target_kelas' => 'X-2',
+                'target_status' => $targetStatus,
+                'siswa_ids' => [$studentId],
+            ]);
+
+        $response->assertSessionHasErrors(['target_status']);
+        $this->assertDatabaseHas('siswa_riwayat_kelas', [
+            'siswa_id' => $studentId,
+            'tahun_ajaran_id' => 2,
+            'status' => 'Aktif',
+            'kelas_id' => 1,
+        ]);
+    }
+
+    /** @return array<string, array{string}> */
+    public static function nonActiveTargetStatuses(): array
+    {
+        return [
+            'lulus' => ['Lulus'],
+            'pindah keluar' => ['Pindah keluar'],
+            'keluar' => ['Keluar'],
+        ];
+    }
+
+    public function test_admin_data_siswa_status_dropdown_only_offers_active(): void
+    {
+        $this->createStudent('Siswa Aktif', 2, 1);
+
+        $response = $this->actingAs($this->createAccount('admin'))
+            ->get(route('admin.data-siswa'));
+
+        $response->assertOk()
+            ->assertDontSee('<option value="Lulus"', false)
+            ->assertDontSee('<option value="Pindah keluar"', false)
+            ->assertDontSee('<option value="Keluar"', false);
     }
 
     public function test_bulk_delete_requires_explicit_confirmation(): void

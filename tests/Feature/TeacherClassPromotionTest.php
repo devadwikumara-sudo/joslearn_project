@@ -2,9 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\Admin\AlumniController;
+use App\Http\Controllers\Admin\DataSiswaController;
 use App\Models\Auth\Pengguna;
 use App\Models\SiswaBiodata;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
@@ -16,6 +19,10 @@ class TeacherClassPromotionTest extends TestCase
     private const TABLES = [
         'catatan_aktivitas',
         'catatan_kenaikan_kelas',
+        'siswa_berkas',
+        'siswa_nilai',
+        'siswa_kehadiran',
+        'siswa_ekskul',
         'siswa_riwayat_kelas',
         'siswa_biodata',
         'guru_wali_kelas',
@@ -137,6 +144,23 @@ class TeacherClassPromotionTest extends TestCase
             $table->timestamps();
             $table->softDeletes();
         });
+        Schema::create('siswa_berkas', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('siswa_id');
+        });
+        Schema::create('siswa_nilai', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('riwayat_kelas_id');
+            $table->unsignedBigInteger('mapel_id');
+        });
+        Schema::create('siswa_kehadiran', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('riwayat_kelas_id');
+        });
+        Schema::create('siswa_ekskul', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('riwayat_kelas_id');
+        });
 
         Schema::create('catatan_kenaikan_kelas', function (Blueprint $table): void {
             $table->id();
@@ -251,6 +275,34 @@ class TeacherClassPromotionTest extends TestCase
             'alasan_keluar' => 'Lulus',
         ]);
         $this->assertFalse(SiswaBiodata::aktif()->whereKey($student)->exists());
+
+        $dataSiswa = app(DataSiswaController::class)->index(Request::create('/admin/data-siswa'));
+        $alumni = app(AlumniController::class)->index(Request::create('/admin/alumni'));
+
+        $this->assertSame(0, $dataSiswa->getData()['siswaList']->total());
+        $this->assertSame([$student], $alumni->getData()['alumni']->getCollection()->pluck('id')->all());
+    }
+
+    public function test_promotion_list_excludes_a_graduate_with_an_active_history(): void
+    {
+        [, , $sourceClass, , $teacher, $activeStudent] = $this->seedPromotionData();
+        $graduatedStudent = DB::table('siswa_biodata')->insertGetId([
+            'nama_lengkap' => 'Siswa Lulus',
+            'nisn' => '0000000002',
+            'tahun_lulus' => '2025',
+        ]);
+        DB::table('siswa_riwayat_kelas')->insert([
+            'siswa_id' => $graduatedStudent,
+            'tahun_ajaran_id' => 1,
+            'kelas_id' => $sourceClass,
+            'status' => 'Aktif',
+        ]);
+
+        $response = $this->actingAs($this->createUser('guru', 'guru-x1', $teacher))
+            ->get(route('guru.kenaikan-kelas', ['kelas' => 'X-1']));
+
+        $response->assertOk()
+            ->assertViewHas('siswaList', fn ($students): bool => $students->modelKeys() === [$activeStudent]);
     }
 
     public function test_wali_cannot_promote_or_cancel_another_class(): void

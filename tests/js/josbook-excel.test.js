@@ -406,6 +406,24 @@ test('shows per-row errors, edits cells, and sends only corrected rows', async (
     assert.equal(getPayload().rows[0].mtk, '85');
 });
 
+test('warns when an active student row also contains a graduation year', async () => {
+    const workbook = {
+        SheetNames: ['Data Siswa'],
+        Sheets: {
+            'Data Siswa': [
+                ['NISN', 'Nama Lengkap', 'Kelas', 'Status Siswa', 'Tahun Lulus'],
+                ['0000000101', 'Siswa Uji', 'XII-1', 'Aktif', '2025']
+            ]
+        }
+    };
+    const {state, preview, window} = await importWorkbook(workbook);
+
+    assert.equal(state.rows[0].status, 'Lulus');
+    assert.equal(window.JosBookState.imp.statuses[0].status, 'warning');
+    assert.match(preview.innerHTML, /Tahun lulus terisi tetapi status siswa Aktif/);
+    assert.doesNotMatch(preview.innerHTML, /active_status_with_graduation_year/);
+});
+
 test('excludes error rows from the batch payload', async () => {
     const workbook = {
         SheetNames: ['Nilai Uji'],

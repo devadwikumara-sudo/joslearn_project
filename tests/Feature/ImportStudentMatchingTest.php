@@ -2,11 +2,15 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\Admin\AlumniController;
+use App\Http\Controllers\Admin\DataSiswaController;
 use App\Models\Auth\Pengguna;
 use App\Models\Guru\GuruBiodata;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Testing\TestResponse;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Tests\TestCase;
@@ -35,6 +39,7 @@ class ImportStudentMatchingTest extends TestCase
             'siswa_kehadiran',
             'siswa_ekskul',
             'siswa_riwayat_kelas',
+            'siswa_berkas',
             'catatan_aktivitas',
             'sekolah_pengaturan',
             'sekolah_mapel',
@@ -151,6 +156,10 @@ class ImportStudentMatchingTest extends TestCase
             $table->string('status');
             $table->softDeletes();
             $table->timestamps();
+        });
+        Schema::create('siswa_berkas', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('siswa_id');
         });
 
         Schema::create('siswa_nilai', function (Blueprint $table): void {
@@ -354,6 +363,7 @@ class ImportStudentMatchingTest extends TestCase
             'siswa_kehadiran',
             'siswa_ekskul',
             'siswa_riwayat_kelas',
+            'siswa_berkas',
             'catatan_aktivitas',
             'sekolah_mapel',
             'sekolah_kelas',
@@ -1494,6 +1504,92 @@ class ImportStudentMatchingTest extends TestCase
         ]);
     }
 
+    public function test_imported_students_are_partitioned_between_active_and_alumni_lists(): void
+    {
+        DB::table('siswa_riwayat_kelas')->delete();
+        DB::table('siswa_biodata')->delete();
+
+        $response = $this->import('siswa', [
+            ['nisn' => '0000000201', 'nama' => 'Siswa Aktif Satu', 'kelas' => 'X-1'],
+            ['nisn' => '0000000202', 'nama' => 'Siswa Aktif Dua', 'kelas' => 'X-1'],
+            ['nisn' => '0000000203', 'nama' => 'Siswa Aktif Tiga', 'kelas' => 'XI-1'],
+            ['nisn' => '0000000204', 'nama' => 'Siswa Lulus Satu', 'kelas' => 'XII-1', 'status' => 'Lulus', 'tahun_lulus' => '2025'],
+            ['nisn' => '0000000205', 'nama' => 'Siswa Lulus Dua', 'kelas' => 'XII-1', 'status' => 'Lulus', 'tahun_lulus' => '2025'],
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('count', 5)
+            ->assertJsonPath('active_count', 3)
+            ->assertJsonPath('graduated_count', 2);
+
+        $dataSiswa = app(DataSiswaController::class)->index(Request::create('/admin/data-siswa'));
+        $alumni = app(AlumniController::class)->index(Request::create('/admin/alumni'));
+        $activeIds = $dataSiswa->getData()['siswaList']->getCollection()->pluck('id')->all();
+        $alumniIds = $alumni->getData()['alumni']->getCollection()->pluck('id')->all();
+
+        $this->assertSame(3, $dataSiswa->getData()['siswaList']->total());
+        $this->assertSame(2, $alumni->getData()['alumni']->total());
+        $this->assertSame([], array_values(array_intersect($activeIds, $alumniIds)));
+    }
+
+    public function test_graduated_import_without_class_or_academic_year_is_listed_as_alumni(): void
+    {
+        $response = $this->import('siswa', [[
+            'nisn' => '0000000301',
+            'nama' => 'Siswa Lulus Tanpa Riwayat',
+            'status' => 'Lulus',
+        ]], 'Ganjil', '');
+
+        $response->assertOk()
+            ->assertJsonPath('count', 1)
+            ->assertJsonPath('graduated_count', 1);
+        $studentId = (int) DB::table('siswa_biodata')->where('nisn', '0000000301')->value('id');
+        $alumni = app(AlumniController::class)->index(Request::create('/admin/alumni'));
+        $alumniIds = $alumni->getData()['alumni']->getCollection()->pluck('id')->all();
+
+        $this->assertDatabaseMissing('siswa_riwayat_kelas', ['siswa_id' => $studentId]);
+        $this->assertContains($studentId, $alumniIds);
+    }
+
+    public function test_exit_statuses_are_alumni_without_overlapping_active_students(): void
+    {
+        DB::table('siswa_riwayat_kelas')->delete();
+        DB::table('siswa_biodata')->delete();
+
+        $this->import('siswa', [
+            [
+                'nisn' => '0000000401',
+                'nama' => 'Siswa Pindah',
+                'kelas' => 'X-1',
+                'status' => 'Pindah keluar',
+            ],
+            [
+                'nisn' => '0000000402',
+                'nama' => 'Siswa Keluar',
+                'kelas' => 'X-1',
+                'status' => 'Keluar',
+            ],
+            [
+                'nisn' => '0000000403',
+                'nama' => 'Siswa Aktif',
+                'kelas' => 'X-1',
+                'status' => 'Aktif',
+                'alasan_keluar' => 'Pindah keluar',
+            ],
+        ])->assertOk()->assertJsonPath('count', 3);
+
+        $dataSiswa = app(DataSiswaController::class)->index(Request::create('/admin/data-siswa'));
+        $alumni = app(AlumniController::class)->index(Request::create('/admin/alumni', 'GET', [
+            'aj' => 'Pindah / Keluar',
+        ]));
+        $activeIds = $dataSiswa->getData()['siswaList']->getCollection()->pluck('id')->all();
+        $alumniIds = $alumni->getData()['alumni']->getCollection()->pluck('id')->all();
+
+        $this->assertSame(1, $dataSiswa->getData()['siswaList']->total());
+        $this->assertSame(2, $alumni->getData()['alumni']->total());
+        $this->assertSame([], array_values(array_intersect($activeIds, $alumniIds)));
+    }
+
     public function test_server_accepts_comma_decimal_long_scores_and_rejects_out_of_range_values(): void
     {
         $response = $this->import('nilai', [
@@ -1618,13 +1714,13 @@ class ImportStudentMatchingTest extends TestCase
     /**
      * @param  array<int, array<string, mixed>>  $rows
      */
-    private function import(string $type, array $rows, string $semester = 'Ganjil')
+    private function import(string $type, array $rows, string $semester = 'Ganjil', ?string $academicYear = null): TestResponse
     {
         $sixSemesterFlow = $semester === 'auto' || in_array($semester, ['1', '2', '3', '4', '5', '6'], true);
 
         return $this->actingAs($this->admin)->withoutMiddleware()->postJson(route('admin.import.save-batch'), [
             'type' => $type,
-            'tahun_ajaran' => $sixSemesterFlow ? '' : '2025/2026',
+            'tahun_ajaran' => $sixSemesterFlow ? '' : ($academicYear ?? '2025/2026'),
             'semester' => $semester,
             'mode' => 'semua',
             'rows' => $rows,

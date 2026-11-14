@@ -720,6 +720,14 @@
             const graduationText = [student.alasan_keluar, student.status]
                 .map(value => String(value ?? '').trim().toLowerCase())
                 .filter(Boolean);
+            const activeStatusWithGraduationYear = String(student.status ?? '').trim().toLowerCase() === 'aktif'
+                && /^\d{4}$/.test(String(student.tahun_lulus ?? '').trim());
+            if (activeStatusWithGraduationYear) {
+                Object.defineProperty(student, '__active_status_with_graduation_year', {
+                    value: true,
+                    configurable: true
+                });
+            }
             const isGraduated = graduationText.some(value =>
                 /\blulus\b/.test(value) && !/\b(belum|tidak)\s+lulus\b/.test(value)
             ) || /^\d{4}$/.test(String(student.tahun_lulus ?? '').trim());
@@ -1092,6 +1100,11 @@
                 }
                 if (!r.nama) {
                     addError(idx, id, 'Nama kosong');
+                }
+                const hasGraduationYear = /^\d{4}$/.test(String(r.tahun_lulus ?? '').trim());
+                const statusIsActive = String(r.status ?? '').trim().toLowerCase() === 'aktif';
+                if (r.__active_status_with_graduation_year || (statusIsActive && hasGraduationYear)) {
+                    addWarning(idx, id, 'Tahun lulus terisi tetapi status siswa Aktif; siswa akan diproses sebagai Lulus');
                 }
             } else if (t === 'nilai' || t === 'hadir' || t === 'ekskul') {
                 if (!r.nisn && !r.nama) {
@@ -1628,6 +1641,9 @@
         }
 
         row[field] = value === '' ? null : value;
+        if (field === 'status' || field === 'tahun_lulus') {
+            delete row.__active_status_with_graduation_year;
+        }
         I.warningsConfirmed = false;
         renderPreviewUI();
     };

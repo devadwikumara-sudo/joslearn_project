@@ -95,6 +95,9 @@ class W6GuruExperienceTest extends TestCase
         Schema::create('siswa_biodata', function (Blueprint $table): void {
             $table->id();
             $table->string('nama_lengkap');
+            $table->string('tahun_lulus', 4)->nullable();
+            $table->string('alasan_keluar')->nullable();
+            $table->date('tanggal_keluar')->nullable();
             $table->softDeletes();
             $table->timestamps();
         });
@@ -190,6 +193,22 @@ class W6GuruExperienceTest extends TestCase
             ->assertDontSee('Import Ekskul')
             ->assertSee(route('guru.import-data'), false)
             ->assertSee(route('guru.kenaikan-kelas'), false);
+    }
+
+    public function test_homeroom_teacher_home_does_not_count_graduates_with_active_histories(): void
+    {
+        $teacher = $this->createTeacher('Wali Kelas');
+        $this->assignHomeroom($teacher, 1);
+        $this->createStudentHistory(1, 'Aktif');
+        $graduatedStudentId = $this->createStudentHistory(1, 'Aktif');
+        DB::table('siswa_biodata')->where('id', $graduatedStudentId)->update([
+            'tahun_lulus' => '2025',
+        ]);
+
+        $this->actingAs($teacher)
+            ->get(route('guru.beranda'))
+            ->assertOk()
+            ->assertSee('1 siswa aktif');
     }
 
     public function test_teacher_with_both_assignments_sees_both_home_cards_and_menus(): void
@@ -355,7 +374,7 @@ class W6GuruExperienceTest extends TestCase
         ]);
     }
 
-    private function createStudentHistory(int $classId, string $status): void
+    private function createStudentHistory(int $classId, string $status): int
     {
         $studentId = DB::table('siswa_biodata')->insertGetId([
             'nama_lengkap' => 'Siswa Uji',
@@ -367,5 +386,7 @@ class W6GuruExperienceTest extends TestCase
             'kelas_id' => $classId,
             'status' => $status,
         ]);
+
+        return $studentId;
     }
 }

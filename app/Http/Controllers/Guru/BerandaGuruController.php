@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\SekolahTahunAjaran;
 use App\Models\SiswaRiwayatKelas;
 use App\Services\AksesGuru;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -31,7 +32,7 @@ class BerandaGuruController extends Controller
                 ->where('tahun_ajaran_id', $tahunAjaran->id)
                 ->where('status', 'Aktif')
                 ->whereIn('kelas_id', $kelasWali->modelKeys())
-                ->whereHas('siswa')
+                ->whereHas('siswa', fn (Builder $query) => $query->aktif((int) $tahunAjaran->id))
                 ->select('kelas_id')
                 ->selectRaw('COUNT(*) AS jumlah_siswa')
                 ->groupBy('kelas_id')
