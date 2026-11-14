@@ -216,3 +216,17 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 - Run `vendor/bin/phpunit` to call the test runner directly. It accepts the same file path and `--filter=testName` arguments.
 
 </laravel-boost-guidelines>
+
+## ATURAN W23
+
+- Sidebar harus datar. DILARANG accordion, grup buka-tutup, anak menu, atau sub-menu.
+- "Menggabungkan halaman" berarti isi halaman lama dipindah ke halaman baru (sebagai tab, panel, atau modal) lalu halaman lama dihapus. Menaruh link dalam satu grup BUKAN penggabungan.
+- Tidak boleh ada fitur yang hilang. Semua tabel, filter, tombol aksi, ekspor, modal, dan bulk action halaman lama harus ada di halaman baru.
+- Hak akses tetap di server (AksesGuru dan middleware peran). Tab hanya tampilan. Tab yang bukan hak pengguna tidak ditampilkan dan tetap ditolak server.
+- Route lama yang halamannya digabung menjadi redirect ke halaman baru (dengan ?tab=...). Jangan dihapus.
+- Jangan salin kode antar halaman. Pindahkan menjadi partial bersama, lalu hapus view lama.
+- Jangan ubah skema database, .env, atau kredensial. Jika terpaksa, berhenti dan tanyakan.
+- Jangan hapus test hanya karena gagal. Ubah ekspektasi hanya bila perilaku memang sengaja berubah, dan jelaskan.
+- Tab memakai ?tab=nama. Server hanya merender partial tab yang aktif. Tanpa framework JS baru. Pakai gaya dan komponen tema JosBook yang sudah ada.
+- Setiap langkah selesai: php artisan test, perbaiki yang gagal karena perubahan Anda, satu commit, laporan singkat, lalu BERHENTI.
+- Jika instruksi bertentangan dengan kode yang ada, berhenti dan tanyakan.

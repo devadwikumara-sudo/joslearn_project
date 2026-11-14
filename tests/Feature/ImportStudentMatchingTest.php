@@ -1058,14 +1058,25 @@ class ImportStudentMatchingTest extends TestCase
             ->assertViewHas('type', 'siswa')
             ->assertViewHas('tab', 'siswa')
             ->assertSee('Import Data')
-            ->assertSee('Data Siswa & Form Pendataan')
-            ->assertSee('Kenaikan Kelas & Mutasi')
-            ->assertSee('Alumni & Pelacakan Alumni')
-            ->assertSee('Laporan & Log Aktivitas')
-            ->assertSee('Master Data, Kualitas, Sampah & Setting')
+            ->assertSee('Dashboard')
+            ->assertSee('Data Siswa')
+            ->assertSee('Form Pendataan')
+            ->assertSee('Data Guru')
+            ->assertSee('Kenaikan Kelas')
+            ->assertSee('Mutasi Siswa')
+            ->assertSee('Alumni')
+            ->assertSee('Pelacakan Alumni')
+            ->assertSee('Laporan')
+            ->assertSee('Log Aktivitas')
+            ->assertSee('Master Kelas')
+            ->assertSee('Cek Kualitas Data')
+            ->assertSee('Tempat Sampah')
+            ->assertSee('Setting')
             ->assertSee(route('admin.import-data', ['tab' => 'nilai']), false)
             ->assertSee(route('admin.import-data.template', ['jenis' => 'siswa']), false);
-        $this->assertSame(8, substr_count($response->getContent(), 'data-menu-group='));
+        $this->assertSame(15, substr_count($response->getContent(), 'data-menu="'));
+        $this->assertStringNotContainsString('data-menu-group=', $response->getContent());
+        $this->assertStringNotContainsString('josbook-sidebar-subnav', $response->getContent());
         foreach ([
             'admin.dashboard',
             'admin.data-siswa',

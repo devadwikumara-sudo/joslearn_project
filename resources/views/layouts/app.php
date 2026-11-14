@@ -43,18 +43,11 @@
             @if(Auth::check() && Auth::user()->peran === 'admin')
             {{-- ── MENU ADMIN ── --}}
             <nav class="josbook-sidebar-nav" aria-label="Menu admin">
-                <a href="{{ route('admin.dashboard') }}" class="{{ request()->routeIs('admin.dashboard') ? 'on' : '' }}" data-menu-group="dashboard">
+                <a href="{{ route('admin.dashboard') }}" class="{{ request()->routeIs('admin.dashboard') ? 'on' : '' }}" data-menu="dashboard">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
                     <span>Dashboard</span>
                 </a>
 
-                <details class="josbook-sidebar-group" data-menu-group="siswa-form" @if(request()->routeIs('admin.data-siswa*') || request()->routeIs('admin.form-pendataan*')) open @endif>
-                    <summary class="{{ (request()->routeIs('admin.data-siswa*') || request()->routeIs('admin.form-pendataan*')) ? 'on' : '' }}">
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0112 20.055a11.952 11.952 0 01-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path></svg>
-                        <span>Data Siswa &amp; Form Pendataan</span>
-                        <svg class="josbook-sidebar-group-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                    </summary>
-                    <div class="josbook-sidebar-subnav">
                 <a href="{{ route('admin.data-siswa') }}" class="{{ request()->routeIs('admin.data-siswa*') ? 'on' : '' }}" data-menu="siswa">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0112 20.055a11.952 11.952 0 01-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path></svg>
                     <span>Data Siswa</span>
@@ -65,21 +58,11 @@
                     <span>Form Pendataan</span>
                 </a>
 
-                    </div>
-                </details>
-
-                <a href="{{ route('admin.data-guru') }}" class="{{ request()->routeIs('admin.data-guru*') ? 'on' : '' }}" data-menu-group="data-guru">
+                <a href="{{ route('admin.data-guru') }}" class="{{ request()->routeIs('admin.data-guru*') ? 'on' : '' }}" data-menu="data-guru">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
                     <span>Data Guru</span>
                 </a>
 
-                <details class="josbook-sidebar-group" data-menu-group="kenaikan-mutasi" @if(request()->routeIs('admin.kenaikan-kelas*') || request()->routeIs('admin.mutasi-siswa*')) open @endif>
-                    <summary class="{{ (request()->routeIs('admin.kenaikan-kelas*') || request()->routeIs('admin.mutasi-siswa*')) ? 'on' : '' }}">
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
-                        <span>Kenaikan Kelas &amp; Mutasi</span>
-                        <svg class="josbook-sidebar-group-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                    </summary>
-                    <div class="josbook-sidebar-subnav">
                 <a href="{{ route('admin.kenaikan-kelas') }}" class="{{ request()->routeIs('admin.kenaikan-kelas*') ? 'on' : '' }}" data-menu="kenaikan">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
                     <span>Kenaikan Kelas</span>
@@ -89,21 +72,12 @@
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
                     <span>Mutasi Siswa</span>
                 </a>
-                    </div>
-                </details>
 
-                <a href="{{ route('admin.import-data') }}" class="{{ (request()->routeIs('admin.import-data*') || request()->routeIs('admin.import.*')) ? 'on' : '' }}" data-menu-group="import-data">
+                <a href="{{ route('admin.import-data') }}" class="{{ (request()->routeIs('admin.import-data*') || request()->routeIs('admin.import.*')) ? 'on' : '' }}" data-menu="import-data">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                     <span>Import Data</span>
                 </a>
 
-                <details class="josbook-sidebar-group" data-menu-group="alumni-pelacakan" @if(request()->routeIs('admin.alumni*') || request()->routeIs('admin.pelacakan-alumni*')) open @endif>
-                    <summary class="{{ (request()->routeIs('admin.alumni*') || request()->routeIs('admin.pelacakan-alumni*')) ? 'on' : '' }}">
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 011.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"></path></svg>
-                        <span>Alumni &amp; Pelacakan Alumni</span>
-                        <svg class="josbook-sidebar-group-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                    </summary>
-                    <div class="josbook-sidebar-subnav">
                 <a href="{{ route('admin.alumni') }}" class="{{ request()->routeIs('admin.alumni*') ? 'on' : '' }}" data-menu="alumni">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 011.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"></path></svg>
                     <span>Alumni &amp; Kontrol Induk</span>
@@ -113,16 +87,7 @@
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 4a7 7 0 100 14 7 7 0 000-14zM21 21l-4.35-4.35"></path></svg>
                     <span>Pelacakan Alumni</span>
                 </a>
-                    </div>
-                </details>
 
-                <details class="josbook-sidebar-group" data-menu-group="laporan-log" @if(request()->routeIs('admin.laporan*') || request()->routeIs('admin.log-aktivitas*')) open @endif>
-                    <summary class="{{ (request()->routeIs('admin.laporan*') || request()->routeIs('admin.log-aktivitas*')) ? 'on' : '' }}">
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2-2z"></path></svg>
-                        <span>Laporan &amp; Log Aktivitas</span>
-                        <svg class="josbook-sidebar-group-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                    </summary>
-                    <div class="josbook-sidebar-subnav">
                 <a href="{{ route('admin.laporan') }}" class="{{ request()->routeIs('admin.laporan*') ? 'on' : '' }}" data-menu="laporan">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                     <span>Laporan</span>
@@ -133,16 +98,6 @@
                     <span>Log Aktivitas</span>
                 </a>
 
-                    </div>
-                </details>
-
-                <details class="josbook-sidebar-group" data-menu-group="master-settings" @if(request()->routeIs('admin.master-kelas*') || request()->routeIs('admin.cek-kualitas-data*') || request()->routeIs('admin.sampah*') || request()->routeIs('admin.setting*')) open @endif>
-                    <summary class="{{ (request()->routeIs('admin.master-kelas*') || request()->routeIs('admin.cek-kualitas-data*') || request()->routeIs('admin.sampah*') || request()->routeIs('admin.setting*')) ? 'on' : '' }}">
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
-                        <span>Master Data, Kualitas, Sampah &amp; Setting</span>
-                        <svg class="josbook-sidebar-group-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                    </summary>
-                    <div class="josbook-sidebar-subnav">
                 <a href="{{ route('admin.master-kelas') }}" class="{{ request()->routeIs('admin.master-kelas*') ? 'on' : '' }}" data-menu="master">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
                     <span>Master Kelas &amp; Mapel</span>
@@ -162,8 +117,6 @@
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                     <span>Setting</span>
                 </a>
-                    </div>
-                </details>
             </nav>
             @else
             {{-- ── MENU GURU ── --}}
