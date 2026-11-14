@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\DashboardAdminController;
 use App\Http\Controllers\Admin\DataGuruController;
 use App\Http\Controllers\Admin\DataSiswaController;
 use App\Http\Controllers\Admin\FormPendataanController;
+use App\Http\Controllers\Admin\GuruMasterController;
 use App\Http\Controllers\Admin\ImportBatchController;
 use App\Http\Controllers\Admin\ImportDataController;
 use App\Http\Controllers\Admin\ImportTemplateController;
@@ -106,7 +107,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin.only'])->grou
     Route::delete('/data-siswa/{id}', [DataSiswaController::class, 'destroy'])->name('data-siswa.destroy');
 
     // Data Guru (data guru.png)
-    Route::get('/data-guru', [DataGuruController::class, 'index'])->name('data-guru');
+    Route::get('/guru-master', [GuruMasterController::class, 'index'])->name('guru-master');
+    Route::get('/data-guru', fn () => redirect()->route('admin.guru-master', ['tab' => 'guru']))->name('data-guru');
     Route::post('/data-guru', [DataGuruController::class, 'store'])->name('data-guru.store');
     Route::post('/data-guru/{id}/buat-akun', [DataGuruController::class, 'buatAkun'])->name('data-guru.buat-akun');
     Route::post('/data-guru/{id}/reset-sandi', [DataGuruController::class, 'resetSandi'])->name('data-guru.reset-sandi');
@@ -223,7 +225,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin.only'])->grou
     Route::get('/log-aktivitas/export', [LogAktivitasController::class, 'export'])->name('log-aktivitas.export');
 
     // Master Kelas & Mapel (master class.png)
-    Route::get('/master-kelas', [MasterKelasController::class, 'index'])->name('master-kelas');
+    Route::get('/master-kelas', fn () => redirect()->route('admin.guru-master', ['tab' => 'kelas']))->name('master-kelas');
     Route::post('/master-kelas', [MasterKelasController::class, 'store'])->name('master-kelas.store');
     Route::delete('/master-kelas/{id}', [MasterKelasController::class, 'destroy'])->name('master-kelas.destroy');
     Route::delete('/master-mapel/{id}', [MasterKelasController::class, 'destroy'])->name('master-mapel.destroy');

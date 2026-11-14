@@ -15,62 +15,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
-use Illuminate\View\View;
 
 class DataGuruController extends Controller
 {
-    public function index(): View
-    {
-        $taAktifObj = SekolahTahunAjaran::where('sedang_berjalan', 1)->first()
-            ?? SekolahTahunAjaran::latest('id')->first();
-        $taAktif = $taAktifObj ? $taAktifObj->nama : '2024/2025';
-        $taAktifId = $taAktifObj?->id ?? 0;
-
-        $guruList = GuruBiodata::whereNull('deleted_at')
-            ->with([
-                'akun',
-                'waliKelas' => fn ($query) => $query->where('tahun_ajaran_id', $taAktifId)->with('kelas'),
-                'mengajar' => fn ($query) => $query->where('tahun_ajaran_id', $taAktifId)->with(['mapel', 'kelas']),
-            ])
-            ->get();
-
-        $totalGuru = $guruList->count();
-        $totalGuruMapel = $guruList->filter(fn ($g) => $g->mengajar && $g->mengajar->count() > 0)->count();
-        $totalWaliKelas = $guruList->filter(fn ($g) => $g->waliKelas && $g->waliKelas->count() > 0)->count();
-
-        $kelasList = SekolahKelas::pluck('nama')->toArray();
-        if (empty($kelasList)) {
-            $kelasList = ['X-1', 'X-2', 'XI-1', 'XI-2', 'XII-1', 'XII-2'];
-        }
-
-        $mapelList = SekolahMapel::pluck('nama', 'kode')->toArray();
-        if (empty($mapelList)) {
-            $mapelList = [
-                'mtk' => 'Matematika',
-                'ind' => 'Bahasa Indonesia',
-                'big' => 'Bahasa Inggris',
-                'pjk' => 'PJOK',
-                'pnc' => 'PPKn / Pancasila',
-                'agm' => 'Pendidikan Agama',
-                'ipa' => 'Ilmu Pengetahuan Alam',
-                'ips' => 'Ilmu Pengetahuan Sosial',
-                'inf' => 'Informatika',
-                'sbd' => 'Seni Budaya',
-                'sej' => 'Sejarah',
-            ];
-        }
-
-        return view('admin.data-guru', compact(
-            'guruList',
-            'totalGuru',
-            'totalGuruMapel',
-            'totalWaliKelas',
-            'kelasList',
-            'mapelList',
-            'taAktif'
-        ));
-    }
-
     public function store(Request $request)
     {
         $validated = $this->validatedGuruInput($request);
@@ -93,7 +40,7 @@ class DataGuruController extends Controller
             return $guru;
         });
 
-        return redirect()->route('admin.data-guru')->with('success', "Data guru {$guru->nama} berhasil disimpan.");
+        return redirect()->route('admin.guru-master', ['tab' => 'guru'])->with('success', "Data guru {$guru->nama} berhasil disimpan.");
     }
 
     public function edit(int $id): JsonResponse
@@ -130,7 +77,7 @@ class DataGuruController extends Controller
             ]);
         });
 
-        return redirect()->route('admin.data-guru')->with('success', "Data guru {$guru->nama} berhasil diperbarui.");
+        return redirect()->route('admin.guru-master', ['tab' => 'guru'])->with('success', "Data guru {$guru->nama} berhasil diperbarui.");
     }
 
     /**
@@ -286,7 +233,7 @@ class DataGuruController extends Controller
         $nama = $guru->nama;
         $guru->delete();
 
-        return redirect()->route('admin.data-guru')->with('success', "Guru {$nama} berhasil dipindahkan ke Tempat Sampah.");
+        return redirect()->route('admin.guru-master', ['tab' => 'guru'])->with('success', "Guru {$nama} berhasil dipindahkan ke Tempat Sampah.");
     }
 
     public function buatAkun(int $id, Request $request)
@@ -342,7 +289,7 @@ class DataGuruController extends Controller
             'password' => $sandiSementara,
         ]);
 
-        return redirect()->route('admin.data-guru')->with('success', "Akun untuk {$guru->nama} berhasil dibuat.");
+        return redirect()->route('admin.guru-master', ['tab' => 'guru'])->with('success', "Akun untuk {$guru->nama} berhasil dibuat.");
     }
 
     public function resetSandi(int $id, Request $request)
@@ -379,6 +326,6 @@ class DataGuruController extends Controller
             'password' => $sandiSementara,
         ]);
 
-        return redirect()->route('admin.data-guru')->with('success', "Sandi akun {$guru->nama} berhasil direset.");
+        return redirect()->route('admin.guru-master', ['tab' => 'guru'])->with('success', "Sandi akun {$guru->nama} berhasil direset.");
     }
 }

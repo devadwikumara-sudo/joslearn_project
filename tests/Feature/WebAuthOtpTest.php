@@ -265,7 +265,7 @@ class WebAuthOtpTest extends TestCase
 
         $response = $this->actingAs($admin)
             ->post(route('admin.data-guru.buat-akun', $guru->id))
-            ->assertRedirect(route('admin.data-guru'))
+            ->assertRedirect(route('admin.guru-master', ['tab' => 'guru']))
             ->assertSessionHas('sandi_sementara');
 
         $akun = Pengguna::where('guru_id', $guru->id)->firstOrFail();
@@ -295,7 +295,7 @@ class WebAuthOtpTest extends TestCase
 
         $response = $this->actingAs($admin)
             ->post(route('admin.data-guru.reset-sandi', $guru->id))
-            ->assertRedirect(route('admin.data-guru'))
+            ->assertRedirect(route('admin.guru-master', ['tab' => 'guru']))
             ->assertSessionHas('sandi_sementara');
 
         $akun->refresh();

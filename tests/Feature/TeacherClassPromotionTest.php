@@ -76,6 +76,7 @@ class TeacherClassPromotionTest extends TestCase
             $table->id();
             $table->string('kode')->unique();
             $table->string('nama');
+            $table->string('tingkat')->nullable();
             $table->timestamps();
         });
 
@@ -581,7 +582,7 @@ class TeacherClassPromotionTest extends TestCase
             'nip' => '1098765432',
             'is_wali' => '1',
             'wali_kelas' => 'X-1',
-        ])->assertRedirect(route('admin.data-guru'));
+        ])->assertRedirect(route('admin.guru-master', ['tab' => 'guru']));
 
         $newTeacherId = DB::table('guru_biodata')->where('nip', '1098765432')->value('id');
         $this->assertDatabaseHas('siswa_riwayat_kelas', [
@@ -666,7 +667,7 @@ class TeacherClassPromotionTest extends TestCase
             'penugasan_mengajar' => [
                 ['kelas' => 'XI-1', 'mapel' => 'ind'],
             ],
-        ])->assertRedirect(route('admin.data-guru'));
+        ])->assertRedirect(route('admin.guru-master', ['tab' => 'guru']));
 
         $this->assertDatabaseHas('guru_wali_kelas', [
             'tahun_ajaran_id' => $year,
@@ -721,11 +722,95 @@ class TeacherClassPromotionTest extends TestCase
         $this->seedPromotionData();
         $admin = $this->createUser('admin', 'admin', null);
 
-        $this->actingAs($admin)->get(route('admin.data-guru'))
+        $this->actingAs($admin)->get(route('admin.guru-master', ['tab' => 'guru']))
             ->assertOk()
             ->assertSee('Pilih kelas wali')
             ->assertSee('Tambah penugasan kelas dan mapel')
             ->assertSee('penugasan_mengajar[');
+    }
+
+    public function test_combined_teacher_and_master_tabs_render_only_the_active_section(): void
+    {
+        [$year, , $sourceClass, , $teacher] = $this->seedPromotionData();
+        DB::table('sekolah_mapel')->insert([
+            'id' => 1,
+            'kode' => 'mtk',
+            'nama' => 'Matematika',
+            'tingkat' => 'X,XI,XII',
+        ]);
+        DB::table('guru_mengajar')->insert([
+            'tahun_ajaran_id' => $year,
+            'guru_id' => $teacher,
+            'kelas_id' => $sourceClass,
+            'mapel_id' => 1,
+        ]);
+        $admin = $this->createUser('admin', 'admin', null);
+
+        $this->actingAs($admin)
+            ->get(route('admin.guru-master', ['tab' => 'guru']))
+            ->assertOk()
+            ->assertSee('Guru X1')
+            ->assertSee('Guru Mapel')
+            ->assertSee('Matematika')
+            ->assertDontSee('Tambah kelas')
+            ->assertDontSee('Tambah mapel');
+
+        $this->get(route('admin.guru-master', ['tab' => 'kelas']))
+            ->assertOk()
+            ->assertSee('X-1')
+            ->assertSee('Tambah kelas')
+            ->assertDontSee('Tambah mapel')
+            ->assertDontSee('Pilih kelas wali');
+
+        $this->get(route('admin.guru-master', ['tab' => 'mapel']))
+            ->assertOk()
+            ->assertSee('Matematika')
+            ->assertSee('Tambah mapel')
+            ->assertDontSee('Tambah kelas')
+            ->assertDontSee('Pilih kelas wali');
+    }
+
+    public function test_legacy_teacher_and_master_pages_redirect_to_their_tabs(): void
+    {
+        $admin = $this->createUser('admin', 'admin', null);
+
+        $this->actingAs($admin)
+            ->get(route('admin.data-guru'))
+            ->assertRedirect(route('admin.guru-master', ['tab' => 'guru']));
+
+        $this->get(route('admin.master-kelas'))
+            ->assertRedirect(route('admin.guru-master', ['tab' => 'kelas']));
+    }
+
+    public function test_class_and_subject_forms_keep_saving_to_their_tabs(): void
+    {
+        $this->seedPromotionData();
+        $admin = $this->createUser('admin', 'admin', null);
+
+        $this->actingAs($admin)
+            ->post(route('admin.master-kelas.store'), [
+                'type' => 'kelas',
+                'nama_kelas' => 'X-2',
+            ])
+            ->assertRedirect(route('admin.guru-master', ['tab' => 'kelas']));
+
+        $this->assertDatabaseHas('sekolah_kelas', [
+            'nama' => 'X-2',
+            'tingkat' => 'X',
+        ]);
+
+        $this->post(route('admin.master-kelas.store'), [
+            'type' => 'mapel',
+            'nama_mapel' => 'Fisika',
+            'kode_mapel' => 'fis',
+            'tingkat_mapel' => ['X', 'XI'],
+        ])->assertRedirect(route('admin.guru-master', ['tab' => 'mapel']));
+
+        $this->assertDatabaseHas('sekolah_mapel', [
+            'kode' => 'fis',
+            'nama' => 'Fisika',
+            'tingkat' => 'X,XI',
+        ]);
     }
 
     private function seedPromotionData(): array

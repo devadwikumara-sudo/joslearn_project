@@ -53,6 +53,7 @@ class HakAksesTest extends TestCase
         $teacher = $this->createAccount('guru');
         $adminRoutes = [
             ['get', '/admin/setting'],
+            ['get', '/admin/guru-master'],
             ['get', '/admin/data-guru'],
             ['post', '/admin/data-guru'],
             ['delete', '/admin/data-guru/1'],

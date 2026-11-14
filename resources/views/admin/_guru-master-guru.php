@@ -1,9 +1,4 @@
-@extends('layouts.app')
-
-@section('title', 'Data Guru — JosBook Admin')
-
-@section('content')
-<h2>Data Guru</h2>
+<h3>Guru</h3>
 <p class="sub">{{ $totalGuru ?? 0 }} guru · {{ $totalGuruMapel ?? 0 }} guru mapel · {{ $totalWaliKelas ?? 0 }} wali kelas</p>
 
 @if(session('sandi_sementara'))
@@ -12,10 +7,6 @@
     <code>{{ session('sandi_sementara.password') }}</code>. Berikan kepada guru secara aman.
 </div>
 @endif
-@if(session('error'))
-<div class="note err">{{ session('error') }}</div>
-@endif
-
 <div class="note">
     Guru mapel hanya bisa mengedit nilai mapelnya di kelas yang diajar. Wali kelas bisa menaikkan kelas siswa di kelasnya sendiri dan mengelola kehadiran &amp; ekskul kelasnya. Satu guru boleh punya kedua peran.
 </div>
@@ -324,4 +315,3 @@ function editGuruData(g) {
 syncGuruRoleFields();
 </script>
 @endpush
-@endsection
