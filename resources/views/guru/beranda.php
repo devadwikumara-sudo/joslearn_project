@@ -40,7 +40,7 @@
         <div class="card">
             <h3>Wali Kelas {{ $kelas->nama }}</h3>
             <p class="sub">{{ $kelas->jumlah_siswa }} siswa aktif pada tahun ajaran berjalan.</p>
-            <a href="{{ route('guru.kenaikan-kelas', ['kelas' => $kelas->nama]) }}" class="btn">Kenaikan kelas</a>
+            <a href="{{ route('guru.kenaikan-mutasi', ['tab' => 'kenaikan', 'kelas' => $kelas->nama]) }}" class="btn">Kenaikan kelas</a>
         </div>
     @endforeach
 </div>

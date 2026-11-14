@@ -172,12 +172,16 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin.only'])->grou
     Route::post('/import/kehadiran/upload', fn () => redirect()->route('admin.import', ['tab' => 'kehadiran']))->name('import.kehadiran.upload');
     Route::get('/import/kehadiran/template', [ImportTemplateController::class, 'download'])->defaults('jenis', 'kehadiran')->name('import.kehadiran.template');
 
-    // Kenaikan Kelas (kenaikan kelas.png)
-    Route::get('/kenaikan-kelas', [KenaikanKelasController::class, 'index'])->name('kenaikan-kelas');
+    // Kenaikan & Mutasi
+    Route::get('/kenaikan-mutasi', [KenaikanKelasController::class, 'index'])->name('kenaikan-mutasi');
+    Route::get('/kenaikan-kelas', function (Request $request) {
+        return redirect()->route('admin.kenaikan-mutasi', array_merge($request->query(), ['tab' => 'kenaikan']));
+    })->name('kenaikan-kelas');
     Route::post('/kenaikan-kelas/proses', [KenaikanKelasController::class, 'proses'])->name('kenaikan-kelas.proses');
 
-    // Mutasi Siswa (mutasi siswa.png)
-    Route::get('/mutasi-siswa', [MutasiSiswaController::class, 'index'])->name('mutasi-siswa');
+    Route::get('/mutasi-siswa', function (Request $request) {
+        return redirect()->route('admin.kenaikan-mutasi', array_merge($request->query(), ['tab' => 'mutasi']));
+    })->name('mutasi-siswa');
     Route::post('/mutasi-siswa', [MutasiSiswaController::class, 'store'])->name('mutasi-siswa.store');
 
     // Alumni & Kontrol (alumni dan kontrol.png)
@@ -291,7 +295,10 @@ Route::prefix('guru')->name('guru.')->middleware(['auth', 'role.web'])->group(fu
     Route::post('/input-nilai-mapel', [InputNilaiMapelController::class, 'store'])->name('input-nilai-mapel.store');
 
     // Kenaikan kelas wali
-    Route::get('/kenaikan-kelas', [KenaikanKelasController::class, 'index'])->name('kenaikan-kelas');
+    Route::get('/kenaikan-mutasi', [KenaikanKelasController::class, 'index'])->name('kenaikan-mutasi');
+    Route::get('/kenaikan-kelas', function (Request $request) {
+        return redirect()->route('guru.kenaikan-mutasi', array_merge($request->query(), ['tab' => 'kenaikan']));
+    })->name('kenaikan-kelas');
     Route::post('/kenaikan-kelas/proses', [KenaikanKelasController::class, 'proses'])->name('kenaikan-kelas.proses');
     Route::post('/kenaikan-kelas/{id}/batalkan', [KenaikanKelasController::class, 'batalkan'])->name('kenaikan-kelas.batalkan');
 });

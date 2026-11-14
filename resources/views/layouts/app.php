@@ -58,14 +58,9 @@
                     <span>Data Guru</span>
                 </a>
 
-                <a href="{{ route('admin.kenaikan-kelas') }}" class="{{ request()->routeIs('admin.kenaikan-kelas*') ? 'on' : '' }}" data-menu="kenaikan">
+                <a href="{{ route('admin.kenaikan-mutasi', ['tab' => 'kenaikan']) }}" class="{{ request()->routeIs('admin.kenaikan-mutasi*', 'admin.kenaikan-kelas*', 'admin.mutasi-siswa*') ? 'on' : '' }}" data-menu="kenaikan-mutasi">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
-                    <span>Kenaikan Kelas</span>
-                </a>
-
-                <a href="{{ route('admin.mutasi-siswa') }}" class="{{ request()->routeIs('admin.mutasi-siswa*') ? 'on' : '' }}" data-menu="mutasi">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
-                    <span>Mutasi Siswa</span>
+                    <span>Kenaikan &amp; Mutasi</span>
                 </a>
 
                 <a href="{{ route('admin.import') }}" class="{{ (request()->routeIs('admin.import*') || request()->routeIs('admin.import-data*')) ? 'on' : '' }}" data-menu="import-data">
@@ -140,7 +135,7 @@
                 @endif
 
                 @if($guruMenuWali)
-                    <a href="{{ route('guru.kenaikan-kelas') }}" class="{{ request()->routeIs('guru.kenaikan-kelas*') ? 'on' : '' }}" data-menu="kenaikan">
+                    <a href="{{ route('guru.kenaikan-mutasi', ['tab' => 'kenaikan']) }}" class="{{ request()->routeIs('guru.kenaikan-mutasi*', 'guru.kenaikan-kelas*') ? 'on' : '' }}" data-menu="kenaikan">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
                         <span>Kenaikan Kelas</span>
                     </a>

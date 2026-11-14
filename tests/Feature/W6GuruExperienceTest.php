@@ -166,7 +166,7 @@ class W6GuruExperienceTest extends TestCase
             ->assertDontSee('Import Ekskul')
             ->assertSee(route('guru.import-data'), false)
             ->assertDontSee(route('guru.import-nilai'), false)
-            ->assertDontSee(route('guru.kenaikan-kelas'), false);
+            ->assertDontSee(route('guru.kenaikan-mutasi'), false);
         $this->assertSame(1, substr_count($response->getContent(), 'data-menu="import-data"'));
     }
 
@@ -193,7 +193,7 @@ class W6GuruExperienceTest extends TestCase
             ->assertDontSee('Import Kehadiran')
             ->assertDontSee('Import Ekskul')
             ->assertSee(route('guru.import-data'), false)
-            ->assertSee(route('guru.kenaikan-kelas'), false);
+            ->assertSee(route('guru.kenaikan-mutasi'), false);
         $this->assertSame(1, substr_count($response->getContent(), 'data-menu="import-data"'));
     }
 
@@ -247,7 +247,7 @@ class W6GuruExperienceTest extends TestCase
         foreach ([
             'guru.input-nilai-mapel',
             'guru.import-data',
-            'guru.kenaikan-kelas',
+            'guru.kenaikan-mutasi',
         ] as $routeName) {
             $this->get(route($routeName))->assertForbidden();
         }

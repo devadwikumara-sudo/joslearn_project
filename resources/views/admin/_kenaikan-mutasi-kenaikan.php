@@ -1,29 +1,8 @@
-@extends('layouts.app')
+<p class="sub">Proses dari {{ $taAktif }} ke {{ $taBerikutnya }}. Naikkan semua sekaligus atau atur satu per satu. Riwayat tahun lama tetap tersimpan.</p>
 
-@section('title', 'Kenaikan Kelas — JosBook')
-
-@section('content')
-<h2>Kenaikan Kelas</h2>
-<p class="sub">Proses dari {{ $taAktif ?? '2024/2025' }} ke {{ $taBerikutnya ?? '2025/2026' }}. Naikkan semua sekaligus atau atur satu per satu. Riwayat tahun lama tetap tersimpan.</p>
-
-@if(!empty($riwayatKenaikanTerakhir))
-<div class="card" style="margin-bottom:14px;border-left:4px solid var(--p,#2563eb);background:var(--card,#fff)">
-    <div class="bar">
-        <div>
-            <b>Riwayat Kenaikan Terakhir:</b>
-            Kelas <strong>{{ $riwayatKenaikanTerakhir->kelasAsal?->nama ?? 'Kelas' }}</strong>
-            ({{ $riwayatKenaikanTerakhir->tahunAjaranAsal?->nama ?? $taAktif }} &rarr; {{ $riwayatKenaikanTerakhir->tahunAjaranTujuan?->nama ?? $taBerikutnya }}) &middot;
-            {{ $riwayatKenaikanTerakhir->jumlah_siswa }} siswa diproses pada {{ $riwayatKenaikanTerakhir->created_at }}.
-        </div>
-        <span class="sp"></span>
-        <form action="{{ route($routePrefix . '.kenaikan-kelas.batalkan', $riwayatKenaikanTerakhir->id) }}" method="POST" onsubmit="return confirm('Apakah Anda yakin ingin membatalkan kenaikan kelas ini? Data riwayat siswa akan dikembalikan ke kondisi sebelum diproses.')">
-            @csrf
-            <button type="submit" class="btn x">Batalkan kenaikan terakhir</button>
-        </form>
-    </div>
-</div>
-@endif
-
+@if($kelasAsal === '*')
+    <div class="note">Pilih satu kelas pada filter di atas untuk memproses kenaikan kelas.</div>
+@else
 <form action="{{ route($routePrefix . '.kenaikan-kelas.proses') }}" method="POST">
     @csrf
     <input type="hidden" name="ta_aktif" value="{{ $taAktif }}">
@@ -32,18 +11,10 @@
 
     <div class="card">
         <div class="bar">
-            <div>
-                <label>Kelas asal</label>
-                <select onchange="location.href='{{ route($routePrefix . '.kenaikan-kelas') }}?kelas='+this.value">
-                    @foreach($kelasAsalList as $k)
-                        <option value="{{ $k }}" {{ $kelasAsal === $k ? 'selected' : '' }}>{{ $k }}</option>
-                    @endforeach
-                </select>
-            </div>
-            <span class="sp"></span>
             <button type="button" class="btn o" onclick="setSemuaHasil('Naik')">Naikkan semua</button>
             <button type="button" class="btn o" onclick="setSemuaHasil('Tinggal')">Tinggal semua</button>
             <button type="button" class="btn o" onclick="setSemuaHasil('Lulus')">Luluskan semua</button>
+            <span class="sp"></span>
             <button type="submit" class="btn a">Proses {{ count($siswaList) }} siswa</button>
         </div>
 
@@ -63,7 +34,6 @@
                     @endphp
                     @forelse($siswaList as $s)
                     @php
-                        $defaultHasil = $isKelas12 ? 'Lulus' : 'Naik';
                         $defaultTujuan = $nextKelasMap[$kelasAsal] ?? $kelasAsal;
                     @endphp
                     <tr>
@@ -112,13 +82,13 @@
 <div class="note" style="margin-top:14px">
     Wali kelas hanya dapat memproses kelasnya sendiri. Siswa kelas XII otomatis berstatus <b>Lulus</b> dan masuk ke Data Alumni. Untuk memindahkan siswa ke kelas lain di tahun yang sama, pakai tombol ⇄ di Data Siswa.
 </div>
+@endif
 
 @push('scripts')
 <script>
 function setSemuaHasil(aksi) {
     document.querySelectorAll('.sel-keputusan').forEach(function(sel) {
         var id = sel.getAttribute('data-id');
-        // Pastikan opsi ada
         for (var i = 0; i < sel.options.length; i++) {
             if (sel.options[i].value === aksi) {
                 sel.selectedIndex = i;
@@ -144,4 +114,3 @@ function updateTargetKelas(sel, id) {
 }
 </script>
 @endpush
-@endsection
