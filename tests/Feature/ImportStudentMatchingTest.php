@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Testing\TestResponse;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Tests\TestCase;
 
@@ -991,7 +992,7 @@ class ImportStudentMatchingTest extends TestCase
         ])->assertForbidden();
     }
 
-    public function test_teacher_specific_import_and_grade_routes_check_class_and_subject_assignments(): void
+    public function test_legacy_teacher_import_routes_redirect_and_grade_routes_check_assignments(): void
     {
         $guru = $this->buatAkunGuru('guru-rute');
         $this->tugaskanMapel($guru, 1, 1, 1);
@@ -1007,9 +1008,11 @@ class ImportStudentMatchingTest extends TestCase
         $this->get(route('guru.input-nilai-mapel', ['kelas' => 'XI-1']))->assertForbidden();
 
         $this->post(route('guru.import-nilai.store'), ['kelas' => 'XI-1', 'mata_pelajaran' => 'Matematika'])
-            ->assertForbidden();
-        $this->post(route('guru.import-ekskul.store'), ['kelas' => 'XI-1'])->assertForbidden();
-        $this->post(route('guru.import-ketidakhadiran.store'), ['kelas' => 'XI-1'])->assertForbidden();
+            ->assertRedirect(route('guru.import-data', ['tab' => 'nilai']));
+        $this->post(route('guru.import-ekskul.store'), ['kelas' => 'XI-1'])
+            ->assertRedirect(route('guru.import-data', ['tab' => 'ekskul']));
+        $this->post(route('guru.import-ketidakhadiran.store'), ['kelas' => 'XI-1'])
+            ->assertRedirect(route('guru.import-data', ['tab' => 'kehadiran']));
         $this->post(route('guru.input-nilai-mapel.store'), [
             'kelas' => 'XI-1',
             'mapel_id' => 1,
@@ -1022,9 +1025,6 @@ class ImportStudentMatchingTest extends TestCase
         ])
             ->assertForbidden();
 
-        $this->post(route('guru.import-nilai.store'), ['kelas' => 'X-1', 'mata_pelajaran' => 'Matematika'])->assertRedirect();
-        $this->post(route('guru.import-ekskul.store'), ['kelas' => 'X-1'])->assertRedirect();
-        $this->post(route('guru.import-ketidakhadiran.store'), ['kelas' => 'X-1'])->assertRedirect();
         $this->post(route('guru.input-nilai-mapel.store'), [
             'kelas' => 'X-1',
             'mapel_id' => 1,
@@ -1042,9 +1042,9 @@ class ImportStudentMatchingTest extends TestCase
 
         $this->get(route('guru.import-data'))->assertForbidden();
         $this->get(route('guru.input-nilai-mapel'))->assertForbidden();
-        $this->get(route('guru.import-nilai'))->assertForbidden();
-        $this->get(route('guru.import-ekskul'))->assertForbidden();
-        $this->get(route('guru.import-ketidakhadiran'))->assertForbidden();
+        foreach (['guru.import-nilai', 'guru.import-ekskul', 'guru.import-ketidakhadiran'] as $routeName) {
+            $this->followingRedirects()->get(route($routeName))->assertForbidden();
+        }
 
         foreach (['nilai', 'kehadiran', 'ekskul', 'siswa', 'guru'] as $type) {
             $this->postJson(route('guru.import.metadata'), ['type' => $type])->assertForbidden();
@@ -1137,14 +1137,22 @@ class ImportStudentMatchingTest extends TestCase
             ->assertRedirect(route('admin.import', ['tab' => 'nilai']));
     }
 
-    public function test_legacy_teacher_import_url_redirects_after_assignment_check(): void
+    public function test_legacy_teacher_import_urls_redirect_to_their_shared_tabs(): void
     {
         $guru = $this->buatAkunGuru('guru-legacy-import');
         $this->tugaskanMapel($guru, 1, 1, 1);
+        $this->tugaskanWali($guru, 1, 1);
 
-        $this->actingAs($guru)->withoutMiddleware()
-            ->get(route('guru.import-nilai'))
-            ->assertRedirect(route('guru.import-data', ['tab' => 'nilai']));
+        $this->actingAs($guru)->withoutMiddleware();
+
+        foreach ([
+            'guru.import-nilai' => 'nilai',
+            'guru.import-ketidakhadiran' => 'kehadiran',
+            'guru.import-ekskul' => 'ekskul',
+        ] as $routeName => $tab) {
+            $this->get(route($routeName))
+                ->assertRedirect(route('guru.import-data', ['tab' => $tab]));
+        }
     }
 
     public function test_teacher_import_page_exposes_only_assigned_import_types(): void
@@ -1205,22 +1213,55 @@ class ImportStudentMatchingTest extends TestCase
         $this->get(route('guru.input-nilai-mapel'))->assertOk();
         $this->get(route('guru.import-nilai'))
             ->assertRedirect(route('guru.import-data', ['tab' => 'nilai']));
-        $this->get(route('guru.import-ekskul'))->assertForbidden();
-        $this->get(route('guru.import-ketidakhadiran'))->assertForbidden();
-        $this->post(route('guru.import-ekskul.store'), ['kelas' => 'X-1'])->assertForbidden();
-        $this->post(route('guru.import-ketidakhadiran.store'), ['kelas' => 'X-1'])->assertForbidden();
+        $this->followingRedirects()->get(route('guru.import-ekskul'))->assertForbidden();
+        $this->followingRedirects()->get(route('guru.import-ketidakhadiran'))->assertForbidden();
+        $this->followingRedirects()->post(route('guru.import-ekskul.store'), ['kelas' => 'X-1'])->assertForbidden();
+        $this->followingRedirects()->post(route('guru.import-ketidakhadiran.store'), ['kelas' => 'X-1'])->assertForbidden();
 
         $this->actingAs($guruWali);
         $this->get(route('guru.input-nilai-mapel'))->assertForbidden();
-        $this->get(route('guru.import-nilai'))->assertForbidden();
+        $this->followingRedirects()->get(route('guru.import-nilai'))->assertForbidden();
         $this->get(route('guru.import-ekskul'))
             ->assertRedirect(route('guru.import-data', ['tab' => 'ekskul']));
         $this->get(route('guru.import-ketidakhadiran'))
             ->assertRedirect(route('guru.import-data', ['tab' => 'kehadiran']));
-        $this->post(route('guru.import-nilai.store'), [
+        $this->followingRedirects()->post(route('guru.import-nilai.store'), [
             'kelas' => 'X-1',
             'mata_pelajaran' => 'Matematika',
         ])->assertForbidden();
+    }
+
+    #[DataProvider('unauthorizedTeacherImportTypes')]
+    public function test_teacher_cannot_save_batch_for_import_types_outside_role(string $assignment, string $type): void
+    {
+        $guru = $this->buatAkunGuru('guru-tolak-'.$type);
+
+        if ($assignment === 'wali') {
+            $this->tugaskanWali($guru, 1, 1);
+        } else {
+            $this->tugaskanMapel($guru, 1, 1, 1);
+        }
+
+        $this->actingAs($guru)->withoutMiddleware()
+            ->postJson(route('guru.import.save-batch'), [
+                'type' => $type,
+                'rows' => [['kelas' => 'X-1']],
+            ])
+            ->assertForbidden();
+
+        $this->assertDatabaseCount('import_unggahan', 0);
+        $this->assertDatabaseCount('siswa_nilai', 0);
+        $this->assertDatabaseCount('siswa_kehadiran', 0);
+        $this->assertDatabaseCount('siswa_ekskul', 0);
+    }
+
+    public static function unauthorizedTeacherImportTypes(): array
+    {
+        return [
+            'wali kelas cannot import grades' => ['wali', 'nilai'],
+            'subject teacher cannot import attendance' => ['mapel', 'kehadiran'],
+            'subject teacher cannot import extracurriculars' => ['mapel', 'ekskul'],
+        ];
     }
 
     public function test_teacher_can_input_grade_for_active_student_and_activity_is_logged(): void

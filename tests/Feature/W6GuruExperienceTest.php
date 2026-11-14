@@ -167,6 +167,7 @@ class W6GuruExperienceTest extends TestCase
             ->assertSee(route('guru.import-data'), false)
             ->assertDontSee(route('guru.import-nilai'), false)
             ->assertDontSee(route('guru.kenaikan-kelas'), false);
+        $this->assertSame(1, substr_count($response->getContent(), 'data-menu="import-data"'));
     }
 
     public function test_homeroom_teacher_home_shows_active_students_and_homeroom_menu_only(): void
@@ -193,6 +194,7 @@ class W6GuruExperienceTest extends TestCase
             ->assertDontSee('Import Ekskul')
             ->assertSee(route('guru.import-data'), false)
             ->assertSee(route('guru.kenaikan-kelas'), false);
+        $this->assertSame(1, substr_count($response->getContent(), 'data-menu="import-data"'));
     }
 
     public function test_homeroom_teacher_home_does_not_count_graduates_with_active_histories(): void
@@ -228,27 +230,30 @@ class W6GuruExperienceTest extends TestCase
             ->assertDontSee('Import Nilai')
             ->assertDontSee('Import Kehadiran')
             ->assertDontSee('Import Ekskul');
+        $this->assertSame(1, substr_count($response->getContent(), 'data-menu="import-data"'));
         $this->assertSame(1, substr_count($response->getContent(), route('guru.import-data')));
     }
 
     public function test_unassigned_teacher_sees_notice_and_is_denied_assignment_routes(): void
     {
         $teacher = $this->createTeacher('Guru Belum Ditugaskan');
-        $this->actingAs($teacher)
+        $response = $this->actingAs($teacher)
             ->get(route('guru.beranda'))
             ->assertOk()
             ->assertSee('Belum ada penugasan, hubungi admin')
             ->assertDontSee('Import Data');
+        $this->assertSame(0, substr_count($response->getContent(), 'data-menu="import-data"'));
 
         foreach ([
             'guru.input-nilai-mapel',
-            'guru.import-nilai',
-            'guru.import-ketidakhadiran',
-            'guru.import-ekskul',
             'guru.import-data',
             'guru.kenaikan-kelas',
         ] as $routeName) {
             $this->get(route($routeName))->assertForbidden();
+        }
+
+        foreach (['guru.import-nilai', 'guru.import-ketidakhadiran', 'guru.import-ekskul'] as $routeName) {
+            $this->followingRedirects()->get(route($routeName))->assertForbidden();
         }
     }
 

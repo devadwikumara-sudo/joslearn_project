@@ -22,9 +22,6 @@ use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\GantiPasswordController;
 use App\Http\Controllers\Guru\BerandaGuruController;
 use App\Http\Controllers\Guru\DataSiswaGuruController;
-use App\Http\Controllers\Guru\ImportEkskulGuruController;
-use App\Http\Controllers\Guru\ImportKetidakhadiranController;
-use App\Http\Controllers\Guru\ImportNilaiGuruController;
 use App\Http\Controllers\Guru\InputNilaiMapelController;
 use App\Http\Controllers\Guru\LogAktivitasGuruController;
 use App\Http\Controllers\Guru\SettingGuruController;
@@ -267,17 +264,13 @@ Route::prefix('guru')->name('guru.')->middleware(['auth', 'role.web'])->group(fu
     Route::get('/import-data/template/{jenis}', [ImportDataController::class, 'downloadTemplate'])
         ->whereIn('jenis', ['siswa', 'guru', 'nilai', 'kehadiran', 'ekskul'])->name('import-data.template');
 
-    // Import Nilai (import nilai.png - guru)
-    Route::get('/import-nilai', [ImportNilaiGuruController::class, 'index'])->name('import-nilai');
-    Route::post('/import-nilai', [ImportNilaiGuruController::class, 'store'])->name('import-nilai.store');
-
-    // Import Ekskul (import ekskul.png - guru)
-    Route::get('/import-ekskul', [ImportEkskulGuruController::class, 'index'])->name('import-ekskul');
-    Route::post('/import-ekskul', [ImportEkskulGuruController::class, 'store'])->name('import-ekskul.store');
-
-    // Import Ketidakhadiran (import ketidakhadiraan.png - guru)
-    Route::get('/import-ketidakhadiran', [ImportKetidakhadiranController::class, 'index'])->name('import-ketidakhadiran');
-    Route::post('/import-ketidakhadiran', [ImportKetidakhadiranController::class, 'store'])->name('import-ketidakhadiran.store');
+    // URL impor lama diarahkan ke tab halaman gabungan; penyimpanan memakai endpoint batch.
+    Route::get('/import-nilai', fn () => redirect()->route('guru.import-data', ['tab' => 'nilai']))->name('import-nilai');
+    Route::post('/import-nilai', fn () => redirect()->route('guru.import-data', ['tab' => 'nilai']))->name('import-nilai.store');
+    Route::get('/import-ekskul', fn () => redirect()->route('guru.import-data', ['tab' => 'ekskul']))->name('import-ekskul');
+    Route::post('/import-ekskul', fn () => redirect()->route('guru.import-data', ['tab' => 'ekskul']))->name('import-ekskul.store');
+    Route::get('/import-ketidakhadiran', fn () => redirect()->route('guru.import-data', ['tab' => 'kehadiran']))->name('import-ketidakhadiran');
+    Route::post('/import-ketidakhadiran', fn () => redirect()->route('guru.import-data', ['tab' => 'kehadiran']))->name('import-ketidakhadiran.store');
 
     // Input Nilai Mapel (input nilai mapel.png - guru)
     Route::get('/input-nilai-mapel', [InputNilaiMapelController::class, 'index'])->name('input-nilai-mapel');
