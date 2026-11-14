@@ -2,7 +2,6 @@
 
 use App\Http\Controllers\Admin\AcademicRecordController;
 use App\Http\Controllers\Admin\AlumniController;
-use App\Http\Controllers\Admin\CekKualitasDataController;
 use App\Http\Controllers\Admin\DashboardAdminController;
 use App\Http\Controllers\Admin\DataGuruController;
 use App\Http\Controllers\Admin\DataSiswaController;
@@ -206,14 +205,25 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin.only'])->grou
     Route::post('/pelacakan-alumni', [PelacakanAlumniController::class, 'store'])->name('pelacakan-alumni.store');
     Route::delete('/pelacakan-alumni/{id}', [PelacakanAlumniController::class, 'destroy'])->name('pelacakan-alumni.destroy');
 
-    // Laporan (laporan.png)
+    // Laporan dan kualitas data (laporan.png)
     Route::get('/laporan', [LaporanController::class, 'index'])->name('laporan');
     Route::match(['get', 'post'], '/laporan/cetak', [LaporanController::class, 'cetak'])->name('laporan.cetak');
     Route::get('/laporan/pdf', [LaporanController::class, 'cetak'])->name('laporan.pdf');
 
-    // Cek Kualitas Data (cek kualitas data.png)
-    Route::get('/cek-kualitas-data', [CekKualitasDataController::class, 'index'])->name('cek-kualitas-data');
-    Route::get('/cek-kualitas-data/export', [CekKualitasDataController::class, 'index'])->name('cek-kualitas-data.export');
+    // URL halaman lama tetap mengarah ke tab Kualitas Data.
+    Route::get('/cek-kualitas-data', function (Request $request) {
+        return redirect()->route('admin.laporan', [
+            'tab' => 'kualitas',
+            ...$request->only(['jenis', 'export']),
+        ]);
+    })->name('cek-kualitas-data');
+    Route::get('/cek-kualitas-data/export', function (Request $request) {
+        return redirect()->route('admin.laporan', [
+            'tab' => 'kualitas',
+            ...$request->only(['jenis']),
+            'export' => 1,
+        ]);
+    })->name('cek-kualitas-data.export');
 
     // URL halaman lama tetap mengarah ke tab gabungan.
     Route::get('/log-aktivitas', function (Request $request) {

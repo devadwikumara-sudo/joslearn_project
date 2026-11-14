@@ -54,6 +54,8 @@ class HakAksesTest extends TestCase
         $adminRoutes = [
             ['get', '/admin/setting'],
             ['get', '/admin/guru-master'],
+            ['get', '/admin/laporan?tab=kualitas'],
+            ['get', '/admin/cek-kualitas-data'],
             ['get', '/admin/data-guru'],
             ['post', '/admin/data-guru'],
             ['delete', '/admin/data-guru/1'],

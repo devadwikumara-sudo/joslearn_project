@@ -49,6 +49,10 @@ class DataSiswaBulkActionsTest extends TestCase
             $table->string('nisn')->nullable();
             $table->string('nomor_induk')->nullable();
             $table->string('nama_lengkap');
+            $table->boolean('foto_ada')->default(false);
+            $table->string('no_skl')->nullable();
+            $table->string('no_ijazah_sma')->nullable();
+            $table->string('no_transkrip')->nullable();
             $table->string('jenis_kelamin')->nullable();
             $table->string('nik')->nullable();
             $table->string('tempat_lahir')->nullable();
@@ -488,6 +492,79 @@ class DataSiswaBulkActionsTest extends TestCase
         $this->assertSame(2, array_sum(array_column($dashboard->getData()['komposisiKelas'], 'total')));
         $this->assertSame(2, $report->getData()['totalSiswa']);
         $this->assertSame(2, $dataSiswa->getData()['siswaList']->total());
+    }
+
+    public function test_report_and_quality_tabs_render_only_the_active_view(): void
+    {
+        $admin = $this->createAccount('admin');
+        $this->createStudent('Siswa Aktif', 2, 1);
+        $graduatedStudentId = $this->createStudent('Siswa Lulus', 2, 1);
+        DB::table('siswa_biodata')->where('id', $graduatedStudentId)->update(['tahun_lulus' => '2026']);
+
+        $report = $this->actingAs($admin)->get(route('admin.laporan', [
+            'tab' => 'laporan',
+            'ta' => '2026/2027',
+        ]));
+
+        $report->assertOk()
+            ->assertViewHas('tab', 'laporan')
+            ->assertSee('Rekap 2026/2027')
+            ->assertSee('Cetak laporan')
+            ->assertDontSee('Siswa diperiksa');
+
+        $quality = $this->get(route('admin.laporan', ['tab' => 'kualitas']));
+
+        $quality->assertOk()
+            ->assertViewHas('tab', 'kualitas')
+            ->assertViewHas('totalSiswa', 1)
+            ->assertSee('Siswa diperiksa')
+            ->assertSee('Siswa Aktif')
+            ->assertDontSee('Siswa Lulus')
+            ->assertDontSee('Rata-rata nilai');
+    }
+
+    public function test_quality_duplicate_findings_link_each_active_student_for_repair(): void
+    {
+        $admin = $this->createAccount('admin');
+        $firstStudentId = $this->createStudent('Duplikat aktif satu', 2, 1);
+        $secondStudentId = $this->createStudent('Duplikat aktif dua', 2, 1);
+        $graduatedStudentId = $this->createStudent('Duplikat lulus', 2, 1);
+        DB::table('siswa_biodata')->where('id', $graduatedStudentId)->update(['tahun_lulus' => '2026']);
+
+        $response = $this->actingAs($admin)->get(route('admin.laporan', ['tab' => 'kualitas']));
+
+        $response->assertOk()
+            ->assertSee('NISN duplikat — ditemukan pada 2 siswa')
+            ->assertSee(route('admin.data-siswa.edit', $firstStudentId), false)
+            ->assertSee(route('admin.data-siswa.edit', $secondStudentId), false)
+            ->assertDontSee(route('admin.data-siswa.edit', $graduatedStudentId), false);
+    }
+
+    public function test_quality_csv_and_legacy_routes_redirect_to_the_quality_tab(): void
+    {
+        $admin = $this->createAccount('admin');
+        $activeStudentId = $this->createStudent('Siswa Aktif', 2, 1);
+        $graduatedStudentId = $this->createStudent('Siswa Lulus', 2, 1);
+        DB::table('siswa_biodata')->whereIn('id', [$activeStudentId, $graduatedStudentId])->update(['nisn' => null]);
+        DB::table('siswa_biodata')->where('id', $graduatedStudentId)->update(['tahun_lulus' => '2026']);
+
+        $this->actingAs($admin)
+            ->get(route('admin.cek-kualitas-data', ['jenis' => 'kesalahan']))
+            ->assertRedirect(route('admin.laporan', ['tab' => 'kualitas', 'jenis' => 'kesalahan']));
+
+        $this->get(route('admin.cek-kualitas-data.export', ['jenis' => 'kesalahan']))
+            ->assertRedirect(route('admin.laporan', ['tab' => 'kualitas', 'jenis' => 'kesalahan', 'export' => 1]));
+
+        $response = $this->get(route('admin.laporan', [
+            'tab' => 'kualitas',
+            'jenis' => 'kesalahan',
+            'export' => 1,
+        ]));
+
+        $response->assertOk();
+        $content = $response->streamedContent();
+        $this->assertStringContainsString('Siswa Aktif', $content);
+        $this->assertStringNotContainsString('Siswa Lulus', $content);
     }
 
     private function createAccount(string $role): Pengguna

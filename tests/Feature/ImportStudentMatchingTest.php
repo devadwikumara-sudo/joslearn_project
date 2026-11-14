@@ -1087,16 +1087,17 @@ class ImportStudentMatchingTest extends TestCase
             ->assertSee('Kenaikan &amp; Mutasi', false)
             ->assertSee('Alumni')
             ->assertSee('Laporan')
-            ->assertSee('Cek Kualitas Data')
+            ->assertDontSee('Cek Kualitas Data')
             ->assertSee('Setting')
             ->assertDontSee('Log Aktivitas')
             ->assertDontSee('Tempat Sampah')
             ->assertSee(route('admin.import', ['tab' => 'nilai']), false)
             ->assertSee(route('admin.import.template', ['jenis' => 'siswa']), false);
-        $this->assertSame(9, substr_count($response->getContent(), 'data-menu="'));
+        $this->assertSame(8, substr_count($response->getContent(), 'data-menu="'));
         $this->assertSame(1, substr_count($response->getContent(), 'data-menu="guru-master"'));
         $this->assertStringNotContainsString('data-menu="data-guru"', $response->getContent());
         $this->assertStringNotContainsString('data-menu="master"', $response->getContent());
+        $this->assertStringNotContainsString('data-menu="cek"', $response->getContent());
         $this->assertSame(1, substr_count($response->getContent(), 'data-menu="alumni"'));
         $this->assertSame(1, substr_count($response->getContent(), 'data-menu="kenaikan-mutasi"'));
         $this->assertStringNotContainsString('data-menu="mutasi"', $response->getContent());
@@ -1111,7 +1112,6 @@ class ImportStudentMatchingTest extends TestCase
             'admin.kenaikan-mutasi',
             'admin.alumni',
             'admin.laporan',
-            'admin.cek-kualitas-data',
             'admin.setting',
         ] as $routeName) {
             $this->assertStringContainsString(route($routeName), $response->getContent());

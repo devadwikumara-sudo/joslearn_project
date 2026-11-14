@@ -1,10 +1,5 @@
-@extends('layouts.app')
-
-@section('title', 'Cek Kualitas Data — JosBook Admin')
-
-@section('content')
-<h2>Cek Kualitas Data</h2>
-<p class="sub">Pemeriksaan seluruh data sekaligus (format, tanggal, data dobel, data yatim, sinkron antar tahun). Aturan yang sama dipasang di server saat coding.</p>
+<h3>Cek Kualitas Data</h3>
+<p class="sub">Pemeriksaan data siswa aktif (format, data dobel, dan kelengkapan dokumen).</p>
 
 {{-- 4 Stat Cards --}}
 <div class="g g4">
@@ -28,13 +23,13 @@
 
 {{-- Bar Filter & Ekspor CSV --}}
 <div class="bar" style="margin-top:12px">
-    <select onchange="location.href='{{ route('admin.cek-kualitas-data') }}?jenis=' + this.value">
+    <select onchange="location.href='{{ route('admin.laporan', ['tab' => 'kualitas']) }}&jenis=' + this.value">
         <option value="semua" {{ $filter === 'semua' ? 'selected' : '' }}>Semua temuan</option>
         <option value="kesalahan" {{ $filter === 'kesalahan' ? 'selected' : '' }}>Kesalahan</option>
         <option value="peringatan" {{ $filter === 'peringatan' ? 'selected' : '' }}>Peringatan</option>
     </select>
     <span class="sp"></span>
-    <a href="{{ route('admin.cek-kualitas-data') }}?export=1&jenis={{ $filter }}" class="btn">⬇ Ekspor CSV</a>
+    <a href="{{ route('admin.laporan', ['tab' => 'kualitas', 'jenis' => $filter, 'export' => 1]) }}" class="btn">⬇ Ekspor CSV</a>
 </div>
 
 {{-- Card Tabel Temuan --}}
@@ -70,6 +65,10 @@
                     <td>
                         @if(!empty($m['id']))
                             <a href="{{ route('admin.data-siswa.edit', $m['id']) }}" class="btn a" style="padding:3px 8px;font-size:12px">Perbaiki</a>
+                        @elseif(!empty($m['siswa_ids']))
+                            @foreach($m['siswa_ids'] as $siswaId)
+                                <a href="{{ route('admin.data-siswa.edit', $siswaId) }}" class="btn a" style="padding:3px 8px;font-size:12px">Perbaiki #{{ $siswaId }}</a>
+                            @endforeach
                         @endif
                     </td>
                 </tr>
@@ -83,4 +82,3 @@
     </div>
     @endif
 </div>
-@endsection
