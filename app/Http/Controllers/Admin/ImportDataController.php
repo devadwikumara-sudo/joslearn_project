@@ -9,6 +9,7 @@ use App\Models\SekolahKelas;
 use App\Models\SekolahTahunAjaran;
 use App\Services\AksesGuru;
 use App\Services\ImportBatchHistory;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -24,7 +25,7 @@ class ImportDataController extends Controller
         'ekskul' => 'Ekskul',
     ];
 
-    public function index(Request $request, AksesGuru $aksesGuru, ImportBatchHistory $importBatchHistory): View
+    public function index(Request $request, AksesGuru $aksesGuru, ImportBatchHistory $importBatchHistory): View|RedirectResponse
     {
         $user = $request->user();
         abort_unless($user instanceof Pengguna, 403);
@@ -32,11 +33,21 @@ class ImportDataController extends Controller
         $allowedTypes = $this->allowedTypes($user, $aksesGuru);
         abort_unless($allowedTypes !== [], 403);
 
-        $type = (string) $request->query('jenis', $allowedTypes[0]);
+        $isAdmin = $user->peran === 'admin';
+        $indexRoute = $isAdmin ? 'admin.import-data' : 'guru.import-data';
+        $type = (string) $request->query('tab', $request->query('jenis', $allowedTypes[0]));
         abort_unless(isset(self::TYPES[$type]), 404);
         abort_unless(in_array($type, $allowedTypes, true), 403);
+        $tab = $type;
 
-        $isAdmin = $user->peran === 'admin';
+        if ($request->query->has('jenis') && ! $request->query->has('tab')) {
+            $query = $request->query->all();
+            unset($query['jenis']);
+            $query['tab'] = $type;
+
+            return redirect()->route($indexRoute, $query);
+        }
+
         $tahunAjaranList = SekolahTahunAjaran::query()->orderBy('nama')->get(['id', 'nama', 'sedang_berjalan']);
         $tahunAjaranAktif = $tahunAjaranList->firstWhere('sedang_berjalan', true)
             ?? $tahunAjaranList->first();
@@ -66,7 +77,6 @@ class ImportDataController extends Controller
                 ->values();
         }
 
-        $indexRoute = $isAdmin ? 'admin.import-data' : 'guru.import-data';
         $templateRoute = $isAdmin ? 'admin.import-data.template' : 'guru.import-data.template';
         $typeLabel = self::TYPES[$type];
         $typeJs = $type === 'kehadiran' ? 'hadir' : $type;
@@ -102,6 +112,7 @@ class ImportDataController extends Controller
             'taAktif',
             'tahunAjaranList',
             'tahunAjaranTerpilihId',
+            'tab',
             'templateRoute',
             'totalGuru',
             'type',

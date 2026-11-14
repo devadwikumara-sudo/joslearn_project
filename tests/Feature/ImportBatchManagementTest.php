@@ -220,7 +220,7 @@ class ImportBatchManagementTest extends TestCase
         $this->createNilaiRecord($historyId, 80, $batchId);
 
         $this->actingAs($admin)
-            ->get(route('admin.import.nilai', ['tahun_ajaran_id' => $yearId]))
+            ->get(route('admin.import-data', ['tab' => 'nilai', 'tahun_ajaran_id' => $yearId]))
             ->assertOk()
             ->assertSee('Data hasil impor 2026/2027')
             ->assertSee('X-1')

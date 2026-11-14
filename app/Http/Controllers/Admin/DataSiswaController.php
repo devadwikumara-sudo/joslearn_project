@@ -78,31 +78,9 @@ class DataSiswaController extends Controller
         ));
     }
 
-    public function importView(): View
+    public function importView(): RedirectResponse
     {
-        $taAktifObj = SekolahTahunAjaran::where('sedang_berjalan', 1)->first()
-            ?? SekolahTahunAjaran::latest('id')->first();
-        $taAktif = $taAktifObj?->nama ?? '2024/2025';
-
-        $taAktifId = $taAktifObj?->id ?? 0;
-        $kelasList = SekolahKelas::orderBy('nama')->pluck('nama')->toArray();
-
-        // Ambil riwayat batch import siswa pada tahun ini
-        $riwayatImport = DB::table('siswa_riwayat_kelas as riwayat')
-            ->join('sekolah_kelas as kelas', 'kelas.id', '=', 'riwayat.kelas_id')
-            ->where('riwayat.tahun_ajaran_id', $taAktifId)
-            ->whereNull('riwayat.deleted_at')
-            ->select('kelas.nama as kelas')
-            ->selectRaw('COUNT(*) as baris')
-            ->groupBy('kelas.id', 'kelas.nama')
-            ->orderBy('kelas.nama')
-            ->get();
-
-        return view('admin.import.siswa', compact(
-            'taAktif',
-            'kelasList',
-            'riwayatImport'
-        ));
+        return redirect()->route('admin.import-data', ['tab' => 'siswa']);
     }
 
     public function export(Request $request): StreamedResponse

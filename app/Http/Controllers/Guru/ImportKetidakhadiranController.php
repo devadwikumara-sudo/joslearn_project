@@ -5,19 +5,16 @@ namespace App\Http\Controllers\Guru;
 use App\Http\Controllers\Controller;
 use App\Models\SekolahKelas;
 use App\Services\AksesGuru;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\View\View;
 
 class ImportKetidakhadiranController extends Controller
 {
-    public function index(Request $request, AksesGuru $aksesGuru): View
+    public function index(Request $request, AksesGuru $aksesGuru): RedirectResponse
     {
         abort_unless($aksesGuru->adalahWali($request->user()), 403, 'Anda tidak memiliki penugasan wali kelas pada tahun ajaran berjalan.');
 
-        return view('guru.import-ketidakhadiran', [
-            'kelasList' => $aksesGuru->kelasWali($request->user())->pluck('nama')->all(),
-            'riwayat' => [],
-        ]);
+        return redirect()->route('guru.import-data', ['tab' => 'kehadiran']);
     }
 
     public function store(Request $request, AksesGuru $aksesGuru)

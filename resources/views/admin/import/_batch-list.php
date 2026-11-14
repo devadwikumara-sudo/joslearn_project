@@ -12,7 +12,7 @@
     <h3>Data hasil impor {{ $tahunTerpilih?->nama ?? '' }}</h3>
     <div class="bar" style="margin-bottom:12px">
         <form method="GET" action="{{ route($indexRoute) }}" class="bar">
-            <input type="hidden" name="jenis" value="{{ $type }}">
+            <input type="hidden" name="tab" value="{{ $type }}">
             <label for="tahun-ajaran-impor">Tahun ajaran</label>
             <select id="tahun-ajaran-impor" name="tahun_ajaran_id" onchange="this.form.submit()">
                 @foreach($tahunAjaranList as $tahunAjaran)

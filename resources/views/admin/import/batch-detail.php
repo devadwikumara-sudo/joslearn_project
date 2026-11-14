@@ -10,7 +10,7 @@
 </p>
 
 <div class="bar" style="margin-bottom:14px">
-    <a class="btn o" href="{{ route('admin.import-data', ['jenis' => $batch->jenis, 'tahun_ajaran_id' => $batch->tahun_ajaran_id]) }}">Kembali</a>
+    <a class="btn o" href="{{ route('admin.import-data', ['tab' => $batch->jenis, 'tahun_ajaran_id' => $batch->tahun_ajaran_id]) }}">Kembali</a>
     @if($records->isNotEmpty())
         @if($editing)
             <a class="btn o" href="{{ route('admin.import.batch.show', $batch) }}">Selesai edit</a>

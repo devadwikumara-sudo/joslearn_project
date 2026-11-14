@@ -1854,7 +1854,7 @@
             hadir: 'Kehadiran',
             ekskul: 'Ekskul'
         }[I.t] || 'Data';
-        const reloadImportUrl = `${appBaseUrl}/${importRolePath}/import-data?jenis=${encodeURIComponent(importType)}`;
+        const reloadImportUrl = `${appBaseUrl}/${importRolePath}/import-data?tab=${encodeURIComponent(importType)}`;
 
         if (!endpoint) {
             alert('Alamat layanan import tidak tersedia. Muat ulang halaman lalu coba lagi.');
@@ -1890,6 +1890,8 @@
             const errors = [];
             let count = 0;
             let skipped = 0;
+            let activeCount = 0;
+            let graduatedCount = 0;
             let lastResponse = null;
 
             for (let chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
@@ -1906,6 +1908,8 @@
                 });
                 count += Number(lastResponse.count) || 0;
                 skipped += Number(lastResponse.skipped) || 0;
+                activeCount += Number(lastResponse.active_count) || 0;
+                graduatedCount += Number(lastResponse.graduated_count) || 0;
                 errors.push(...(Array.isArray(lastResponse.errors) ? lastResponse.errors : []));
             }
 
@@ -1914,8 +1918,12 @@
                 success: true,
                 count,
                 skipped,
+                active_count: activeCount,
+                graduated_count: graduatedCount,
                 errors,
-                message: `Berhasil mengimpor ${count} data ${I.t}${skipped ? ` (${skipped} baris gagal/dilewati)` : ''}.`
+                message: I.t === 'siswa'
+                    ? `Berhasil mengimpor ${count} data siswa: ${activeCount} siswa aktif untuk Data Siswa dan ${graduatedCount} siswa lulus untuk Alumni${skipped ? ` (${skipped} baris gagal/dilewati)` : ''}.`
+                    : `Berhasil mengimpor ${count} data ${I.t}${skipped ? ` (${skipped} baris gagal/dilewati)` : ''}.`
             };
             const container = document.getElementById('josbook-import-preview-area');
             if (container) {

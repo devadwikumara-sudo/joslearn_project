@@ -482,9 +482,11 @@ class ImportBatchController extends Controller
                 $skippedCount = 0;
                 $rowErrors = [];
                 $unlinkedCount = 0;
+                $activeStudentCount = 0;
+                $graduatedStudentCount = 0;
 
                 if ($type === 'siswa') {
-                    [$savedCount, $skippedCount, $rowErrors, $unlinkedCount] = $this->saveSiswa($rows, $ta, $mode, $kelasInput);
+                    [$savedCount, $skippedCount, $rowErrors, $unlinkedCount, $activeStudentCount, $graduatedStudentCount] = $this->saveSiswa($rows, $ta, $mode, $kelasInput);
                 } elseif ($type === 'nilai') {
                     [$savedCount, $skippedCount, $rowErrors] = $this->saveNilai($rows, $ta, $semester, $mode, $kelasInput, $user, $requestedTaName !== '', (int) $activeUpload->id, $createdYearIds, $createdHistoryIds);
                 } elseif ($type === 'kehadiran') {
@@ -526,6 +528,8 @@ class ImportBatchController extends Controller
                     'success' => true,
                     'count' => $savedCount,
                     'skipped' => $skippedCount,
+                    'active_count' => $activeStudentCount,
+                    'graduated_count' => $graduatedStudentCount,
                     'created_years' => count($createdYearIds),
                     'created_histories' => count($createdHistoryIds),
                     'message' => "Berhasil mengimpor {$savedCount} data {$type}".($skippedCount > 0 ? " ({$skippedCount} baris gagal/dilewati)" : '').$creationSummary.'.',
@@ -966,6 +970,8 @@ class ImportBatchController extends Controller
         $seenNisn = [];
         $seenNis = [];
         $unlinked = 0;
+        $active = 0;
+        $graduated = 0;
 
         foreach ($rows as $rowIndex => $r) {
             if (! is_array($r)) {
@@ -1222,12 +1228,17 @@ class ImportBatchController extends Controller
                 $unlinked++;
             }
             $saved++;
+            if ($statusSiswa === 'Aktif') {
+                $active++;
+            } elseif ($statusSiswa === 'Lulus') {
+                $graduated++;
+            }
             foreach ($this->importedStudentDateWarnings($data) as $warning) {
                 $errors[] = ['row' => $rowNumber, 'reason' => $warning, 'warning' => true];
             }
         }
 
-        return [$saved, $skipped, $errors, $unlinked];
+        return [$saved, $skipped, $errors, $unlinked, $active, $graduated];
     }
 
     /**

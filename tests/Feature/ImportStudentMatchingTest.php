@@ -989,10 +989,11 @@ class ImportStudentMatchingTest extends TestCase
 
         $this->actingAs($guru)->withoutMiddleware()
             ->get(route('guru.import-nilai'))
-            ->assertOk()
-            ->assertViewHas('kelasList', ['X-1']);
-        $this->get(route('guru.import-ekskul'))->assertOk()->assertViewHas('kelasList', ['X-1']);
-        $this->get(route('guru.import-ketidakhadiran'))->assertOk()->assertViewHas('kelasList', ['X-1']);
+            ->assertRedirect(route('guru.import-data', ['tab' => 'nilai']));
+        $this->get(route('guru.import-ekskul'))
+            ->assertRedirect(route('guru.import-data', ['tab' => 'ekskul']));
+        $this->get(route('guru.import-ketidakhadiran'))
+            ->assertRedirect(route('guru.import-data', ['tab' => 'kehadiran']));
         $this->get(route('guru.input-nilai-mapel', ['kelas' => 'XI-1']))->assertForbidden();
 
         $this->post(route('guru.import-nilai.store'), ['kelas' => 'XI-1', 'mata_pelajaran' => 'Matematika'])
@@ -1055,13 +1056,14 @@ class ImportStudentMatchingTest extends TestCase
         $response->assertOk()
             ->assertViewHas('allowedTypes', ['siswa', 'guru', 'nilai', 'kehadiran', 'ekskul'])
             ->assertViewHas('type', 'siswa')
+            ->assertViewHas('tab', 'siswa')
             ->assertSee('Import Data')
             ->assertSee('Data Siswa & Form Pendataan')
             ->assertSee('Kenaikan Kelas & Mutasi')
             ->assertSee('Alumni & Pelacakan Alumni')
             ->assertSee('Laporan & Log Aktivitas')
             ->assertSee('Master Data, Kualitas, Sampah & Setting')
-            ->assertSee(route('admin.import-data', ['jenis' => 'nilai']), false)
+            ->assertSee(route('admin.import-data', ['tab' => 'nilai']), false)
             ->assertSee(route('admin.import-data.template', ['jenis' => 'siswa']), false);
         $this->assertSame(8, substr_count($response->getContent(), 'data-menu-group='));
         foreach ([
@@ -1083,11 +1085,39 @@ class ImportStudentMatchingTest extends TestCase
             $this->assertStringContainsString(route($routeName), $response->getContent());
         }
 
-        $this->get(route('admin.import-data', ['jenis' => 'nilai']))
+        $this->get(route('admin.import-data', ['tab' => 'nilai']))
             ->assertOk()
             ->assertViewHas('type', 'nilai')
+            ->assertViewHas('tab', 'nilai')
             ->assertSee('Data hasil impor 2025/2026')
-            ->assertSee('name="jenis" value="nilai"', false);
+            ->assertSee('name="tab" value="nilai"', false)
+            ->assertSee('loadDemoNilai')
+            ->assertDontSee('loadDemoHadir')
+            ->assertDontSee('Jumlah Siswa');
+    }
+
+    public function test_legacy_admin_import_url_redirects_to_the_selected_tab(): void
+    {
+        $this->actingAs($this->admin)->withoutMiddleware()
+            ->get(route('admin.import.nilai'))
+            ->assertRedirect(route('admin.import-data', ['tab' => 'nilai']));
+    }
+
+    public function test_legacy_import_data_query_parameter_redirects_to_tab(): void
+    {
+        $this->actingAs($this->admin)->withoutMiddleware()
+            ->get(route('admin.import-data', ['jenis' => 'nilai']))
+            ->assertRedirect(route('admin.import-data', ['tab' => 'nilai']));
+    }
+
+    public function test_legacy_teacher_import_url_redirects_after_assignment_check(): void
+    {
+        $guru = $this->buatAkunGuru('guru-legacy-import');
+        $this->tugaskanMapel($guru, 1, 1, 1);
+
+        $this->actingAs($guru)->withoutMiddleware()
+            ->get(route('guru.import-nilai'))
+            ->assertRedirect(route('guru.import-data', ['tab' => 'nilai']));
     }
 
     public function test_teacher_import_page_exposes_only_assigned_import_types(): void
@@ -1106,6 +1136,7 @@ class ImportStudentMatchingTest extends TestCase
             ->assertViewHas('allowedTypes', ['nilai'])
             ->assertViewHas('kelasList', fn ($kelasList): bool => $kelasList->all() === ['X-1'])
             ->assertSee('Import Nilai')
+            ->assertSee('Riwayat Import Nilai Saya')
             ->assertDontSee('Import Kehadiran')
             ->assertDontSee('Import Ekskul');
 
@@ -1130,6 +1161,7 @@ class ImportStudentMatchingTest extends TestCase
         $this->tugaskanMapel($guru, 1, 1, 1);
         $this->actingAs($guru)->withoutMiddleware();
 
+        $this->get(route('guru.import-data', ['tab' => 'ekskul']))->assertForbidden();
         $this->get(route('guru.import-data', ['jenis' => 'ekskul']))->assertForbidden();
         $this->get(route('guru.import-data.template', ['jenis' => 'siswa']))->assertForbidden();
         $this->get(route('guru.import-data.template', ['jenis' => 'nilai']))->assertOk();
@@ -1144,7 +1176,8 @@ class ImportStudentMatchingTest extends TestCase
 
         $this->actingAs($guruMapel)->withoutMiddleware();
         $this->get(route('guru.input-nilai-mapel'))->assertOk();
-        $this->get(route('guru.import-nilai'))->assertOk();
+        $this->get(route('guru.import-nilai'))
+            ->assertRedirect(route('guru.import-data', ['tab' => 'nilai']));
         $this->get(route('guru.import-ekskul'))->assertForbidden();
         $this->get(route('guru.import-ketidakhadiran'))->assertForbidden();
         $this->post(route('guru.import-ekskul.store'), ['kelas' => 'X-1'])->assertForbidden();
@@ -1153,8 +1186,10 @@ class ImportStudentMatchingTest extends TestCase
         $this->actingAs($guruWali);
         $this->get(route('guru.input-nilai-mapel'))->assertForbidden();
         $this->get(route('guru.import-nilai'))->assertForbidden();
-        $this->get(route('guru.import-ekskul'))->assertOk();
-        $this->get(route('guru.import-ketidakhadiran'))->assertOk();
+        $this->get(route('guru.import-ekskul'))
+            ->assertRedirect(route('guru.import-data', ['tab' => 'ekskul']));
+        $this->get(route('guru.import-ketidakhadiran'))
+            ->assertRedirect(route('guru.import-data', ['tab' => 'kehadiran']));
         $this->post(route('guru.import-nilai.store'), [
             'kelas' => 'X-1',
             'mata_pelajaran' => 'Matematika',
@@ -1405,6 +1440,47 @@ class ImportStudentMatchingTest extends TestCase
             'status' => 'selesai',
         ]);
         $this->assertSame(2, DB::table('import_baris')->where('status', 'peringatan')->count());
+    }
+
+    public function test_student_import_reports_saved_active_and_graduated_counts(): void
+    {
+        $response = $this->import('siswa', [
+            [
+                'nisn' => '0000000101',
+                'nama' => 'Siswa Aktif',
+                'kelas' => 'X-1',
+            ],
+            [
+                'nisn' => '0000000102',
+                'nama' => 'Siswa Lulus',
+                'kelas' => 'XII-1',
+                'status' => 'Lulus',
+                'tahun_lulus' => '2025',
+            ],
+            [
+                'nisn' => '0000000103',
+                'nama' => 'Baris Tidak Valid',
+                'kelas' => 'X-1',
+                'status' => 'Lulus',
+                'tahun_lulus' => '25',
+            ],
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('count', 2)
+            ->assertJsonPath('skipped', 1)
+            ->assertJsonPath('active_count', 1)
+            ->assertJsonPath('graduated_count', 1);
+        $activeStudentId = DB::table('siswa_biodata')->where('nisn', '0000000101')->value('id');
+        $graduatedStudentId = DB::table('siswa_biodata')->where('nisn', '0000000102')->value('id');
+        $this->assertDatabaseHas('siswa_riwayat_kelas', [
+            'siswa_id' => $activeStudentId,
+            'status' => 'Aktif',
+        ]);
+        $this->assertDatabaseHas('siswa_riwayat_kelas', [
+            'siswa_id' => $graduatedStudentId,
+            'status' => 'Lulus',
+        ]);
     }
 
     public function test_server_accepts_comma_decimal_long_scores_and_rejects_out_of_range_values(): void

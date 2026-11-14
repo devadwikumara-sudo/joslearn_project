@@ -46,7 +46,7 @@ function workbookFromFixture(fixture) {
     };
 }
 
-async function importWorkbook(workbook, expectedType = 'siswa', dictionaries = {columns: {}, subjects: {}}) {
+async function importWorkbook(workbook, expectedType = 'siswa', dictionaries = {columns: {}, subjects: {}}, saveResponse = {}) {
     const alerts = [];
     const window = {toast() {}};
     const preview = {innerHTML: ''};
@@ -104,10 +104,13 @@ async function importWorkbook(workbook, expectedType = 'siswa', dictionaries = {
                 success: true,
                 batch_id: request.batch_id,
                 count: request.rows.length,
+                active_count: 0,
+                graduated_count: 0,
                 skipped: 0,
                 errors: [],
                 completed: request.final_chunk,
-                message: 'Impor selesai'
+                message: 'Impor selesai',
+                ...saveResponse
             };
         } else {
             data = {success: true};
@@ -152,7 +155,8 @@ async function importWorkbook(workbook, expectedType = 'siswa', dictionaries = {
         preview,
         window,
         requests,
-        getPayload: () => payload
+        getPayload: () => payload,
+        runImport: () => window.executeBatchImport()
     };
 }
 
@@ -234,6 +238,85 @@ test('ignores Petunjuk sheets and recognizes the active Excel template headers',
             assert.deepEqual(state.detection.sheets.map(sheet => sheet.name), ['Data'], template.type);
         }
     }
+});
+
+test('shows active and graduated student totals after saving', async () => {
+    const workbook = {
+        SheetNames: ['Data Siswa'],
+        Sheets: {
+            'Data Siswa': [
+                ['NISN', 'Nama', 'Kelas'],
+                ['0000000101', 'Siswa Aktif', 'X-1'],
+                ['0000000102', 'Siswa Lulus', 'XII-1']
+            ]
+        }
+    };
+    const {window, preview, requests, runImport} = await importWorkbook(
+        workbook,
+        'siswa',
+        {columns: {}, subjects: {}},
+        {active_count: 1, graduated_count: 1}
+    );
+    window.JosBookState.imp.statuses = [
+        {status: 'ready'},
+        {status: 'ready'}
+    ];
+
+    await runImport();
+
+    assert.match(preview.innerHTML, /1 siswa aktif/);
+    assert.match(preview.innerHTML, /1 siswa lulus/);
+    assert.match(preview.innerHTML, /\/test\/admin\/data-siswa/);
+    assert.match(preview.innerHTML, /\/test\/admin\/alumni/);
+    assert.ok(requests.some(({endpoint}) => endpoint.endsWith('/save-batch')));
+});
+
+test('reloads an academic import on the same tab after saving', async () => {
+    const workbook = {
+        SheetNames: ['Nilai'],
+        Sheets: {
+            Nilai: [
+                ['NISN', 'Nama', 'Kelas', 'Semester', 'Mata Pelajaran', 'Nilai Akhir'],
+                ['0000000101', 'Siswa Uji', 'X-1', 'Ganjil', 'Matematika', 88]
+            ]
+        }
+    };
+    const {window, preview, runImport} = await importWorkbook(workbook, 'nilai');
+    window.JosBookState.imp.statuses = [{status: 'ready'}];
+
+    await runImport();
+
+    assert.match(preview.innerHTML, /\/test\/admin\/import-data\?tab=nilai/);
+});
+
+test('aggregates student status totals across saved chunks', async () => {
+    const workbook = {
+        SheetNames: ['Data Siswa'],
+        Sheets: {
+            'Data Siswa': [
+                ['NISN', 'Nama', 'Kelas'],
+                ['0000000101', 'Siswa Uji', 'X-1']
+            ]
+        }
+    };
+    const {window, preview, requests, runImport} = await importWorkbook(
+        workbook,
+        'siswa',
+        {columns: {}, subjects: {}},
+        {active_count: 1, graduated_count: 1}
+    );
+    window.JosBookState.imp.rows = Array.from({length: 201}, (_, index) => ({
+        nisn: String(1000000000 + index),
+        nama: `Siswa ${index}`,
+        kelas: 'X-1'
+    }));
+    window.JosBookState.imp.statuses = Array.from({length: 201}, () => ({status: 'ready'}));
+
+    await runImport();
+
+    assert.match(preview.innerHTML, /2 siswa aktif/);
+    assert.match(preview.innerHTML, /2 siswa lulus/);
+    assert.equal(requests.filter(({endpoint}) => endpoint.endsWith('/save-batch')).length, 2);
 });
 
 test('maps repeated parent and guardian headings by family group', async () => {
