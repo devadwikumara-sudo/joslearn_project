@@ -9,6 +9,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class SettingWorkflowTest extends TestCase
@@ -78,6 +79,150 @@ class SettingWorkflowTest extends TestCase
             'aksi' => 'update_setting',
             'objek_tipe' => 'setting',
         ]);
+    }
+
+    #[DataProvider('settingTabs')]
+    public function test_admin_setting_renders_only_the_requested_tab(string $tab, string $visibleMarker, string $hiddenMarker): void
+    {
+        $response = $this->actingAs($this->user('admin', 1))
+            ->get(route('admin.setting', ['tab' => $tab]));
+
+        $response->assertOk()
+            ->assertViewHas('tab', $tab)
+            ->assertSee($visibleMarker, false)
+            ->assertDontSee($hiddenMarker, false);
+    }
+
+    /**
+     * @return array<string, array{string, string, string}>
+     */
+    public static function settingTabs(): array
+    {
+        return [
+            'profil' => ['profil', 'name="nama_kepala_sekolah"', 'name="backup_file"'],
+            'tahun ajaran' => ['tahun-ajaran', 'name="nama_ta"', 'name="nama_kepala_sekolah"'],
+            'cadangan' => ['cadangan', 'name="backup_file"', 'name="nama_ta"'],
+            'tempat sampah' => ['sampah', 'Tempat sampah kosong.', 'name="backup_file"'],
+            'log aktivitas' => ['log', 'placeholder="Cari aktivitas"', 'name="backup_file"'],
+            'akun' => ['akun', 'Tambah Akun Pengguna', 'name="nama_kepala_sekolah"'],
+        ];
+    }
+
+    public function test_admin_setting_rejects_an_unknown_tab(): void
+    {
+        $this->actingAs($this->user('admin', 1))
+            ->get(route('admin.setting', ['tab' => 'unknown']))
+            ->assertNotFound();
+    }
+
+    public function test_legacy_admin_pages_redirect_to_setting_tabs_and_keep_log_filters(): void
+    {
+        $this->actingAs($this->user('admin', 1))
+            ->get(route('admin.log-aktivitas', ['lf' => 'admin', 'lq' => 'perubahan', 'page' => 2]))
+            ->assertRedirect(route('admin.setting', [
+                'tab' => 'log',
+                'lf' => 'admin',
+                'lq' => 'perubahan',
+                'page' => 2,
+            ]));
+
+        $this->get(route('admin.sampah'))
+            ->assertRedirect(route('admin.setting', ['tab' => 'sampah']));
+    }
+
+    public function test_log_tab_preserves_filters_and_paginates_activity_rows(): void
+    {
+        for ($index = 1; $index <= 26; $index++) {
+            DB::table('catatan_aktivitas')->insert([
+                'peran' => 'admin',
+                'aksi' => 'ubah_setting',
+                'keterangan' => 'Log cocok '.str_pad((string) $index, 2, '0', STR_PAD_LEFT),
+                'created_at' => now()->addSeconds($index),
+            ]);
+        }
+
+        $response = $this->actingAs($this->user('admin', 1))
+            ->get(route('admin.setting', [
+                'tab' => 'log',
+                'lf' => 'admin',
+                'lq' => 'cocok',
+            ]));
+
+        $response->assertOk()
+            ->assertViewHas('lf', 'admin')
+            ->assertViewHas('lq', 'cocok')
+            ->assertViewHas('logs', fn ($logs): bool => $logs->total() === 26 && $logs->count() === 25)
+            ->assertSee('Log cocok 26')
+            ->assertDontSee('Log cocok 01')
+            ->assertSee('page=2', false)
+            ->assertSee('tab=log', false)
+            ->assertSee('lf=admin', false)
+            ->assertSee('lq=cocok', false);
+
+        $this->get(route('admin.log-aktivitas.export', ['lf' => 'admin', 'lq' => 'cocok']))
+            ->assertOk()
+            ->assertHeader('Content-Type', 'text/csv; charset=UTF-8');
+    }
+
+    public function test_year_tab_changes_the_active_year(): void
+    {
+        DB::table('sekolah_tahun_ajaran')->insert([
+            ['id' => 1, 'nama' => '2024/2025', 'sedang_berjalan' => true],
+            ['id' => 2, 'nama' => '2025/2026', 'sedang_berjalan' => false],
+        ]);
+
+        $this->actingAs($this->user('admin', 1))
+            ->get(route('admin.setting', ['tab' => 'tahun-ajaran']))
+            ->assertOk()
+            ->assertSee('name="ta_id"', false)
+            ->assertSee(route('admin.setting.tahun-ajaran.aktif'), false);
+
+        $this->post(route('admin.setting.tahun-ajaran.aktif'), ['ta_id' => 2])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('sekolah_tahun_ajaran', ['id' => 1, 'sedang_berjalan' => false]);
+        $this->assertDatabaseHas('sekolah_tahun_ajaran', ['id' => 2, 'sedang_berjalan' => true]);
+    }
+
+    public function test_trash_tab_lists_records_and_keeps_restore_and_permanent_delete_actions(): void
+    {
+        foreach ([
+            ['siswa_biodata', 11, ['nama_lengkap' => 'Siswa Pulih', 'nisn' => '1234567890', 'nomor_induk' => '1001']],
+            ['siswa_biodata', 12, ['nama_lengkap' => 'Siswa Hapus Permanen', 'nisn' => '1234567891', 'nomor_induk' => '1002']],
+            ['guru_biodata', 21, ['nama' => 'Guru Pulih', 'nip' => '198001012010011001', 'nuptk' => '001']],
+            ['guru_biodata', 22, ['nama' => 'Guru Hapus Permanen', 'nip' => '198001012010011002', 'nuptk' => '002']],
+        ] as [$table, $id, $attributes]) {
+            DB::table($table)->insert([
+                'id' => $id,
+                ...$attributes,
+                'deleted_at' => now(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        $this->actingAs($this->user('admin', 1))
+            ->get(route('admin.setting', ['tab' => 'sampah']))
+            ->assertOk()
+            ->assertSee('Siswa Pulih')
+            ->assertSee('Guru Pulih')
+            ->assertSee(route('admin.sampah.pulihkan'), false)
+            ->assertSee(route('admin.sampah.hapus-permanen'), false);
+
+        foreach ([['siswa', 11], ['guru', 21]] as [$type, $id]) {
+            $this->post(route('admin.sampah.pulihkan'), ['tipe' => $type, 'id' => $id])
+                ->assertRedirect();
+        }
+
+        foreach ([['siswa', 12], ['guru', 22]] as [$type, $id]) {
+            $this->delete(route('admin.sampah.hapus-permanen'), ['tipe' => $type, 'id' => $id])
+                ->assertRedirect();
+        }
+
+        $this->assertDatabaseHas('siswa_biodata', ['id' => 11, 'deleted_at' => null]);
+        $this->assertDatabaseHas('guru_biodata', ['id' => 21, 'deleted_at' => null]);
+        $this->assertDatabaseMissing('siswa_biodata', ['id' => 12]);
+        $this->assertDatabaseMissing('guru_biodata', ['id' => 22]);
     }
 
     public function test_downloaded_backup_contains_core_data_without_passwords_or_tokens(): void

@@ -21,34 +21,67 @@ use Symfony\Component\HttpFoundation\Response;
 
 class SettingController extends Controller
 {
-    public function index(): View
+    private const TABS = [
+        'profil' => 'Profil Sekolah',
+        'tahun-ajaran' => 'Tahun Ajaran',
+        'cadangan' => 'Cadangan',
+        'sampah' => 'Tempat Sampah',
+        'log' => 'Log Aktivitas',
+        'akun' => 'Akun',
+    ];
+
+    public function index(Request $request): View
     {
-        $setting = DB::table('sekolah_identitas')->where('id', 1)->first();
-        $pengguna = Pengguna::with('guru')->orderBy('peran')->orderBy('username')->get();
-        $tahunAjaranList = SekolahTahunAjaran::orderByDesc('id')->get();
-        $pengaturan = DB::table('sekolah_pengaturan')->pluck('isi', 'kunci');
-        $semesterBerjalan = in_array($pengaturan->get('semester_berjalan'), ['Ganjil', 'Genap'], true)
-            ? $pengaturan->get('semester_berjalan')
-            : 'Ganjil';
-        $kktp = $pengaturan->get('kktp', '75');
-        $cadanganList = CatatanCadangan::query()->latest('id')->limit(5)->get();
+        $tab = $request->query('tab', 'profil');
+        abort_unless(is_string($tab) && array_key_exists($tab, self::TABS), 404);
 
-        return view('admin.setting', compact(
-            'setting',
-            'pengguna',
-            'tahunAjaranList',
-            'semesterBerjalan',
-            'kktp',
-            'cadanganList'
-        ));
-    }
+        $data = [];
 
-    public function tempahSampah(): View
-    {
-        $siswaTerhapus = SiswaBiodata::onlyTrashed()->orderByDesc('deleted_at')->get();
-        $guruTerhapus = GuruBiodata::onlyTrashed()->orderByDesc('deleted_at')->get();
+        if ($tab === 'profil') {
+            $setting = DB::table('sekolah_identitas')->where('id', 1)->first();
+            $pengaturan = DB::table('sekolah_pengaturan')->pluck('isi', 'kunci');
+            $semesterBerjalan = in_array($pengaturan->get('semester_berjalan'), ['Ganjil', 'Genap'], true)
+                ? $pengaturan->get('semester_berjalan')
+                : 'Ganjil';
+            $kktp = $pengaturan->get('kktp', '75');
+            $data = compact('setting', 'semesterBerjalan', 'kktp');
+        } elseif ($tab === 'tahun-ajaran') {
+            $tahunAjaranList = SekolahTahunAjaran::query()->orderByDesc('id')->get();
+            $data = compact('tahunAjaranList');
+        } elseif ($tab === 'cadangan') {
+            $cadanganList = CatatanCadangan::query()->latest('id')->limit(5)->get();
+            $data = compact('cadanganList');
+        } elseif ($tab === 'sampah') {
+            $siswaTerhapus = SiswaBiodata::onlyTrashed()->orderByDesc('deleted_at')->get();
+            $guruTerhapus = GuruBiodata::onlyTrashed()->orderByDesc('deleted_at')->get();
+            $data = compact('siswaTerhapus', 'guruTerhapus');
+        } elseif ($tab === 'log') {
+            $lf = $request->query('lf', '');
+            $lq = trim($request->query('lq', ''));
+            $who2 = CatatanAktivitas::query()
+                ->select('peran')
+                ->whereNotNull('peran')
+                ->distinct()
+                ->pluck('peran')
+                ->toArray();
+            $userList = Pengguna::query()->pluck('username')->toArray();
+            $whoList = array_values(array_unique(array_filter(array_merge($who2, $userList))));
+            $query = CatatanAktivitas::with('pengguna')
+                ->forAdminLog($lf, $lq)
+                ->latest('id');
+            $totalLogs = CatatanAktivitas::query()->count();
+            $logs = $query->paginate(25)->withQueryString();
+            $data = compact('lf', 'lq', 'whoList', 'totalLogs', 'logs');
+        } elseif ($tab === 'akun') {
+            $pengguna = Pengguna::with('guru')->orderBy('peran')->orderBy('username')->get();
+            $data = compact('pengguna');
+        }
 
-        return view('admin.tempat-sampah', compact('siswaTerhapus', 'guruTerhapus'));
+        return view('admin.setting', [
+            ...$data,
+            'tab' => $tab,
+            'tabs' => self::TABS,
+        ]);
     }
 
     public function pulihkan(Request $request)
@@ -110,6 +143,7 @@ class SettingController extends Controller
             'nama_kepala_sekolah' => ['nullable', 'string', 'max:150'],
             'nip_kepala_sekolah' => ['nullable', 'string', 'max:30'],
             'tahun_ajaran_aktif_id' => [
+                'sometimes',
                 'required',
                 'integer',
                 Rule::exists('sekolah_tahun_ajaran', 'id'),
@@ -142,7 +176,9 @@ class SettingController extends Controller
                 ]);
             }
 
-            $this->jadikanTahunBerjalan((int) $validated['tahun_ajaran_aktif_id']);
+            if (isset($validated['tahun_ajaran_aktif_id'])) {
+                $this->jadikanTahunBerjalan((int) $validated['tahun_ajaran_aktif_id']);
+            }
 
             foreach ([
                 'semester_berjalan' => $validated['semester_berjalan'],

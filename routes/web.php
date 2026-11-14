@@ -200,8 +200,13 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin.only'])->grou
     Route::get('/cek-kualitas-data', [CekKualitasDataController::class, 'index'])->name('cek-kualitas-data');
     Route::get('/cek-kualitas-data/export', [CekKualitasDataController::class, 'index'])->name('cek-kualitas-data.export');
 
-    // Log Aktivitas (log aktivitas.png)
-    Route::get('/log-aktivitas', [LogAktivitasController::class, 'index'])->name('log-aktivitas');
+    // URL halaman lama tetap mengarah ke tab gabungan.
+    Route::get('/log-aktivitas', function (Request $request) {
+        return redirect()->route('admin.setting', [
+            'tab' => 'log',
+            ...$request->only(['lf', 'lq', 'page']),
+        ]);
+    })->name('log-aktivitas');
     Route::get('/log-aktivitas/export', [LogAktivitasController::class, 'export'])->name('log-aktivitas.export');
 
     // Master Kelas & Mapel (master class.png)
@@ -218,7 +223,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin.only'])->grou
         ->name('import.guru');
 
     // Tempat Sampah
-    Route::get('/sampah', [SettingController::class, 'tempahSampah'])->name('sampah');
+    Route::get('/sampah', fn () => redirect()->route('admin.setting', ['tab' => 'sampah']))->name('sampah');
     Route::post('/sampah/pulihkan', [SettingController::class, 'pulihkan'])->name('sampah.pulihkan');
     Route::delete('/sampah/hapus-permanen', [SettingController::class, 'hapusPermanenSampah'])->name('sampah.hapus-permanen');
 

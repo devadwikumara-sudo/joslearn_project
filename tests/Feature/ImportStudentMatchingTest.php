@@ -1077,14 +1077,15 @@ class ImportStudentMatchingTest extends TestCase
             ->assertSee('Alumni')
             ->assertSee('Pelacakan Alumni')
             ->assertSee('Laporan')
-            ->assertSee('Log Aktivitas')
             ->assertSee('Master Kelas')
             ->assertSee('Cek Kualitas Data')
-            ->assertSee('Tempat Sampah')
             ->assertSee('Setting')
+            ->assertDontSee('Log Aktivitas')
+            ->assertDontSee('Tempat Sampah')
             ->assertSee(route('admin.import', ['tab' => 'nilai']), false)
             ->assertSee(route('admin.import.template', ['jenis' => 'siswa']), false);
-        $this->assertSame(15, substr_count($response->getContent(), 'data-menu="'));
+        $this->assertSame(13, substr_count($response->getContent(), 'data-menu="'));
+        $this->assertSame(1, substr_count($response->getContent(), 'data-menu="setting"'));
         $this->assertStringNotContainsString('data-menu-group=', $response->getContent());
         $this->assertStringNotContainsString('josbook-sidebar-subnav', $response->getContent());
         foreach ([
@@ -1097,10 +1098,8 @@ class ImportStudentMatchingTest extends TestCase
             'admin.alumni',
             'admin.pelacakan-alumni',
             'admin.laporan',
-            'admin.log-aktivitas',
             'admin.master-kelas',
             'admin.cek-kualitas-data',
-            'admin.sampah',
             'admin.setting',
         ] as $routeName) {
             $this->assertStringContainsString(route($routeName), $response->getContent());
