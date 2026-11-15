@@ -77,15 +77,16 @@ class PdfCetakController extends Controller
         $sekolah = SekolahIdentitas::first();
         if (! $sekolah) {
             $sekolah = (object) [
-                'nama' => 'SMA NEGERI 1 NGANJUK',
-                'npsn' => '20538338',
-                'alamat' => 'Jl. Panglima Sudirman No. 77',
-                'desa' => 'Mangundikaran',
-                'kecamatan' => 'Nganjuk',
-                'kabupaten' => 'Kab. Nganjuk',
-                'provinsi' => 'Jawa Timur',
-                'nama_kepala_sekolah' => 'Drs. SUGIARTO, M.Pd.',
-                'nip_kepala_sekolah' => '19670815 199412 1 003',
+                'nama' => 'SMA Negeri 1 Rejoso Nganjuk',
+                'npsn' => '20539744',
+                'alamat' => 'Jl. Raya Rejoso No. 1, Rejoso, Nganjuk',
+                'desa' => null,
+                'kelurahan' => null,
+                'kecamatan' => null,
+                'kabupaten' => null,
+                'provinsi' => null,
+                'nama_kepala_sekolah' => null,
+                'nip_kepala_sekolah' => null,
             ];
         }
 
@@ -96,7 +97,7 @@ class PdfCetakController extends Controller
         }
 
         // 3. Parsing Pilihan Konten (Default: Semua aktif jika pertama buka)
-        $hasQueryParams = $request->has('bio') || $request->has('nilai') || $request->has('hadir') || $request->has('ekskul') || $request->has('naik');
+        $hasQueryParams = $request->has('filter_applied') || $request->has('bio') || $request->has('nilai') || $request->has('hadir') || $request->has('ekskul') || $request->has('naik');
 
         $optBio = $hasQueryParams ? $request->boolean('bio') : true;
         $optNilai = $hasQueryParams ? $request->boolean('nilai') : true;

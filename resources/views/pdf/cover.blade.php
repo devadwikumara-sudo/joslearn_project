@@ -1,15 +1,15 @@
 {{-- Sampul Kelas Buku Induk Register Sesuai Prototype (cover(k, ss)) --}}
 @php
-    $npsn = (string)($sekolah->npsn ?? '20538338');
+    $npsn = (string)($sekolah->npsn ?? '20539744');
     $npsnChars = str_split($npsn);
     $angkatan = $angkatan ?? '';
     $tahunLulus = $angkatan ? ((int)$angkatan + 3) : '';
-    $namaSekolah = strtoupper($sekolah->nama ?? 'SMA NEGERI 1 NGANJUK');
-    $alamat = $sekolah->alamat ?? 'Jl. Panglima Sudirman No. 77';
-    $kelurahan = $sekolah->desa ?? $sekolah->kelurahan ?? 'Mangundikaran';
-    $kecamatan = $sekolah->kecamatan ?? 'Nganjuk';
-    $kabupaten = $sekolah->kabupaten ?? 'Kab. Nganjuk';
-    $provinsi = $sekolah->provinsi ?? 'Jawa Timur';
+    $namaSekolah = strtoupper($sekolah->nama ?? 'SMA NEGERI 1 REJOSO NGANJUK');
+    $alamat = $sekolah->alamat ?? 'Jl. Raya Rejoso No. 1, Rejoso, Nganjuk';
+    $kelurahan = $sekolah->desa ?? $sekolah->kelurahan ?? '-';
+    $kecamatan = $sekolah->kecamatan ?? '-';
+    $kabupaten = $sekolah->kabupaten ?? '-';
+    $provinsi = $sekolah->provinsi ?? '-';
 @endphp
 <div class="pg dc cv">
     <div class="cvt">

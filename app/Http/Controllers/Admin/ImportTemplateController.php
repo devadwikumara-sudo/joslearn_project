@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Admin;
 
 use App\Exports\ImportTemplateExport;
 use App\Http\Controllers\Controller;
-use Maatwebsite\Excel\Facades\Excel;
 use Maatwebsite\Excel\Excel as ExcelWriter;
+use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class ImportTemplateController extends Controller
@@ -23,7 +23,7 @@ class ImportTemplateController extends Controller
                 'Pendidikan Ibu', 'Pekerjaan Ibu', 'Penghasilan Ibu', 'HP Ibu',
                 'Nama Wali', 'Status Siswa',
             ],
-            'instruction' => 'NISN dan Nama wajib diisi. Baris data dimulai tepat di bawah header.',
+            'instruction' => 'NISN dan Nama wajib diisi. Header/urutan kolom boleh berbeda; periksa pemetaan dan pratinjau sebelum menyimpan.',
         ],
         'guru' => [
             'headers' => [
@@ -31,19 +31,19 @@ class ImportTemplateController extends Controller
                 'Tanggal Lahir', 'Pendidikan', 'Status Kepegawaian', 'Mulai Bertugas',
                 'Nomor HP', 'Alamat',
             ],
-            'instruction' => 'Isi Nama atau NIP. Template ini hanya untuk biodata, bukan penugasan kelas/mapel.',
+            'instruction' => 'Isi Nama atau NIP. Template ini hanya untuk biodata, bukan penugasan kelas/mapel. Header/urutan kolom boleh berbeda; periksa pemetaan dan pratinjau sebelum menyimpan.',
         ],
         'nilai' => [
             'headers' => ['NISN', 'Nama', 'Kelas', 'Semester', 'Mata Pelajaran', 'Nilai Akhir'],
-            'instruction' => 'Satu baris untuk satu mapel. Isi kode/nama mapel yang terdaftar dan nilai 0–100. Semester dapat berupa Ganjil/Genap atau nomor 1–6.',
+            'instruction' => 'Satu baris untuk satu mapel. Isi kode/nama mapel yang terdaftar dan nilai 0–100. Semester dapat berupa Ganjil/Genap atau nomor 1–6. Header/urutan kolom boleh berbeda; periksa pemetaan dan pratinjau sebelum menyimpan.',
         ],
         'kehadiran' => [
             'headers' => ['NISN', 'Nama', 'Kelas', 'Semester', 'Sakit (hari)', 'Izin (hari)', 'Alpa (hari)', 'Kokurikuler'],
-            'instruction' => 'Isi jumlah hari sebagai bilangan bulat tidak negatif. Semester dapat berupa Ganjil/Genap atau nomor 1–6.',
+            'instruction' => 'Isi jumlah hari sebagai bilangan bulat tidak negatif. Semester dapat berupa Ganjil/Genap atau nomor 1–6. Header/urutan kolom boleh berbeda; periksa pemetaan dan pratinjau sebelum menyimpan.',
         ],
         'ekskul' => [
             'headers' => ['NISN', 'Nama', 'Kelas', 'Semester', 'Nama Ekskul', 'Predikat'],
-            'instruction' => 'Satu baris untuk satu kegiatan. Semester dapat berupa Ganjil/Genap atau nomor 1–6.',
+            'instruction' => 'Satu baris untuk satu kegiatan. Semester dapat berupa Ganjil/Genap atau nomor 1–6. Header/urutan kolom boleh berbeda; periksa pemetaan dan pratinjau sebelum menyimpan.',
         ],
     ];
 

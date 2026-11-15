@@ -194,6 +194,30 @@ class PdfSemesterFilterTest extends TestCase
             ->assertDontSee('>88</td>', false);
     }
 
+    public function test_pdf_uses_correct_school_identity_defaults_when_school_settings_are_empty(): void
+    {
+        $response = $this->withoutMiddleware()->get(route('admin.pdf.batch', [
+            'ids' => '1',
+            'bio' => 1,
+            'nilai' => 0,
+            'hadir' => 0,
+            'ekskul' => 0,
+            'naik' => 1,
+        ]));
+
+        $response->assertOk()
+            ->assertSee('SMA NEGERI 1 REJOSO NGANJUK')
+            ->assertSee('Jl. Raya Rejoso No. 1, Rejoso, Nganjuk')
+            ->assertDontSee('SMA NEGERI 1 NGANJUK')
+            ->assertDontSee('20538338')
+            ->assertDontSee('Drs. SUGIARTO, M.Pd.')
+            ->assertDontSee('19670815 199412 1 003');
+
+        $textWithoutWhitespace = preg_replace('/\s+/', '', strip_tags((string) $response->getContent()));
+        $this->assertIsString($textWithoutWhitespace);
+        $this->assertStringContainsString('20539744', $textWithoutWhitespace);
+    }
+
     public function test_pdf_semester_number_and_term_filters_render_only_the_matching_scores(): void
     {
         $semesterScores = [1 => 81, 2 => 82, 3 => 88, 4 => 89, 5 => 94, 6 => 96];

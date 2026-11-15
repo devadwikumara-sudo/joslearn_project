@@ -86,6 +86,7 @@ class ImportTemplateControllerTest extends TestCase
         $workbook = IOFactory::load($response->baseResponse->getFile()->getPathname());
         $this->assertSame(['Data', 'Petunjuk'], $workbook->getSheetNames());
         $this->assertSame($expectedHeaders, $workbook->getSheetByName('Data')->toArray()[0]);
+        $this->assertStringContainsString('Header/urutan kolom boleh berbeda', (string) $workbook->getSheetByName('Petunjuk')->getCell('A2')->getValue());
         $this->assertStringContainsString('Tidak ada baris contoh', $workbook->getSheetByName('Petunjuk')->getCell('A3')->getValue());
         $workbook->disconnectWorksheets();
     }

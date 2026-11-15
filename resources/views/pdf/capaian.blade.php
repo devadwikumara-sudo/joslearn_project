@@ -270,9 +270,9 @@
                 : ['NAIK', 'TIDAK NAIK'];
             $kelasTujuan = $kelasTujuanNama ?? ($nextKelasMap[$kelasNama] ?? '-');
             $tglKeputusan = $riwayatKelas?->tanggal_keputusan_kenaikan ?? now()->toDateString();
-            $namaSekolah = strtoupper($sekolah->nama ?? 'SMA NEGERI 1 NGANJUK');
-            $namaKepsek = $sekolah->nama_kepala_sekolah ?? 'Drs. SUGIARTO, M.Pd.';
-            $nipKepsek = $sekolah->nip_kepala_sekolah ?? '19670815 199412 1 003';
+            $namaSekolah = strtoupper($sekolah->nama ?? 'SMA NEGERI 1 REJOSO NGANJUK');
+            $namaKepsek = $sekolah->nama_kepala_sekolah ?? '-';
+            $nipKepsek = $sekolah->nip_kepala_sekolah ?? '-';
             $namaWali = $waliKelasNama ?? '..................................';
             $nipWali = $waliKelasNip ?? '';
         @endphp

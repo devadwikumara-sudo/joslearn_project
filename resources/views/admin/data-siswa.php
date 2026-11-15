@@ -118,8 +118,8 @@
     <div class="bar">
         <b>{{ $siswaList ? $siswaList->total() : 0 }} siswa</b>
         <div class="student-table-actions">
-            <button class="btn o" onclick="window.print()">PDF terpilih</button>
-            <button class="btn o" onclick="window.print()">PDF semua tampil</button>
+            <button type="button" class="btn o" onclick="cetakPdfTerpilih()">PDF terpilih</button>
+            <button type="button" class="btn o" onclick="cetakPdfSemua()">PDF semua tampil</button>
             <button type="button" class="btn o" onclick="openBulkMovePanel()">Pindah kelas</button>
             <button type="button" id="delete-selected-button" class="btn x" onclick="deleteSelectedStudents()" disabled>Hapus terpilih</button>
             @if($kelasSelected !== '' && $kelasSelected !== '*')
@@ -437,6 +437,27 @@ function confirmBulkUpdate(form, total) {
         ? 'Pindahkan ' + selectedCount + ' siswa terpilih ke penempatan tujuan?'
         : 'Terapkan penempatan ke semua ' + total + ' siswa pada filter ini?';
     return confirm(message);
+}
+
+function cetakPdfTerpilih() {
+    const ids = selectedStudentIds();
+    if (!ids.length) {
+        alert('Pilih minimal satu siswa pada kotak centang terlebih dahulu untuk mencetak PDF terpilih.');
+        return;
+    }
+    const url = '{{ route("admin.pdf.batch") }}?ids=' + encodeURIComponent(ids.join(','));
+    window.open(url, '_blank');
+}
+
+function cetakPdfSemua() {
+    const allCheckboxes = document.querySelectorAll('.check-item');
+    const ids = Array.from(allCheckboxes).map(function(c) { return c.value; });
+    if (!ids.length) {
+        alert('Tidak ada siswa pada halaman ini untuk dicetak.');
+        return;
+    }
+    const url = '{{ route("admin.pdf.batch") }}?ids=' + encodeURIComponent(ids.join(','));
+    window.open(url, '_blank');
 }
 </script>
 @endpush

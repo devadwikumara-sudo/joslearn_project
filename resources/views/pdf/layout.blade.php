@@ -471,6 +471,7 @@
             </label>
 
             <input type="hidden" name="paper" id="form-paper" value="{{ $paper ?? 'F4' }}">
+            <input type="hidden" name="filter_applied" value="1">
             @if(request()->has('kelas'))
                 <input type="hidden" name="kelas" value="{{ request('kelas') }}">
             @endif

@@ -35,18 +35,14 @@
     <span class="sp"></span>
     <a href="{{ route('admin.data-siswa') }}" class="btn o">Kembali</a>
     <a href="{{ route('admin.data-siswa.pdf', $siswa->id) }}" target="_blank" rel="noopener" class="btn" style="background:var(--p);color:#fff">⬇ Cetak PDF</a>
-    <a href="{{ route('admin.form-pendataan.edit', $siswa->id) }}" class="btn a">Edit biodata</a>
+    <a href="{{ route('admin.data-siswa', ['panel' => 'form', 'mode' => 'edit', 'siswa' => $siswa->id]) }}" class="btn a">Edit biodata</a>
 </div>
 
 <div style="margin-top:14px">
-<<<<<<< HEAD
     @include('admin.siswa-detail-content', [
         'includeGraduationDetails' => true,
         'canManageAcademicRecords' => true,
         'academicMapelOptions' => $academicMapelOptions,
     ])
-=======
-    @include('admin.siswa-detail-content', ['includeGraduationDetails' => true])
->>>>>>> 497b07e27e50c1c03a318e4e1e5f3c83921f699c
 </div>
 @endsection
