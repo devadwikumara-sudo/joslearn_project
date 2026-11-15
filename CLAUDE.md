@@ -31,13 +31,37 @@ JosBook adalah sistem Buku Induk digital SMA Negeri 1 Rejoso Nganjuk.
 
 ## Letak kode penting
 - Login web: app/Http/Controllers/Auth/AuthController.php, views di resources/views/login-guru-dan-admin/
-- Login/OTP API mobile (contoh implementasi benar): app/Http/Controllers/Api/AuthApiController.php
+- Login/OTP API mobile: app/Http/Controllers/Api/AuthApiController.php
 - Middleware: app/Http/Middleware (EnsureAdminOnly, EnsureUserIsAdminOrGuru, EnsureSiswaOnly)
-- Import: app/Http/Controllers/Admin/ImportBatchController.php (server), public/js/josbook-excel.js (pembacaan Excel di browser, SheetJS)
-- PDF: app/Http/Controllers/Admin/PdfCetakController.php, views di resources/views/pdf/
-- Controller guru: `app/Http/Controllers/Guru/` mencakup beranda, data siswa, input nilai, import, log aktivitas, dan pengaturan. Periksa implementasi per controller; jangan mengasumsikan seluruhnya masih kerangka.
-- Model: app/Models (Admin/, Auth/, Guru/)
-- Test: tests/Feature
+- Import: app/Http/Controllers/Admin/ImportBatchController.php, app/Http/Controllers/Admin/ImportDataController.php, public/js/josbook-excel.js (pembacaan Excel di browser, SheetJS)
+- PDF: app/Http/Controllers/Admin/PdfCetakController.php, views di resources/views/pdf/ (F4/A4, layout, cover, register 1-3, capaian)
+- Controller guru: app/Http/Controllers/Guru/ (beranda, data siswa, input nilai mapel, log aktivitas, dan pengaturan)
+- Model: app/Models (Admin/, Auth/, Guru/, dan model entitas di app/Models/)
+- Test: tests/Feature, tests/Unit, tests/js
+
+## Struktur Sidebar (Penutupan W23)
+- **Sidebar Admin (tepat 8 item datar, urut, dilarang accordion/sub-menu):**
+  1. Dashboard (`admin.dashboard`)
+  2. Data Siswa (`admin.data-siswa`)
+  3. Import Data (`admin.import`)
+  4. Kenaikan & Mutasi (`admin.kenaikan-mutasi`)
+  5. Alumni (`admin.alumni`)
+  6. Guru & Master (`admin.guru-master`)
+  7. Laporan (`admin.laporan`)
+  8. Setting (`admin.setting`)
+- **Sidebar Guru (maksimal 5 item datar, dilarang accordion/sub-menu):**
+  1. Beranda (`guru.beranda`, alias `guru.dashboard`)
+  2. Data Siswa (`guru.data-siswa`)
+  3. Input Nilai Mapel (`guru.input-nilai-mapel`) — hanya untuk guru mapel yang bukan wali kelas
+  4. Import Data (`guru.import-data`) — untuk guru mapel dan/atau wali kelas
+  5. Kenaikan Kelas (`guru.kenaikan-mutasi?tab=kenaikan`) — hanya untuk wali kelas
+  6. Setting (`guru.setting`)
+  *Jumlah item yang tampil untuk setiap guru tidak pernah melebihi 5.*
+
+## Aturan Siswa Aktif vs Alumni
+- **Siswa Aktif:** Siswa terdaftar pada tahun ajaran yang sedang berjalan dengan status `'Aktif'`. Ditampilkan di menu Data Siswa admin/guru, dapat dipindah kelas, dan diproses pada kenaikan kelas.
+- **Siswa Alumni:** Siswa berstatus kelulusan (`'Lulus'`), tercatat pada riwayat kelas dan kelengkapan Kontrol Induk (nomor SKL, nomor ijazah, tanggal ijazah, nomor transkrip, PSAJ). Ditampilkan dan dikelola secara eksklusif di menu **Alumni** (`admin.alumni`) serta pelacakan kegiatan pasca kelulusan di panel Pelacakan Alumni. Siswa alumni tidak muncul di daftar Data Siswa aktif.
+- **Mutasi Siswa:** Siswa keluar karena alasan pindah sekolah, dikeluarkan, atau meninggal dunia dicatat di menu **Kenaikan & Mutasi** tab Mutasi (`admin.kenaikan-mutasi?tab=mutasi`).
 
 ## Aturan kerja (berlaku di semua tugas)
 1. Baca dulu kode yang relevan dan tulis rencana singkat sebelum mengedit. Jika kode berbeda dari deskripsi tugas, percayai kode dan beri tahu perbedaannya.

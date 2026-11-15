@@ -1094,6 +1094,17 @@ class ImportStudentMatchingTest extends TestCase
             ->assertSee(route('admin.import', ['tab' => 'nilai']), false)
             ->assertSee(route('admin.import.template', ['jenis' => 'siswa']), false);
         $this->assertSame(8, substr_count($response->getContent(), 'data-menu="'));
+        preg_match_all('/data-menu="([^"]+)"/', $response->getContent(), $menuMatches);
+        $this->assertSame([
+            'dashboard',
+            'siswa',
+            'import-data',
+            'kenaikan-mutasi',
+            'alumni',
+            'guru-master',
+            'laporan',
+            'setting',
+        ], $menuMatches[1]);
         $this->assertSame(1, substr_count($response->getContent(), 'data-menu="guru-master"'));
         $this->assertStringNotContainsString('data-menu="data-guru"', $response->getContent());
         $this->assertStringNotContainsString('data-menu="master"', $response->getContent());
@@ -1117,7 +1128,7 @@ class ImportStudentMatchingTest extends TestCase
             $this->assertStringContainsString(route($routeName), $response->getContent());
         }
 
-        $this->get(route('admin.import', ['tab' => 'nilai']))
+        $academicImport = $this->get(route('admin.import', ['tab' => 'nilai']))
             ->assertOk()
             ->assertViewHas('type', 'nilai')
             ->assertViewHas('tab', 'nilai')
@@ -1126,6 +1137,7 @@ class ImportStudentMatchingTest extends TestCase
             ->assertSee('loadDemoNilai')
             ->assertDontSee('loadDemoHadir')
             ->assertDontSee('Jumlah Siswa');
+        $this->assertMatchesRegularExpression('/class="[^"]*\bon\b[^"]*" data-menu="import-data"/', $academicImport->getContent());
     }
 
     public function test_legacy_admin_import_url_redirects_to_the_selected_tab(): void

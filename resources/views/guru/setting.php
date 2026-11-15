@@ -6,6 +6,10 @@
 <h2>Setting</h2>
 <p class="sub">Kelola nama tampilan dan kata sandi akun Anda.</p>
 
+<div class="bar" style="margin-bottom:14px">
+    <a href="{{ route('guru.log-aktivitas') }}" class="btn o">Log Aktivitas</a>
+</div>
+
 @if($errors->any())
     <div class="note err" style="margin-bottom:14px">
         <ul style="margin:0;padding-left:20px">

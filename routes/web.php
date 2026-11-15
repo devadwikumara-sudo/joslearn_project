@@ -268,6 +268,7 @@ Route::prefix('guru')->name('guru.')->middleware(['auth', 'role.web'])->group(fu
 
     // Beranda Guru (beranda guru.png)
     Route::get('/beranda', [BerandaGuruController::class, 'index'])->name('beranda');
+    Route::get('/dashboard', fn () => redirect()->route('guru.beranda'))->name('dashboard');
     Route::get('/log-aktivitas', [LogAktivitasGuruController::class, 'index'])->name('log-aktivitas');
     Route::get('/setting', [SettingGuruController::class, 'index'])->name('setting');
     Route::put('/setting/profil', [SettingGuruController::class, 'updateProfil'])->name('setting.profil');

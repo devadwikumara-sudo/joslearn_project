@@ -53,9 +53,9 @@
                     <span>Data Siswa</span>
                 </a>
 
-                <a href="{{ route('admin.guru-master', ['tab' => 'guru']) }}" class="{{ request()->routeIs('admin.guru-master*') ? 'on' : '' }}" data-menu="guru-master">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
-                    <span>Guru &amp; Master</span>
+                <a href="{{ route('admin.import') }}" class="{{ (request()->routeIs('admin.import*') || request()->routeIs('admin.import-data*')) ? 'on' : '' }}" data-menu="import-data">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    <span>Import Data</span>
                 </a>
 
                 <a href="{{ route('admin.kenaikan-mutasi', ['tab' => 'kenaikan']) }}" class="{{ request()->routeIs('admin.kenaikan-mutasi*', 'admin.kenaikan-kelas*', 'admin.mutasi-siswa*') ? 'on' : '' }}" data-menu="kenaikan-mutasi">
@@ -63,22 +63,22 @@
                     <span>Kenaikan &amp; Mutasi</span>
                 </a>
 
-                <a href="{{ route('admin.import') }}" class="{{ (request()->routeIs('admin.import*') || request()->routeIs('admin.import-data*')) ? 'on' : '' }}" data-menu="import-data">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                    <span>Import Data</span>
-                </a>
-
-                <a href="{{ route('admin.alumni') }}" class="{{ request()->routeIs('admin.alumni*') ? 'on' : '' }}" data-menu="alumni">
+                <a href="{{ route('admin.alumni') }}" class="{{ request()->routeIs('admin.alumni*', 'admin.pelacakan-alumni*') ? 'on' : '' }}" data-menu="alumni">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 011.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"></path></svg>
                     <span>Alumni</span>
                 </a>
 
-                <a href="{{ route('admin.laporan') }}" class="{{ request()->routeIs('admin.laporan*') ? 'on' : '' }}" data-menu="laporan">
+                <a href="{{ route('admin.guru-master', ['tab' => 'guru']) }}" class="{{ request()->routeIs('admin.guru-master*', 'admin.data-guru*', 'admin.master-kelas*', 'admin.master-mapel*') ? 'on' : '' }}" data-menu="guru-master">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                    <span>Guru &amp; Master</span>
+                </a>
+
+                <a href="{{ route('admin.laporan') }}" class="{{ request()->routeIs('admin.laporan*', 'admin.cek-kualitas-data*') ? 'on' : '' }}" data-menu="laporan">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                     <span>Laporan</span>
                 </a>
 
-                <a href="{{ route('admin.setting') }}" class="{{ request()->routeIs('admin.setting*') ? 'on' : '' }}" data-menu="setting">
+                <a href="{{ route('admin.setting') }}" class="{{ request()->routeIs('admin.setting*', 'admin.log-aktivitas*', 'admin.sampah*') ? 'on' : '' }}" data-menu="setting">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                     <span>Setting</span>
                 </a>
@@ -88,7 +88,7 @@
             <nav class="josbook-sidebar-nav" aria-label="Menu guru">
                 <a href="{{ route('guru.beranda') }}" class="{{ request()->routeIs('guru.beranda') ? 'on' : '' }}" data-menu="beranda">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
-                    <span>Dashboard</span>
+                    <span>Beranda</span>
                 </a>
 
                 <a href="{{ route('guru.data-siswa') }}" class="{{ request()->routeIs('guru.data-siswa*') ? 'on' : '' }}" data-menu="siswa">
@@ -96,31 +96,17 @@
                     <span>Data Siswa</span>
                 </a>
 
-                <a href="{{ route('guru.log-aktivitas') }}" class="{{ request()->routeIs('guru.log-aktivitas*') ? 'on' : '' }}" data-menu="log">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                    <span>Log Aktivitas</span>
-                </a>
-
-                <a href="{{ route('guru.setting') }}" class="{{ request()->routeIs('guru.setting*') ? 'on' : '' }}" data-menu="setting">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924-1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 001.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                    <span>Setting</span>
-                </a>
-
-                @if($guruMenuMapel || $guruMenuWali)
-                    <a
-                        href="{{ route('guru.import-data') }}"
-                        class="{{ (request()->routeIs('guru.import-data*') || request()->routeIs('guru.import-nilai*') || request()->routeIs('guru.import-ketidakhadiran*') || request()->routeIs('guru.import-ekskul*')) ? 'on' : '' }}"
-                        data-menu="import-data"
-                    >
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                        <span>Import Data</span>
-                    </a>
-                @endif
-
-                @if($guruMenuMapel)
+                @if($guruMenuMapel && ! $guruMenuWali)
                     <a href="{{ route('guru.input-nilai-mapel') }}" class="{{ request()->routeIs('guru.input-nilai-mapel*') ? 'on' : '' }}" data-menu="input-nilai">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
                         <span>Input Nilai Mapel</span>
+                    </a>
+                @endif
+
+                @if($guruMenuMapel || $guruMenuWali)
+                    <a href="{{ route('guru.import-data') }}" class="{{ (request()->routeIs('guru.import-data*', 'guru.import-nilai*', 'guru.import-ketidakhadiran*', 'guru.import-ekskul*') || ($guruMenuMapel && $guruMenuWali && request()->routeIs('guru.input-nilai-mapel*'))) ? 'on' : '' }}" data-menu="import-data">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        <span>Import Data</span>
                     </a>
                 @endif
 
@@ -130,6 +116,10 @@
                         <span>Kenaikan Kelas</span>
                     </a>
                 @endif
+                <a href="{{ route('guru.setting') }}" class="{{ request()->routeIs('guru.setting*', 'guru.log-aktivitas*') ? 'on' : '' }}" data-menu="setting">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924-1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 001.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                    <span>Setting</span>
+                </a>
             </nav>
             @endif
         </div>

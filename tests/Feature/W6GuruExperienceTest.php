@@ -20,6 +20,7 @@ class W6GuruExperienceTest extends TestCase
 
         foreach ([
             'catatan_aktivitas',
+            'catatan_kenaikan_kelas',
             'siswa_riwayat_kelas',
             'siswa_biodata',
             'akun_pengguna',
@@ -33,6 +34,17 @@ class W6GuruExperienceTest extends TestCase
         ] as $table) {
             Schema::dropIfExists($table);
         }
+
+        Schema::create('catatan_kenaikan_kelas', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('kelas_asal_id');
+            $table->unsignedBigInteger('tahun_ajaran_asal_id');
+            $table->unsignedBigInteger('tahun_ajaran_tujuan_id')->nullable();
+            $table->string('jenis_aksi', 30)->default('kenaikan');
+            $table->integer('jumlah_siswa')->default(0);
+            $table->timestamp('dibatalkan_at')->nullable();
+            $table->timestamps();
+        });
 
         Schema::create('sekolah_tahun_ajaran', function (Blueprint $table): void {
             $table->id();
@@ -155,10 +167,10 @@ class W6GuruExperienceTest extends TestCase
             ->assertSee('X-1')
             ->assertSee('2025/2026')
             ->assertSee('Ganjil')
-            ->assertSee('Dashboard')
+            ->assertSee('Beranda')
             ->assertSee('Input Nilai Mapel')
             ->assertSee('Import Data')
-            ->assertSee('Log Aktivitas')
+            ->assertDontSee('Log Aktivitas')
             ->assertSee('Setting')
             ->assertDontSee('Wali Kelas X-1')
             ->assertDontSee('Import Nilai')
@@ -167,7 +179,21 @@ class W6GuruExperienceTest extends TestCase
             ->assertSee(route('guru.import-data'), false)
             ->assertDontSee(route('guru.import-nilai'), false)
             ->assertDontSee(route('guru.kenaikan-mutasi'), false);
-        $this->assertSame(1, substr_count($response->getContent(), 'data-menu="import-data"'));
+        $this->assertSidebarMenuOrder($response->getContent(), [
+            'beranda',
+            'siswa',
+            'input-nilai',
+            'import-data',
+            'setting',
+        ]);
+
+        $inputPage = $this->get(route('guru.input-nilai-mapel'));
+        $inputPage->assertOk();
+        $this->assertMatchesRegularExpression('/class="[^"]*\bon\b[^"]*" data-menu="input-nilai"/', $inputPage->getContent());
+
+        $importPage = $this->get(route('guru.import-data', ['tab' => 'nilai']));
+        $importPage->assertOk();
+        $this->assertMatchesRegularExpression('/class="[^"]*\bon\b[^"]*" data-menu="import-data"/', $importPage->getContent());
     }
 
     public function test_homeroom_teacher_home_shows_active_students_and_homeroom_menu_only(): void
@@ -182,10 +208,10 @@ class W6GuruExperienceTest extends TestCase
         $response->assertOk()
             ->assertSee('Wali Kelas X-1')
             ->assertSee('1 siswa aktif')
-            ->assertSee('Dashboard')
+            ->assertSee('Beranda')
             ->assertSee('Import Data')
             ->assertSee('Kenaikan Kelas')
-            ->assertSee('Log Aktivitas')
+            ->assertDontSee('Log Aktivitas')
             ->assertSee('Setting')
             ->assertDontSee('Guru Mapel')
             ->assertDontSee('Input Nilai Mapel')
@@ -194,7 +220,17 @@ class W6GuruExperienceTest extends TestCase
             ->assertDontSee('Import Ekskul')
             ->assertSee(route('guru.import-data'), false)
             ->assertSee(route('guru.kenaikan-mutasi'), false);
-        $this->assertSame(1, substr_count($response->getContent(), 'data-menu="import-data"'));
+        $this->assertSidebarMenuOrder($response->getContent(), [
+            'beranda',
+            'siswa',
+            'import-data',
+            'kenaikan',
+            'setting',
+        ]);
+
+        $promotionPage = $this->get(route('guru.kenaikan-mutasi', ['tab' => 'kenaikan']));
+        $promotionPage->assertOk();
+        $this->assertMatchesRegularExpression('/class="[^"]*\bon\b[^"]*" data-menu="kenaikan"/', $promotionPage->getContent());
     }
 
     public function test_homeroom_teacher_home_does_not_count_graduates_with_active_histories(): void
@@ -230,8 +266,38 @@ class W6GuruExperienceTest extends TestCase
             ->assertDontSee('Import Nilai')
             ->assertDontSee('Import Kehadiran')
             ->assertDontSee('Import Ekskul');
+        $this->assertSidebarMenuOrder($response->getContent(), [
+            'beranda',
+            'siswa',
+            'import-data',
+            'kenaikan',
+            'setting',
+        ]);
+        $this->assertSame(0, substr_count($response->getContent(), 'data-menu="input-nilai"'));
         $this->assertSame(1, substr_count($response->getContent(), 'data-menu="import-data"'));
-        $this->assertSame(1, substr_count($response->getContent(), route('guru.import-data')));
+    }
+
+    public function test_dual_role_teacher_can_open_subject_input_from_import_data(): void
+    {
+        $teacher = $this->createTeacher('Guru Mapel dan Wali');
+        $this->assignSubject($teacher, 1, 1);
+        $this->assignHomeroom($teacher, 1);
+
+        $response = $this->actingAs($teacher)
+            ->get(route('guru.import-data', ['tab' => 'nilai']));
+
+        $response->assertOk()
+            ->assertSee('Input Nilai Mapel')
+            ->assertSee(route('guru.input-nilai-mapel'), false);
+        $this->assertSame(0, substr_count($response->getContent(), 'data-menu="input-nilai"'));
+        $this->assertMatchesRegularExpression('/class="[^"]*\bon\b[^"]*" data-menu="import-data"/', $response->getContent());
+        $this->assertSidebarMenuOrder($response->getContent(), [
+            'beranda',
+            'siswa',
+            'import-data',
+            'kenaikan',
+            'setting',
+        ]);
     }
 
     public function test_unassigned_teacher_sees_notice_and_is_denied_assignment_routes(): void
@@ -281,6 +347,7 @@ class W6GuruExperienceTest extends TestCase
         $response->assertOk()
             ->assertSee('Aktivitas milik saya.')
             ->assertDontSee('Aktivitas milik guru lain.');
+        $this->assertMatchesRegularExpression('/class="[^"]*\bon\b[^"]*" data-menu="setting"/', $response->getContent());
     }
 
     public function test_teacher_can_update_display_name_and_password_and_changes_are_logged(): void
@@ -291,7 +358,8 @@ class W6GuruExperienceTest extends TestCase
             ->get(route('guru.setting'))
             ->assertOk()
             ->assertSee('Nama Tampilan')
-            ->assertSee('Ganti Kata Sandi');
+            ->assertSee('Ganti Kata Sandi')
+            ->assertSee(route('guru.log-aktivitas'), false);
 
         $this->put(route('guru.setting.profil'), ['nama' => 'Guru Sesudah'])
             ->assertRedirect()
@@ -393,5 +461,15 @@ class W6GuruExperienceTest extends TestCase
         ]);
 
         return $studentId;
+    }
+
+    /**
+     * @param  array<int, string>  $expected
+     */
+    private function assertSidebarMenuOrder(string $html, array $expected): void
+    {
+        preg_match_all('/data-menu="([^"]+)"/', $html, $matches);
+
+        $this->assertSame($expected, $matches[1]);
     }
 }

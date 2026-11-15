@@ -32,7 +32,7 @@
                     <div style="font-size:11px;color:var(--mu)">{{ $kelasDiajar->pluck('nama')->join(', ') }}</div>
                 </div>
             </div>
-            <a href="{{ route('guru.input-nilai-mapel') }}" class="btn" style="margin-top:12px">Input nilai mapel</a>
+            <a href="{{ route('guru.input-nilai-mapel') }}" class="btn" style="margin-top:12px">Input Nilai Mapel</a>
         </div>
     @endif
 

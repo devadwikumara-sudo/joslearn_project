@@ -3,10 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\Auth\Pengguna;
-use App\Models\SekolahKelas;
-use App\Models\SekolahTahunAjaran;
 use App\Models\SiswaBiodata;
-use App\Models\SiswaRiwayatKelas;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class PdfOutputTest extends TestCase
@@ -15,17 +13,17 @@ class PdfOutputTest extends TestCase
     {
         config([
             'database.default' => 'mysql',
-            'database.connections.mysql.database' => 'josbook',
+            'database.connections.mysql.database' => 'josbook_db',
         ]);
-        \Illuminate\Support\Facades\DB::purge('mysql');
+        DB::purge('mysql');
 
         $admin = Pengguna::where('peran', 'admin')->first();
-        if (!$admin) {
+        if (! $admin) {
             $this->markTestSkipped('Tidak ada akun admin di mysql');
         }
 
         $siswa = SiswaBiodata::first();
-        if (!$siswa) {
+        if (! $siswa) {
             $this->markTestSkipped('Tidak ada siswa di database');
         }
 

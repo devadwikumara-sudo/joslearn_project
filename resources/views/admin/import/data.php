@@ -16,6 +16,13 @@
     @endforeach
 </nav>
 
+@if(! $isAdmin && in_array('nilai', $allowedTypes, true) && in_array('kehadiran', $allowedTypes, true))
+    <div class="bar" style="margin-top:12px">
+        <span class="sub">Pengisian nilai per siswa:</span>
+        <a href="{{ route('guru.input-nilai-mapel') }}" class="btn o">Input Nilai Mapel</a>
+    </div>
+@endif
+
 @include('admin.import.tabs.'.$tabView)
 
 @if($batchDetail !== null)
