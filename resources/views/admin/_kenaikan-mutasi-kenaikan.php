@@ -34,7 +34,7 @@
                     @endphp
                     @forelse($siswaList as $s)
                     @php
-                        $defaultTujuan = $nextKelasMap[$kelasAsal] ?? $kelasAsal;
+                        $defaultTujuan = $nextKelasMap[$kelasAsal] ?? '';
                     @endphp
                     <tr>
                         <td><b>{{ $s->nama_lengkap }}</b></td>
@@ -58,9 +58,11 @@
                                     <span style="color:var(--mu)">Lulus (Masuk Alumni)</span>
                                 @else
                                     <select name="kelas_tujuan[{{ $s->id }}]" class="sel-tujuan">
-                                        @foreach($kelasList as $kt)
+                                        @forelse($kelasNaikList as $kt)
                                             <option value="{{ $kt }}" {{ $defaultTujuan === $kt ? 'selected' : '' }}>{{ $kt }}</option>
-                                        @endforeach
+                                        @empty
+                                            <option value="" selected disabled>Belum ada kelas tujuan tingkat berikutnya</option>
+                                        @endforelse
                                     </select>
                                 @endif
                             </div>

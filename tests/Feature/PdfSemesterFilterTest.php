@@ -208,6 +208,39 @@ class PdfSemesterFilterTest extends TestCase
             ->assertSee('Siswa Enam Semester');
     }
 
+    public function test_batch_pdf_keeps_forty_student_registers_with_bounded_output_and_render_time(): void
+    {
+        $studentIds = [];
+        $studentNames = [];
+        for ($index = 1; $index <= 40; $index++) {
+            $studentName = "Siswa Batch Uji {$index}";
+            $studentNames[] = $studentName;
+            $studentIds[] = DB::table('siswa_biodata')->insertGetId([
+                'nama_lengkap' => $studentName,
+                'nisn' => str_pad((string) $index, 10, '0', STR_PAD_LEFT),
+                'nomor_induk' => 'BATCH-'.$index,
+            ]);
+        }
+
+        $startedAt = microtime(true);
+        $response = $this->withoutMiddleware()->get(route('admin.pdf.batch', [
+            'ids' => implode(',', $studentIds),
+            'bio' => 1,
+            'nilai' => 0,
+            'hadir' => 0,
+            'ekskul' => 0,
+            'naik' => 0,
+        ]));
+        $elapsedSeconds = microtime(true) - $startedAt;
+        $content = (string) $response->assertOk()->getContent();
+
+        foreach ($studentNames as $studentName) {
+            $this->assertStringContainsString($studentName, $content);
+        }
+        $this->assertLessThan(15, $elapsedSeconds);
+        $this->assertLessThan(5 * 1024 * 1024, strlen($content));
+    }
+
     public function test_pdf_semester_six_filter_renders_only_the_matching_grade_history(): void
     {
         $response = $this->withoutMiddleware()->get(route('admin.data-siswa.pdf', [

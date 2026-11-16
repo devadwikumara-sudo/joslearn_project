@@ -16,6 +16,8 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class KenaikanKelasController extends Controller
@@ -86,6 +88,17 @@ class KenaikanKelasController extends Controller
         abort_unless($isAdmin || ($kelasObj && $aksesGuru->bolehKenaikanKelas($pengguna, (int) $kelasObj->id)), 403, 'Anda bukan wali kelas untuk kelas yang dipilih.');
 
         $kelasList = $kelasTujuanList;
+        $tingkatTujuanNaik = match ($kelasObj?->tingkat) {
+            'X' => 'XI',
+            'XI' => 'XII',
+            default => null,
+        };
+        $kelasNaikList = $tingkatTujuanNaik === null
+            ? []
+            : array_values(array_filter(
+                $kelasList,
+                fn (string $namaKelas): bool => $this->tingkatKelas($namaKelas) === $tingkatTujuanNaik
+            ));
         $kelasAsalId = $kelasAsal === '*' ? null : ($kelasObj?->id ?? 0);
         $filterRiwayatKelas = function (Builder|Relation $query) use ($taAktifId, $kelasAsalId): void {
             $this->filterRiwayatKelas($query, (int) $taAktifId, $kelasAsalId);
@@ -159,6 +172,7 @@ class KenaikanKelasController extends Controller
             'taAktifId',
             'taBerikutnya',
             'kelasList',
+            'kelasNaikList',
             'kelasAsalList',
             'kelasAsal',
             'siswaList',
@@ -208,19 +222,67 @@ class KenaikanKelasController extends Controller
             $taBerikutnya = $this->tahunAjaranBerikutnya($taAktif);
         }
 
-        $kelasAsalObj = SekolahKelas::where('nama', $validated['kelas_asal'])->first();
-        if (! $kelasAsalObj && $isAdmin) {
-            $kelasAsalObj = SekolahKelas::firstOrCreate(
-                ['nama' => $validated['kelas_asal']],
-                ['tingkat' => $this->tingkatKelas($validated['kelas_asal'])]
-            );
+        $tingkatAsal = $this->tingkatKelas($validated['kelas_asal']);
+        if ($tingkatAsal === null) {
+            throw ValidationException::withMessages([
+                'kelas_asal' => 'Format kelas asal harus berupa X-..., XI-..., atau XII-....',
+            ]);
         }
-        abort_unless($kelasAsalObj, 422, 'Kelas asal tidak ditemukan.');
+        $kelasAsalObj = SekolahKelas::where('nama', $validated['kelas_asal'])->first();
+        if ($kelasAsalObj === null || $kelasAsalObj->tingkat !== $tingkatAsal) {
+            throw ValidationException::withMessages([
+                'kelas_asal' => 'Kelas asal tidak ditemukan atau tingkatnya tidak sesuai.',
+            ]);
+        }
         abort_unless(
             $isAdmin || $aksesGuru->bolehKenaikanKelas($pengguna, (int) $kelasAsalObj->id),
             403,
             'Anda bukan wali kelas untuk kelas yang dipilih.'
         );
+
+        $tingkatTujuan = match ($tingkatAsal) {
+            'X' => 'XI',
+            'XI' => 'XII',
+            default => null,
+        };
+        $kelasTujuanPerSiswa = [];
+        foreach ($validated['keputusan'] as $siswaId => $aksi) {
+            if ($aksi === 'Lulus' && $tingkatAsal !== 'XII') {
+                throw ValidationException::withMessages([
+                    "keputusan.{$siswaId}" => 'Kelulusan hanya dapat diproses untuk siswa kelas XII.',
+                ]);
+            }
+
+            if ($aksi === 'Naik') {
+                if ($tingkatTujuan === null) {
+                    throw ValidationException::withMessages([
+                        "keputusan.{$siswaId}" => 'Siswa kelas XII tidak dapat dinaikkan ke tingkat berikutnya.',
+                    ]);
+                }
+
+                $namaKelasTujuan = trim((string) ($validated['kelas_tujuan'][$siswaId] ?? ''));
+                $tingkatKelasTujuan = $this->tingkatKelas($namaKelasTujuan);
+                if ($tingkatKelasTujuan !== $tingkatTujuan) {
+                    throw ValidationException::withMessages([
+                        "kelas_tujuan.{$siswaId}" => "Kelas tujuan wajib berada satu tingkat di atas kelas asal ({$tingkatTujuan}).",
+                    ]);
+                }
+
+                $kelasTujuan = SekolahKelas::where('nama', $namaKelasTujuan)->first();
+                if ($kelasTujuan !== null && $kelasTujuan->tingkat !== $tingkatKelasTujuan) {
+                    throw ValidationException::withMessages([
+                        "kelas_tujuan.{$siswaId}" => 'Tingkat kelas tujuan tidak sesuai dengan nama kelas.',
+                    ]);
+                }
+                if ($kelasTujuan === null && ! $isAdmin) {
+                    throw ValidationException::withMessages([
+                        "kelas_tujuan.{$siswaId}" => 'Kelas tujuan tidak ditemukan pada data kelas sekolah.',
+                    ]);
+                }
+
+                $kelasTujuanPerSiswa[$siswaId] = $namaKelasTujuan;
+            }
+        }
 
         $taAktifId = (int) $taAktifObj->id;
         $kelasAsalId = (int) $kelasAsalObj->id;
@@ -277,15 +339,18 @@ class KenaikanKelasController extends Controller
 
                 $tujuanKelas = null;
                 if ($aksi === 'Naik') {
-                    $namaKelasTujuan = $request->input("kelas_tujuan.{$siswaId}", $kelasAsalObj->nama);
-                    $tujuanKelas = SekolahKelas::where('nama', $namaKelasTujuan)->first();
-                    if (! $tujuanKelas && $isAdmin) {
+                    $namaKelasTujuan = $kelasTujuanPerSiswa[$siswaId];
+                    if ($isAdmin) {
                         $tujuanKelas = SekolahKelas::firstOrCreate(
                             ['nama' => $namaKelasTujuan],
                             ['tingkat' => $this->tingkatKelas($namaKelasTujuan)]
                         );
+                    } else {
+                        $tujuanKelas = SekolahKelas::where('nama', $namaKelasTujuan)->first();
                     }
-                    abort_unless($tujuanKelas, 422, 'Kelas tujuan tidak ditemukan.');
+                    if ($tujuanKelas === null) {
+                        throw new \RuntimeException('Kelas tujuan tidak tersedia saat proses kenaikan berlangsung.');
+                    }
                 } elseif ($aksi === 'Tinggal') {
                     $tujuanKelas = $kelasAsalObj;
                 }
@@ -365,8 +430,14 @@ class KenaikanKelasController extends Controller
                 ->with('success', "Proses kenaikan kelas {$kelasAsalObj->nama} berhasil: {$naikCount} lanjut ke {$taTujuan}, {$lulusCount} lulus, {$keluarCount} keluar.");
         } catch (\Exception $e) {
             DB::rollBack();
+            Log::error('Gagal memproses kenaikan kelas.', [
+                'pengguna_id' => $pengguna->id,
+                'kelas_asal_id' => $kelasAsalId,
+                'tahun_ajaran_id' => $taAktifId,
+                'exception' => $e,
+            ]);
 
-            return back()->with('error', 'Gagal memproses kenaikan kelas: '.$e->getMessage());
+            return back()->with('error', 'Proses kenaikan kelas gagal. Silakan coba kembali atau hubungi administrator.');
         }
     }
 
@@ -455,8 +526,13 @@ class KenaikanKelasController extends Controller
             return back()->with('success', 'Kenaikan kelas berhasil dibatalkan. Riwayat siswa dikembalikan ke kondisi sebelumnya.');
         } catch (\Exception $e) {
             DB::rollBack();
+            Log::error('Gagal membatalkan kenaikan kelas.', [
+                'pengguna_id' => $pengguna->id,
+                'catatan_kenaikan_id' => $id,
+                'exception' => $e,
+            ]);
 
-            return back()->with('error', 'Gagal membatalkan kenaikan: '.$e->getMessage());
+            return back()->with('error', 'Pembatalan kenaikan kelas gagal. Silakan coba kembali atau hubungi administrator.');
         }
     }
 
@@ -517,12 +593,12 @@ class KenaikanKelasController extends Controller
             : '2025/2026';
     }
 
-    private function tingkatKelas(string $namaKelas): string
+    private function tingkatKelas(string $namaKelas): ?string
     {
-        if (str_starts_with(strtoupper($namaKelas), 'XII-')) {
-            return 'XII';
+        if (preg_match('/^(X|XI|XII)-.+$/', trim($namaKelas), $matches) !== 1) {
+            return null;
         }
 
-        return str_starts_with(strtoupper($namaKelas), 'XI-') ? 'XI' : 'X';
+        return $matches[1];
     }
 }

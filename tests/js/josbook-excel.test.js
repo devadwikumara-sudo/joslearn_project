@@ -272,6 +272,7 @@ test('shows active and graduated student totals after saving', async () => {
     assert.match(preview.innerHTML, /\/test\/admin\/alumni/);
     const saveRequest = requests.find(({endpoint}) => endpoint.endsWith('/save-batch'));
     assert.equal(saveRequest.request.type, 'siswa');
+    assert.equal(saveRequest.request.dup, 'lengkapi');
 });
 
 test('reloads an academic import on the same tab after saving', async () => {
@@ -476,6 +477,23 @@ test('normalizes alumni status but does not treat belum lulus as graduated', asy
     assert.deepEqual(state.rows.map(row => row.status), ['Lulus', 'Belum Lulus']);
 });
 
+test('does not pad short NISN values and marks them invalid', async () => {
+    const workbook = {
+        SheetNames: ['Data Siswa'],
+        Sheets: {
+            'Data Siswa': [
+                ['NISN', 'Nama Lengkap', 'Kelas'],
+                ['123456789', 'Siswa Uji', 'X-1']
+            ]
+        }
+    };
+    const {state, preview, window} = await importWorkbook(workbook);
+
+    assert.equal(state.rows[0].nisn, '123456789');
+    assert.equal(window.JosBookState.imp.statuses[0].status, 'error');
+    assert.match(preview.innerHTML, /NISN bukan 10 digit/);
+});
+
 test('excludes error rows from the batch payload', async () => {
     const workbook = {
         SheetNames: ['Nilai Uji'],
@@ -524,14 +542,14 @@ test('normalizes numeric identifiers, whitespace, and empty placeholders', async
         Sheets: {
             'Data Siswa': [
                 ['NISN', 'Nama Lengkap', 'NIS', 'Alamat', 'Tempat Lahir', 'Agama', 'Kewarganegaraan'],
-                [123456789, '  Siswa   Uji  ', 1.23456789012e11, '-', 'X', 'N/A', '   ']
+                [1234567890, '  Siswa   Uji  ', 1.23456789012e11, '-', 'X', 'N/A', '   ']
             ]
         }
     };
     const {state} = await importWorkbook(workbook);
 
     assert.equal(state.rows.length, 1);
-    assert.equal(state.rows[0].nisn, '0123456789');
+    assert.equal(state.rows[0].nisn, '1234567890');
     assert.equal(state.rows[0].nis, '123456789012');
     assert.equal(state.rows[0].nama, 'Siswa Uji');
     assert.equal(state.rows[0].alamat, null);
@@ -594,7 +612,7 @@ test('combines merged two-row headings and uses cached formula results', async (
                 data: [
                     ['Nilai', '', '', ''],
                     ['NISN', 'Nama Lengkap', 'Kelas', 'Matematika'],
-                    ['123456789', 'Siswa Uji', 'X-1', {f: '40+45.5', v: 85.5}]
+                    ['1234567890', 'Siswa Uji', 'X-1', {f: '40+45.5', v: 85.5}]
                 ],
                 '!merges': [{s: {r: 0, c: 0}, e: {r: 0, c: 3}}]
             }
@@ -604,7 +622,7 @@ test('combines merged two-row headings and uses cached formula results', async (
 
     assert.equal(state.detection.sheets[0].headerRow, 2);
     assert.equal(state.raws[0].heads[3], 'Nilai | Matematika');
-    assert.equal(state.rows[0].nisn, '0123456789');
+    assert.equal(state.rows[0].nisn, '1234567890');
     assert.equal(state.rows[0].mtk, 85.5);
     assert.equal(state.statuses[0].status, 'ready');
 });

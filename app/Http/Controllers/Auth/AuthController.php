@@ -186,8 +186,8 @@ class AuthController extends Controller
             }
         }
 
-        $email = Str::lower(trim($request->email));
-        $pengguna = DB::transaction(function () use ($request, $email) {
+        $pengguna = DB::transaction(function () use ($request) {
+            $email = Str::lower(trim($request->email));
             $guruId = null;
 
             if ($request->peran === 'guru') {
@@ -208,6 +208,24 @@ class AuthController extends Controller
                     ]);
                 }
 
+                $emailResmi = Str::lower(trim((string) $guru->email));
+                if ($emailResmi === '' || filter_var($emailResmi, FILTER_VALIDATE_EMAIL) === false) {
+                    throw ValidationException::withMessages([
+                        'email' => 'Email resmi guru belum tersedia atau tidak valid. Hubungi administrator.',
+                    ]);
+                }
+                if (! hash_equals($emailResmi, $email)) {
+                    throw ValidationException::withMessages([
+                        'email' => 'Email harus sesuai dengan email resmi yang tersimpan pada data guru.',
+                    ]);
+                }
+                if (Pengguna::query()->whereRaw('LOWER(email) = ?', [$emailResmi])->exists()) {
+                    throw ValidationException::withMessages([
+                        'email' => 'Email resmi guru sudah digunakan oleh akun lain.',
+                    ]);
+                }
+
+                $email = $emailResmi;
                 $guruId = $guru->id;
             }
 

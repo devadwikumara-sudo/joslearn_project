@@ -37,20 +37,20 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
 // 2. Halaman Pendaftaran Akun (DAFTAR (1).png)
 Route::get('/daftar', [AuthController::class, 'showDaftar'])->name('daftar')->middleware('guest');
-Route::post('/daftar', [AuthController::class, 'daftar'])->name('daftar.post')->middleware('guest');
+Route::post('/daftar', [AuthController::class, 'daftar'])->name('daftar.post')->middleware(['guest', 'throttle:web-auth-otp']);
 
 // 3. Halaman Verifikasi Akun OTP (Verifikasi akun.png)
 Route::get('/verifikasi-akun', [AuthController::class, 'showVerifikasi'])->name('verifikasi-akun');
-Route::post('/verifikasi-akun', [AuthController::class, 'verifikasi'])->name('verifikasi-akun.post');
-Route::post('/verifikasi-akun/kirim-ulang', [AuthController::class, 'kirimUlangOtp'])->name('verifikasi-akun.kirim-ulang');
+Route::post('/verifikasi-akun', [AuthController::class, 'verifikasi'])->name('verifikasi-akun.post')->middleware('throttle:web-auth-otp');
+Route::post('/verifikasi-akun/kirim-ulang', [AuthController::class, 'kirimUlangOtp'])->name('verifikasi-akun.kirim-ulang')->middleware('throttle:web-auth-otp');
 
 // 4. Halaman Reset Sandi (Reset sandi.png)
 Route::get('/reset-sandi', [AuthController::class, 'showResetSandi'])->name('reset-sandi')->middleware('guest');
-Route::post('/reset-sandi', [AuthController::class, 'kirimResetSandi'])->name('reset-sandi.post')->middleware('guest');
+Route::post('/reset-sandi', [AuthController::class, 'kirimResetSandi'])->name('reset-sandi.post')->middleware(['guest', 'throttle:web-auth-otp']);
 
 // 5. Halaman Buat Kata Sandi Baru (Buat kata sandi baru tersembunyi.png)
 Route::get('/buat-kata-sandi-baru', [AuthController::class, 'showBuatKataSandiBaru'])->name('buat-kata-sandi-baru');
-Route::post('/buat-kata-sandi-baru', [AuthController::class, 'simpanKataSandiBaru'])->name('buat-kata-sandi-baru.post');
+Route::post('/buat-kata-sandi-baru', [AuthController::class, 'simpanKataSandiBaru'])->name('buat-kata-sandi-baru.post')->middleware('throttle:web-auth-otp');
 
 // 6. Halaman Selesai Kata Sandi (selesai kata sandi.png)
 Route::get('/selesai-kata-sandi', [AuthController::class, 'showSelesaiKataSandi'])->name('selesai-kata-sandi');

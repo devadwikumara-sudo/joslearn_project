@@ -111,7 +111,6 @@
             value = Number.isFinite(number) ? number.toLocaleString('fullwide', {useGrouping:false, maximumFractionDigits:0}) : value;
         }
         value = value.replace(/\.0+$/, '').replace(/\D/g, '');
-        if (value.length >= 6 && value.length <= 9) return value.padStart(10, '0');
         return value;
     };
 
@@ -1218,7 +1217,7 @@
             mode: 'semua',
             kelas: 'X-1',
             sem: 'auto',
-            dup: 'skip',
+            dup: 'lengkapi',
             ta: '2024/2025',
             raws: null,
             rows: null,
@@ -1252,6 +1251,7 @@
 
         const dupEl = document.querySelector('select[name="duplikat"]') || document.getElementById('duplikat');
         if (dupEl && dupEl.value) I.dup = dupEl.value;
+        else I.dup = I.t === 'siswa' ? 'lengkapi' : 'skip';
 
         const modeEl = document.querySelector('select[name="mode"]') || document.getElementById('mode');
         if (modeEl && modeEl.value) I.mode = (modeEl.value === 'kelas') ? 'kelas' : 'semua';
@@ -1933,7 +1933,7 @@
             semester: I.sem || 'Genap',
             mode: I.mode || 'semua',
             kelas: I.kelas || '',
-            dup: I.dup || 'skip',
+            dup: I.dup || (I.t === 'siswa' ? 'lengkapi' : 'skip'),
             format_id: I.savedFormats?.find(format => format?.format_id)?.format_id || null,
             mapping_corrections: mappingCorrections(I),
             new_classes: [...new Set(rowsToSend.map(r => normK(r.kelas || '')).filter(Boolean))],
