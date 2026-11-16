@@ -1606,6 +1606,39 @@ class ImportStudentMatchingTest extends TestCase
         ]);
     }
 
+    public function test_student_import_routes_alumni_to_alumni_and_belum_lulus_to_active_students(): void
+    {
+        $response = $this->import('siswa', [
+            [
+                'nisn' => '0000000111',
+                'nama' => 'Siswa Alumni',
+                'kelas' => 'XII-1',
+                'status' => 'Alumni',
+            ],
+            [
+                'nisn' => '0000000112',
+                'nama' => 'Siswa Belum Lulus',
+                'kelas' => 'XII-1',
+                'status' => 'Belum Lulus',
+            ],
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('count', 2)
+            ->assertJsonPath('active_count', 1)
+            ->assertJsonPath('graduated_count', 1);
+        $alumniId = DB::table('siswa_biodata')->where('nisn', '0000000111')->value('id');
+        $activeId = DB::table('siswa_biodata')->where('nisn', '0000000112')->value('id');
+        $alumni = app(AlumniController::class)->index(Request::create('/admin/alumni'));
+        $activeStudents = app(DataSiswaController::class)->index(Request::create('/admin/data-siswa'));
+        $alumniIds = $alumni->getData()['alumni']->getCollection()->pluck('id')->all();
+        $activeIds = $activeStudents->getData()['siswaList']->getCollection()->pluck('id')->all();
+
+        $this->assertContains($alumniId, $alumniIds);
+        $this->assertContains($activeId, $activeIds);
+        $this->assertNotContains($alumniId, $activeIds);
+    }
+
     public function test_imported_students_are_partitioned_between_active_and_alumni_lists(): void
     {
         DB::table('siswa_riwayat_kelas')->delete();

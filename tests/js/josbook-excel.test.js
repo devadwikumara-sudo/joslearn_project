@@ -51,6 +51,7 @@ async function importWorkbook(workbook, expectedType = 'siswa', dictionaries = {
     const window = {toast() {}};
     const preview = {innerHTML: ''};
     let payload = null;
+    const classField = expectedType === 'siswa' ? {value: 'X-1'} : null;
     const csrfMeta = {getAttribute: () => 'csrf-test'};
     const endpointMeta = {getAttribute: () => '/test/save-batch'};
     const baseMeta = {getAttribute: () => '/test'};
@@ -59,6 +60,7 @@ async function importWorkbook(workbook, expectedType = 'siswa', dictionaries = {
             return id === 'josbook-import-preview-area' ? preview : null;
         },
         querySelector(selector) {
+            if (selector === '[name="kelas"]') return classField;
             if (selector === 'meta[name="csrf-token"]') return csrfMeta;
             if (selector === 'meta[name="batch-import-url"]') return endpointMeta;
             if (selector === 'meta[name="app-base-url"]') return baseMeta;
@@ -257,6 +259,7 @@ test('shows active and graduated student totals after saving', async () => {
         {columns: {}, subjects: {}},
         {active_count: 1, graduated_count: 1}
     );
+    assert.match(preview.innerHTML, /id="btn-do-import"[^>]*>[\s\S]*Impor 2 Baris ke Data Siswa/);
     window.JosBookState.imp.statuses = [
         {status: 'ready'},
         {status: 'ready'}
@@ -267,7 +270,8 @@ test('shows active and graduated student totals after saving', async () => {
     assert.match(preview.innerHTML, /1 siswa aktif masuk Data Siswa, 1 siswa lulus masuk Alumni/);
     assert.match(preview.innerHTML, /\/test\/admin\/data-siswa/);
     assert.match(preview.innerHTML, /\/test\/admin\/alumni/);
-    assert.ok(requests.some(({endpoint}) => endpoint.endsWith('/save-batch')));
+    const saveRequest = requests.find(({endpoint}) => endpoint.endsWith('/save-batch'));
+    assert.equal(saveRequest.request.type, 'siswa');
 });
 
 test('reloads an academic import on the same tab after saving', async () => {
@@ -358,6 +362,37 @@ test('reports missing required student headings and allows correcting the mappin
     }
 });
 
+test('allows manual mapping when every Excel heading is unfamiliar', async () => {
+    const workbook = {
+        SheetNames: ['Data Aktif'],
+        Sheets: {
+            'Data Aktif': [
+                ['Kode Peserta', 'Nama Lengkap Murid', 'Rombel Aktif', 'Lahir Pada'],
+                ['0000000123', 'Siswa Uji', 'X-1', '12 Mei 2008']
+            ]
+        }
+    };
+    const {state, preview, window} = await importWorkbook(workbook);
+
+    assert.equal(state.detection.headerDetected, true);
+    assert.equal(state.detection.headerRow, 1);
+    assert.equal(state.rows.length, 0);
+    assert.match(preview.innerHTML, /Contoh data/);
+    assert.match(preview.innerHTML, /12 Mei 2008/);
+
+    window.changeStudentColumnMap(0, 'nisn');
+    window.changeStudentColumnMap(1, 'nama');
+    window.changeStudentColumnMap(2, 'kelas');
+    window.changeStudentColumnMap(3, 'tgl');
+
+    const mappedStudent = window.JosBookState.imp.rows[0];
+    assert.equal(mappedStudent.nisn, '0000000123');
+    assert.equal(mappedStudent.nama, 'Siswa Uji');
+    assert.equal(mappedStudent.kelas, 'X-1');
+    assert.equal(mappedStudent.tgl, '2008-05-12');
+    assert.equal(window.JosBookState.imp.mappingIssues.length, 0);
+});
+
 test('selects the sheet with the strongest matching header row', async () => {
     const workbook = {
         SheetNames: ['Catatan', 'Data Siswa'],
@@ -394,10 +429,13 @@ test('shows per-row errors, edits cells, and sends only corrected rows', async (
     assert.equal(window.JosBookState.imp.statuses[0].status, 'error');
     assert.match(preview.innerHTML, /Terdeteksi: Data Nilai Rapor/);
     assert.match(preview.innerHTML, /Nilai Matematika harus angka 0–100/);
+    assert.match(preview.innerHTML, /<button[^>]*id="btn-do-import"[^>]*disabled[^>]*>[\s\S]*Tidak ada baris valid untuk diimpor/);
 
     window.editImportCell({dataset: {row: '0', field: 'mtk'}, textContent: '85'});
     assert.equal(window.JosBookState.imp.statuses[0].status, 'ready');
     assert.match(preview.innerHTML, />Siap</);
+    assert.match(preview.innerHTML, /<button[^>]*id="btn-do-import"[^>]*>[\s\S]*Impor 1 Baris Data Nilai Rapor/);
+    assert.ok(preview.innerHTML.indexOf('id="btn-do-import"') < preview.innerHTML.indexOf('<div class="tw"><table>'));
 
     await window.executeBatchImport();
     assert.equal(getPayload().rows.length, 1);
@@ -420,6 +458,22 @@ test('warns when an active student row also contains a graduation year', async (
     assert.equal(window.JosBookState.imp.statuses[0].status, 'warning');
     assert.match(preview.innerHTML, /Tahun lulus terisi tetapi status siswa Aktif/);
     assert.doesNotMatch(preview.innerHTML, /active_status_with_graduation_year/);
+});
+
+test('normalizes alumni status but does not treat belum lulus as graduated', async () => {
+    const workbook = {
+        SheetNames: ['Data Siswa'],
+        Sheets: {
+            'Data Siswa': [
+                ['NISN', 'Nama Lengkap', 'Status Kelulusan'],
+                ['0000000101', 'Siswa Alumni', 'Alumni'],
+                ['0000000102', 'Siswa Belum Lulus', 'Belum Lulus']
+            ]
+        }
+    };
+    const {state} = await importWorkbook(workbook);
+
+    assert.deepEqual(state.rows.map(row => row.status), ['Lulus', 'Belum Lulus']);
 });
 
 test('excludes error rows from the batch payload', async () => {

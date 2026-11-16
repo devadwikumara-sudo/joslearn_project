@@ -74,7 +74,7 @@
     </div>
 
     <p class="sub" style="margin:8px 0 0;font-size:12px">
-        Data akan diperiksa lebih dahulu. Baris yang tidak valid atau tidak sesuai hak akses tidak disimpan.
+        Setelah pratinjau muncul, tekan tombol {{ $type === 'siswa' ? 'Impor ke Data Siswa' : 'Impor' }} di atas tabel untuk menyimpan. Baris yang tidak valid atau tidak sesuai hak akses tidak disimpan.
     </p>
     @if($type === 'nilai')
         <p class="sub" style="margin:8px 0 0;font-size:12px">

@@ -1394,13 +1394,9 @@ class ImportBatchController extends Controller
     {
         $reason = mb_strtolower(trim((string) ($data['alasan_keluar'] ?? '')));
         $status = mb_strtolower(trim((string) ($row['status'] ?? '')));
-        $isGraduated = (
-            preg_match('/\blulus\b/u', $reason) === 1
-            && preg_match('/\b(?:belum|tidak)\s+lulus\b/u', $reason) !== 1
-        ) || (
-            preg_match('/\blulus\b/u', $status) === 1
-            && preg_match('/\b(?:belum|tidak)\s+lulus\b/u', $status) !== 1
-        ) || $data['tahun_lulus'] !== null;
+        $isGraduated = $this->isGraduationText($reason)
+            || $this->isGraduationText($status)
+            || $data['tahun_lulus'] !== null;
 
         if ($isGraduated) {
             return 'Lulus';
@@ -1411,6 +1407,15 @@ class ImportBatchController extends Controller
             'pindah keluar' => 'Pindah keluar',
             'keluar' => 'Keluar',
         ][$status] ?? 'Aktif';
+    }
+
+    private function isGraduationText(string $value): bool
+    {
+        if (preg_match('/\b(?:belum|tidak|gagal)\s+(?:lulus|tamat)\b/u', $value) === 1) {
+            return false;
+        }
+
+        return preg_match('/\b(?:lulus|alumni|graduate(?:d)?|tamat)\b/u', $value) === 1;
     }
 
     /**
