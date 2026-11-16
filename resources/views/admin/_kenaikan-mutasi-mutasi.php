@@ -1,6 +1,6 @@
-<p class="sub">Catat siswa pindah atau keluar dari kelas yang dipilih.</p>
-
 <div class="card">
+    <h3>Catat mutasi siswa</h3>
+    <p class="sub" style="margin-bottom:12px">Catat siswa pindah atau keluar dari kelas yang dipilih.</p>
     <form action="{{ route('admin.mutasi-siswa.store') }}" method="POST">
         @csrf
         <input type="hidden" name="tahun_ajaran" value="{{ $taAktifId }}">
@@ -36,7 +36,7 @@
             </div>
         </div>
 
-        <div class="bar" style="margin-top:14px">
+        <div class="bar" style="margin:14px 0 0">
             <button type="submit" class="btn a">Catat mutasi</button>
         </div>
     </form>
