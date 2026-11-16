@@ -1,8 +1,8 @@
-<section class="card" style="margin-top:14px">
+<section class="card">
     <h3>Riwayat perubahan</h3>
 
     @if($riwayatKenaikanTerakhir)
-        <div class="bar" style="border-left:4px solid var(--p,#2563eb);padding:12px;margin:12px 0;background:var(--card,#fff)">
+        <div class="note bar" style="margin:0 0 12px">
             <div>
                 <b>Riwayat kenaikan kelas terakhir:</b>
                 Kelas <strong>{{ $riwayatKenaikanTerakhir->kelasAsal?->nama ?? 'Kelas' }}</strong>
@@ -19,7 +19,7 @@
     @endif
 
     @if($isAdmin)
-        <div class="tw" style="margin-top:12px">
+        <div class="tw">
             <table>
                 <thead>
                     <tr>
@@ -42,7 +42,7 @@
                     <tr>
                         <td><b>{{ $m->nama_lengkap }}</b></td>
                         <td>{{ $kName }}</td>
-                        <td><span class="bd w">{{ $labelJenis }}</span></td>
+                        <td><span class="bd {{ $isMasuk ? 'ok' : 'w' }}">{{ $labelJenis }}</span></td>
                         <td>{{ $tujuanAsal }}</td>
                         <td>
                             <a href="{{ route('admin.data-siswa.pdf', $m->id) }}" class="btn o" style="padding:3px 8px;font-size:12px">⬇ PDF</a>
