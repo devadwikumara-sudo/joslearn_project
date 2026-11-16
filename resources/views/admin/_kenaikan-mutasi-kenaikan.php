@@ -1,5 +1,3 @@
-<p class="sub">Proses dari {{ $taAktif }} ke {{ $taBerikutnya }}. Naikkan semua sekaligus atau atur satu per satu. Riwayat tahun lama tetap tersimpan.</p>
-
 @if($kelasAsal === '*')
     <div class="note">Pilih satu kelas pada filter di atas untuk memproses kenaikan kelas.</div>
 @else
@@ -10,6 +8,8 @@
     <input type="hidden" name="kelas_asal" value="{{ $kelasAsal }}">
 
     <div class="card">
+        <h3>Kenaikan kelas {{ $kelasAsal }}</h3>
+        <p class="sub" style="margin-bottom:12px">Proses dari {{ $taAktif }} ke {{ $taBerikutnya }}. Naikkan semua sekaligus atau atur satu per satu. Riwayat tahun lama tetap tersimpan.</p>
         <div class="bar">
             <button type="button" class="btn o" onclick="setSemuaHasil('Naik')">Naikkan semua</button>
             <button type="button" class="btn o" onclick="setSemuaHasil('Tinggal')">Tinggal semua</button>
@@ -18,7 +18,7 @@
             <button type="submit" class="btn a">Proses {{ count($siswaList) }} siswa</button>
         </div>
 
-        <div class="tw" style="margin-top:12px">
+        <div class="tw">
             <table>
                 <thead>
                     <tr>
@@ -68,7 +68,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="4" style="text-align:center;padding:26px;color:var(--mu)">
+                        <td colspan="4" style="text-align:center;padding:24px;color:var(--mu)">
                             Tidak ada siswa aktif di kelas {{ $kelasAsal }} pada tahun ajaran {{ $taAktif }}.
                         </td>
                     </tr>
@@ -79,7 +79,7 @@
     </div>
 </form>
 
-<div class="note" style="margin-top:14px">
+<div class="note">
     Wali kelas hanya dapat memproses kelasnya sendiri. Siswa kelas XII otomatis berstatus <b>Lulus</b> dan masuk ke Data Alumni. Untuk memindahkan siswa ke kelas lain di tahun yang sama, pakai tombol ⇄ di Data Siswa.
 </div>
 @endif
