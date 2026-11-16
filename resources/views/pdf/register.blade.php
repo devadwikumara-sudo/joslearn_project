@@ -157,6 +157,8 @@
     <div class="fr in"><span></span><span>c. Tanggal Ijazah</span><span class="v">: {{ $tgi($siswa->tanggal_ijazah_sma) }}</span></div>
     <div class="fr in"><span></span><span>d. Nomor Ijazah</span><span class="v">: {{ $v($siswa->nomor_ijazah_sma) }}</span></div>
     <div class="fr in"><span></span><span>e. Nomor Transkrip Nilai</span><span class="v">: {{ $v($siswa->nomor_transkrip) }}</span></div>
+    <div class="fr in"><span></span><span>f. Nomor Peserta PSAJ</span><span class="v">: {{ $v($siswa->nomor_peserta_psaj) }}</span></div>
+    <div class="fr in"><span></span><span>g. Tahun Lulus</span><span class="v">: {{ $v($siswa->tahun_lulus) }}</span></div>
 
     <div class="fh">H. KETERANGAN SETELAH SELESAI PENDIDIKAN</div>
     <div class="fr"><span>28.</span><span>Melanjutkan Studi / Bekerja</span><span class="v">: {{ $v($siswa->kegiatan_setelah_lulus) }}</span></div>

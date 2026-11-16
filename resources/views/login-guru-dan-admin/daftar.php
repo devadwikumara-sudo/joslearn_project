@@ -60,10 +60,11 @@
                     <input id="d_n" class="no-icon" name="nama" type="text" placeholder="Joko Susanto" value="{{ old('nama') }}" required>
                 </div>
 
-                <label for="d_e">Email</label>
+                <label for="d_e">Email resmi</label>
                 <div class="wf">
                     <input id="d_e" class="no-icon" name="email" type="email" placeholder="198204152008011007@sman1rejoso.sch.id" value="{{ old('email') }}" required>
                 </div>
+                <small>Untuk guru, email harus sama dengan yang tersimpan pada data Guru &amp; Master.</small>
 
                 <label for="d_i" id="label_identitas">Nomor Identitas / NIP</label>
                 <div class="wf">

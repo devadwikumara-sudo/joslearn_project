@@ -78,6 +78,7 @@ class ImportBatchController extends Controller
         $validated = $request->validate([
             'file_name' => ['nullable', 'string', 'max:255'],
             'total_rows' => ['required', 'integer', 'min:1', 'max:100000'],
+            'dup' => ['nullable', Rule::in(['skip', 'lengkapi', 'timpa'])],
             'tahun_ajaran' => ['nullable', 'string', 'max:20'],
             'semester' => ['nullable', 'string', 'max:20'],
             'kelas' => ['nullable', 'string', 'max:30'],
@@ -388,7 +389,10 @@ class ImportBatchController extends Controller
         $semester = $request->input('semester', $semesterDefault);
         $mode = $request->input('mode', 'semua');
         $kelasInput = $request->input('kelas', '');
-        $dup = $request->input('dup', 'skip');
+        $validatedDup = $request->validate([
+            'dup' => ['nullable', Rule::in(['skip', 'lengkapi', 'timpa'])],
+        ]);
+        $dup = $validatedDup['dup'] ?? ($type === 'siswa' ? 'lengkapi' : 'skip');
         $rawRows = $request->input('rows', []);
         $newClasses = $request->input('new_classes', []);
         $newMapel = $request->input('new_mapel', []);
@@ -458,7 +462,7 @@ class ImportBatchController extends Controller
                 ));
             }
 
-            $result = DB::transaction(function () use ($request, $user, $type, $taName, $requestedTaName, $semester, $mode, $kelasInput, $rows, $rawRows, $newClasses, $newMapel, $isAcademicImport, $finalChunk, $upload): array {
+            $result = DB::transaction(function () use ($request, $user, $type, $taName, $requestedTaName, $semester, $mode, $kelasInput, $dup, $rows, $rawRows, $newClasses, $newMapel, $isAcademicImport, $finalChunk, $upload): array {
                 $activeUpload = $upload;
                 $processedRows = (int) $activeUpload->jumlah_siap + count($rows);
                 if ($processedRows > (int) $activeUpload->jumlah_baris
@@ -516,7 +520,14 @@ class ImportBatchController extends Controller
                 $graduatedStudentCount = 0;
 
                 if ($type === 'siswa') {
-                    [$savedCount, $skippedCount, $rowErrors, $unlinkedCount, $activeStudentCount, $graduatedStudentCount] = $this->saveSiswa($rows, $ta, $mode, $kelasInput);
+                    [$savedCount, $skippedCount, $rowErrors, $unlinkedCount, $activeStudentCount, $graduatedStudentCount] = $this->saveSiswa(
+                        $rows,
+                        $ta,
+                        $mode,
+                        $kelasInput,
+                        $dup,
+                        $requestedTaName !== ''
+                    );
                 } elseif ($type === 'nilai') {
                     [$savedCount, $skippedCount, $rowErrors] = $this->saveNilai($rows, $ta, $semester, $mode, $kelasInput, $user, $requestedTaName !== '', (int) $activeUpload->id, $createdYearIds, $createdHistoryIds);
                 } elseif ($type === 'kehadiran') {
@@ -565,9 +576,7 @@ class ImportBatchController extends Controller
                     'message' => "Berhasil mengimpor {$savedCount} data {$type}".($skippedCount > 0 ? " ({$skippedCount} baris gagal/dilewati)" : '').$creationSummary.'.'.($type === 'guru' ? ' Akun login dapat dibuat terpisah melalui menu Guru & Master.' : ''),
                     'errors' => $rowErrors,
                     'class_warning' => $type === 'siswa' && $unlinkedCount > 0
-                        ? (! $ta
-                            ? 'Biodata tersimpan, tetapi riwayat kelas tidak dibuat karena tahun ajaran yang dipilih belum terdaftar.'
-                            : "{$unlinkedCount} biodata tersimpan tanpa riwayat kelas karena kelas tidak tersedia.")
+                        ? "{$unlinkedCount} biodata tersimpan tanpa riwayat kelas karena kelas atau tahun ajaran tidak dapat ditentukan."
                         : null,
                     'batch_id' => $activeUpload->id,
                     'processed_rows' => $processedRows,
@@ -590,7 +599,8 @@ class ImportBatchController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Terjadi kesalahan saat menyimpan ke database: '.$e->getMessage(),
+                'message' => 'Terjadi kesalahan saat menyimpan data. Silakan coba kembali dan sampaikan ID batch kepada administrator.',
+                'batch_id' => $upload?->id,
             ], 500);
         }
     }
@@ -856,6 +866,9 @@ class ImportBatchController extends Controller
         );
     }
 
+    /**
+     * @return array{history: ?SiswaRiwayatKelas, created: bool, error: ?string}
+     */
     private function getOrCreateRiwayatKelas(int $siswaId, int $taId, ?SekolahKelas $kelas): array
     {
         $riwayat = SiswaRiwayatKelas::where('siswa_id', $siswaId)
@@ -864,7 +877,14 @@ class ImportBatchController extends Controller
 
         if (! $riwayat) {
             if (! $kelas) {
-                return ['history' => null, 'created' => false];
+                return ['history' => null, 'created' => false, 'error' => null];
+            }
+            if (SiswaRiwayatKelas::where('siswa_id', $siswaId)->count() >= 3) {
+                return [
+                    'history' => null,
+                    'created' => false,
+                    'error' => 'Siswa sudah memiliki 3 riwayat kelas; riwayat ke-4 tidak dapat dibuat.',
+                ];
             }
 
             $riwayat = SiswaRiwayatKelas::create([
@@ -874,12 +894,16 @@ class ImportBatchController extends Controller
                 'status' => 'Aktif',
             ]);
 
-            return ['history' => $riwayat, 'created' => true];
+            return ['history' => $riwayat, 'created' => true, 'error' => null];
         } elseif ($kelas && (int) $riwayat->kelas_id !== (int) $kelas->id) {
-            return ['history' => null, 'created' => false];
+            return [
+                'history' => null,
+                'created' => false,
+                'error' => 'Riwayat untuk tahun ajaran ini sudah ada pada kelas berbeda; kelas lama tidak diubah.',
+            ];
         }
 
-        return ['history' => $riwayat, 'created' => false];
+        return ['history' => $riwayat, 'created' => false, 'error' => null];
     }
 
     private function normDate($val): ?string
@@ -928,9 +952,6 @@ class ImportBatchController extends Controller
             $value = sprintf('%.0f', (float) $v);
         }
         $value = preg_replace('/\D/', '', $value) ?? '';
-        if (preg_match('/^\d{6,9}$/', $value)) {
-            return str_pad($value, 10, '0', STR_PAD_LEFT);
-        }
 
         return $value;
     }
@@ -992,13 +1013,21 @@ class ImportBatchController extends Controller
         return is_numeric($value) ? (float) $value : null;
     }
 
-    private function saveSiswa($rows, $ta, $mode, $kelasInput)
-    {
+    /**
+     * @param  array<int, mixed>  $rows
+     * @return array{0: int, 1: int, 2: array<int, array<string, mixed>>, 3: int, 4: int, 5: int}
+     */
+    private function saveSiswa(
+        array $rows,
+        ?SekolahTahunAjaran $ta,
+        string $mode,
+        string $kelasInput,
+        string $duplicateMode,
+        bool $formYearIsExplicit
+    ): array {
         $saved = 0;
         $skipped = 0;
         $errors = [];
-        $seenNisn = [];
-        $seenNis = [];
         $unlinked = 0;
         $active = 0;
         $graduated = 0;
@@ -1011,7 +1040,6 @@ class ImportBatchController extends Controller
                 continue;
             }
             $rowNumber = max(1, (int) ($r['__excel_row'] ?? $rowIndex + 1));
-            $rowTa = $ta;
             $rowTaName = null;
             $rawRowTaName = trim((string) ($r['tahun_ajaran'] ?? ''));
             if ($rawRowTaName !== '') {
@@ -1061,25 +1089,18 @@ class ImportBatchController extends Controller
                 continue;
             }
 
-            if (isset($seenNisn[$nisn]) || ($nis !== null && isset($seenNis[$nis]))) {
-                $skipped++;
-                $errors[] = ['row' => $rowNumber, 'reason' => 'NISN atau NIS duplikat pada file yang diunggah.'];
-
-                continue;
-            }
-
             $siswaByNisn = SiswaBiodata::where('nisn', $nisn)->first();
             $siswaByNis = $nis !== null
                 ? SiswaBiodata::where('nomor_induk', $nis)->first()
                 : null;
 
-            if (($siswaByNisn && $siswaByNis && $siswaByNisn->id !== $siswaByNis->id)
-                || $siswaByNisn || $siswaByNis) {
+            if ($siswaByNisn !== null && $siswaByNis !== null && $siswaByNisn->id !== $siswaByNis->id) {
                 $skipped++;
-                $errors[] = ['row' => $rowNumber, 'reason' => 'Siswa dengan NISN atau NIS tersebut sudah terdaftar; data lama tidak ditimpa.'];
+                $errors[] = ['row' => $rowNumber, 'reason' => 'NISN dan NIS mengarah ke siswa berbeda; periksa kembali identitas pada file.'];
 
                 continue;
             }
+            $existingStudent = $siswaByNisn ?? $siswaByNis;
 
             $jk = strtoupper(trim((string) ($r['jk'] ?? $r['jenis_kelamin'] ?? '')));
             if ($jk !== '' && ! in_array($jk, ['L', 'LAKI-LAKI', 'P', 'PEREMPUAN'], true)) {
@@ -1096,13 +1117,6 @@ class ImportBatchController extends Controller
                 $errors[] = ['row' => $rowNumber, 'reason' => 'Nama kelas melebihi batas 30 karakter.'];
 
                 continue;
-            }
-
-            if ($rowTaName !== null && (! $rowTa || $rowTa->nama !== $rowTaName)) {
-                $rowTa = SekolahTahunAjaran::firstOrCreate(
-                    ['nama' => $rowTaName],
-                    ['sedang_berjalan' => 0]
-                );
             }
 
             $data = [
@@ -1204,15 +1218,92 @@ class ImportBatchController extends Controller
                 'catatan' => $this->cleanVal($r['catatan'] ?? null),
             ];
 
-            $statusSiswa = $this->importedStudentStatus($r, $data);
+            $profileUpdates = $existingStudent === null
+                ? $data
+                : $this->studentImportUpdates($existingStudent, $data, $duplicateMode);
+            $effectiveData = $existingStudent === null
+                ? $data
+                : array_merge($existingStudent->only(array_keys($data)), $profileUpdates);
+            $statusData = $effectiveData;
+            foreach (['alasan_keluar', 'tahun_lulus', 'tanggal_keluar'] as $statusField) {
+                if ($this->hasImportValue($data[$statusField] ?? null)) {
+                    $statusData[$statusField] = $data[$statusField];
+                }
+            }
+            $statusSiswa = $this->importedStudentStatus($r, $statusData);
+            $hasGraduationSignal = $this->isGraduationText((string) ($r['status'] ?? ''))
+                || $this->isGraduationText((string) ($data['alasan_keluar'] ?? ''))
+                || (is_string($data['tahun_lulus']) && preg_match('/^\d{4}$/', $data['tahun_lulus']) === 1);
             if ($statusSiswa === 'Lulus') {
-                $data['alasan_keluar'] = $data['alasan_keluar'] ?: 'Lulus';
-                if ($data['tahun_lulus'] === null && $data['tanggal_keluar'] !== null) {
-                    $data['tahun_lulus'] = substr($data['tanggal_keluar'], 0, 4);
+                $effectiveData['alasan_keluar'] = 'Lulus';
+                $profileUpdates['alasan_keluar'] = 'Lulus';
+                $statusData['alasan_keluar'] = 'Lulus';
+                if (! $this->hasImportValue($effectiveData['tahun_lulus'] ?? null)) {
+                    $graduationYear = $data['tahun_lulus']
+                        ?? ($data['tanggal_keluar'] !== null ? substr($data['tanggal_keluar'], 0, 4) : null);
+                    if ($graduationYear !== null) {
+                        $effectiveData['tahun_lulus'] = $graduationYear;
+                        $profileUpdates['tahun_lulus'] = $graduationYear;
+                        $statusData['tahun_lulus'] = $graduationYear;
+                    }
                 }
             }
 
-            $validationError = $this->validateImportedStudent($data, $r);
+            $rowTa = null;
+            if ($rowTaName !== null) {
+                $rowTa = $ta !== null && $ta->nama === $rowTaName
+                    ? $ta
+                    : SekolahTahunAjaran::firstOrCreate(
+                        ['nama' => $rowTaName],
+                        ['sedang_berjalan' => false]
+                    );
+            } elseif ($formYearIsExplicit) {
+                $rowTa = $ta;
+            } else {
+                $inferredYear = $this->inferStudentAcademicYear($statusData, $kStr, $statusSiswa);
+                if ($inferredYear !== null) {
+                    $rowTa = SekolahTahunAjaran::firstOrCreate(
+                        ['nama' => $inferredYear],
+                        ['sedang_berjalan' => false]
+                    );
+                } elseif ($statusSiswa !== 'Lulus') {
+                    $rowTa = $ta;
+                }
+            }
+
+            if ($statusSiswa === 'Lulus' && ! $this->hasImportValue($effectiveData['tahun_lulus'] ?? null) && $rowTa !== null) {
+                $academicYearParts = explode('/', $rowTa->nama);
+                $graduationYear = $academicYearParts[1] ?? null;
+                if ($graduationYear !== null && preg_match('/^\d{4}$/', $graduationYear)) {
+                    $effectiveData['tahun_lulus'] = $graduationYear;
+                    $profileUpdates['tahun_lulus'] = $graduationYear;
+                    $statusData['tahun_lulus'] = $graduationYear;
+                }
+            }
+
+            if ($kStr === null && $existingStudent !== null && $rowTa !== null) {
+                $existingHistory = SiswaRiwayatKelas::query()
+                    ->where('siswa_id', $existingStudent->id)
+                    ->where('tahun_ajaran_id', $rowTa->id)
+                    ->first();
+                $kStr = $existingHistory === null
+                    ? null
+                    : SekolahKelas::query()->whereKey($existingHistory->kelas_id)->value('nama');
+            }
+
+            $grade = $kStr === null ? null : Semester::tingkatDariNamaKelas($kStr);
+            if ($statusSiswa === 'Lulus' && $grade !== null && $grade !== 'XII' && ! $hasGraduationSignal) {
+                $statusSiswa = 'Aktif';
+            }
+            if ($statusSiswa === 'Lulus' && $kStr !== null && $grade !== 'XII') {
+                $skipped++;
+                $errors[] = ['row' => $rowNumber, 'reason' => 'Siswa berstatus lulus harus memiliki riwayat pada kelas XII.'];
+
+                continue;
+            }
+
+            $validationError = $this->validateImportedStudent($data, $r)
+                ?? $this->validateImportedStudent($effectiveData, $r);
             if ($validationError !== null) {
                 $skipped++;
                 $errors[] = ['row' => $rowNumber, 'reason' => $validationError];
@@ -1221,23 +1312,53 @@ class ImportBatchController extends Controller
             }
 
             try {
-                DB::transaction(function () use ($data, $kStr, $rowTa, $statusSiswa): void {
-                    $siswa = SiswaBiodata::create($data);
-                    $kelas = $rowTa && $kStr ? $this->ensureKelas($kStr) : null;
+                DB::transaction(function () use ($effectiveData, $profileUpdates, $existingStudent, $kStr, $rowTa, $statusSiswa): void {
+                    if ($existingStudent === null) {
+                        $siswa = SiswaBiodata::create($effectiveData);
+                    } else {
+                        $siswa = $existingStudent;
+                        if ($profileUpdates !== []) {
+                            $siswa->forceFill($profileUpdates)->save();
+                        }
+                    }
 
-                    if ($kelas && $rowTa) {
-                        SiswaRiwayatKelas::updateOrCreate(
-                            [
-                                'siswa_id' => $siswa->id,
-                                'tahun_ajaran_id' => $rowTa->id,
-                            ],
-                            [
-                                'kelas_id' => $kelas->id,
-                                'status' => $statusSiswa,
-                            ]
-                        );
+                    if ($rowTa === null || $kStr === null) {
+                        return;
+                    }
+
+                    $kelas = $this->ensureKelas($kStr);
+                    if ($kelas === null) {
+                        throw new \DomainException('Kelas tidak dapat ditentukan untuk riwayat tahun ajaran ini.');
+                    }
+
+                    $historyQuery = SiswaRiwayatKelas::query()
+                        ->where('siswa_id', $siswa->id)
+                        ->where('tahun_ajaran_id', $rowTa->id);
+                    $history = $historyQuery->first();
+                    if ($history !== null && (int) $history->kelas_id !== (int) $kelas->id) {
+                        throw new \DomainException('Riwayat untuk tahun ajaran ini sudah ada pada kelas berbeda; kelas lama tidak diubah.');
+                    }
+
+                    if ($history === null) {
+                        if (SiswaRiwayatKelas::query()->where('siswa_id', $siswa->id)->count() >= 3) {
+                            throw new \DomainException('Siswa sudah memiliki 3 riwayat kelas; riwayat ke-4 tidak dapat dibuat.');
+                        }
+
+                        SiswaRiwayatKelas::create([
+                            'siswa_id' => $siswa->id,
+                            'tahun_ajaran_id' => $rowTa->id,
+                            'kelas_id' => $kelas->id,
+                            'status' => $statusSiswa,
+                        ]);
+                    } elseif ($history->status !== $statusSiswa) {
+                        $history->forceFill(['status' => $statusSiswa])->save();
                     }
                 });
+            } catch (\DomainException $exception) {
+                $skipped++;
+                $errors[] = ['row' => $rowNumber, 'reason' => $exception->getMessage()];
+
+                continue;
             } catch (QueryException $exception) {
                 $skipped++;
                 $errors[] = ['row' => $rowNumber, 'reason' => 'Database menolak data baris ini karena duplikasi atau batasan kolom/relasi.'];
@@ -1250,12 +1371,14 @@ class ImportBatchController extends Controller
                 continue;
             }
 
-            $seenNisn[$nisn] = true;
-            if ($nis !== null) {
-                $seenNis[$nis] = true;
-            }
-            if (! $rowTa || ! $kStr) {
+            if ($rowTa === null || $kStr === null) {
                 $unlinked++;
+                $reason = $statusSiswa === 'Lulus' && $rowTa === null
+                    ? 'Tahun ajaran siswa lulus tidak dapat ditentukan; biodata disimpan tanpa riwayat kelas.'
+                    : ($rowTa === null
+                        ? 'Riwayat kelas tidak dibuat karena tahun ajaran tidak dapat ditentukan.'
+                        : 'Riwayat kelas tidak dibuat karena kelas tidak dapat ditentukan.');
+                $errors[] = ['row' => $rowNumber, 'reason' => $reason, 'warning' => true];
             }
             $saved++;
             if ($statusSiswa === 'Aktif') {
@@ -1263,12 +1386,76 @@ class ImportBatchController extends Controller
             } elseif ($statusSiswa === 'Lulus') {
                 $graduated++;
             }
-            foreach ($this->importedStudentDateWarnings($data) as $warning) {
+            foreach ($this->importedStudentDateWarnings($effectiveData) as $warning) {
                 $errors[] = ['row' => $rowNumber, 'reason' => $warning, 'warning' => true];
             }
         }
 
         return [$saved, $skipped, $errors, $unlinked, $active, $graduated];
+    }
+
+    /**
+     * @param  array<string, mixed>  $incoming
+     * @return array<string, mixed>
+     */
+    private function studentImportUpdates(SiswaBiodata $student, array $incoming, string $duplicateMode): array
+    {
+        if ($duplicateMode === 'skip') {
+            return [];
+        }
+
+        $updates = [];
+        foreach ($incoming as $field => $value) {
+            if (! $this->hasImportValue($value)) {
+                continue;
+            }
+
+            if ($duplicateMode === 'lengkapi' && $this->hasImportValue($student->getAttribute($field))) {
+                continue;
+            }
+
+            $updates[$field] = $value;
+        }
+
+        return $updates;
+    }
+
+    private function hasImportValue(mixed $value): bool
+    {
+        return $value !== null && (! is_string($value) || trim($value) !== '');
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function inferStudentAcademicYear(array $data, ?string $className, string $status): ?string
+    {
+        $grade = $className === null ? null : Semester::tingkatDariNamaKelas($className);
+        if ($grade === null && $this->hasImportValue($data['kelas_diterima'] ?? null)) {
+            $acceptedClass = $this->normK((string) $data['kelas_diterima']);
+            $grade = $acceptedClass === null ? null : Semester::tingkatDariNamaKelas($acceptedClass);
+        }
+        if ($grade === null && $status === 'Lulus') {
+            $grade = 'XII';
+        }
+
+        $entryYear = null;
+        $graduationYear = $data['tahun_lulus'] ?? null;
+        if ($status === 'Lulus' && is_string($graduationYear) && preg_match('/^\d{4}$/', $graduationYear)) {
+            $entryYear = (int) $graduationYear - 3;
+        } elseif ($this->hasImportValue($data['tanggal_diterima'] ?? null)) {
+            $entryYear = (int) substr((string) $data['tanggal_diterima'], 0, 4);
+        }
+
+        if ($grade === null || $entryYear === null) {
+            return null;
+        }
+
+        try {
+            return $this->normAcademicYear(Semester::tahunAjaranDariTahunMasuk($entryYear, $grade));
+        } catch (\InvalidArgumentException) {
+            return null;
+        }
     }
 
     /**
@@ -1640,7 +1827,11 @@ class ImportBatchController extends Controller
             return [
                 'student' => null,
                 'history' => null,
-                'error' => ['row' => $rowNumber, 'reason' => 'Riwayat kelas untuk tahun ajaran ini belum ada dan kelas pada file tidak tersedia. Tambahkan kelas agar data tidak masuk ke riwayat yang salah.'],
+                'error' => [
+                    'row' => $rowNumber,
+                    'reason' => $historyResult['error']
+                        ?? 'Riwayat kelas untuk tahun ajaran ini belum ada dan kelas pada file tidak tersedia. Tambahkan kelas agar data tidak masuk ke riwayat yang salah.',
+                ],
             ];
         }
 

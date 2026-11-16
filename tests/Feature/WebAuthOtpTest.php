@@ -210,6 +210,50 @@ class WebAuthOtpTest extends TestCase
         $this->assertSame('Guru Terdaftar', $guru->fresh()->nama);
     }
 
+    public function test_teacher_registration_rejects_an_email_different_from_official_biodata(): void
+    {
+        $guru = $this->buatBiodataGuru('1987654321', 'Guru Terdaftar', 'guru@example.test');
+        Mail::shouldReceive('raw')->never();
+
+        $this->from(route('daftar'))->post(route('daftar.post'), [
+            'nama' => 'Guru Terdaftar',
+            'email' => 'attacker@example.test',
+            'identitas' => $guru->nip,
+            'peran' => 'guru',
+            'password' => 'Password123',
+            'password_confirmation' => 'Password123',
+        ])
+            ->assertRedirect(route('daftar'))
+            ->assertSessionHasErrors([
+                'email' => 'Email harus sesuai dengan email resmi yang tersimpan pada data guru.',
+            ]);
+
+        $this->assertDatabaseMissing('akun_pengguna', ['username' => $guru->nip]);
+        $this->assertSame(0, DB::table('akun_kode_otp')->count());
+    }
+
+    public function test_teacher_registration_is_rejected_when_official_email_is_missing(): void
+    {
+        $guru = $this->buatBiodataGuru('1987654321', 'Guru Tanpa Email');
+        Mail::shouldReceive('raw')->never();
+
+        $this->from(route('daftar'))->post(route('daftar.post'), [
+            'nama' => 'Guru Tanpa Email',
+            'email' => 'attacker@example.test',
+            'identitas' => $guru->nip,
+            'peran' => 'guru',
+            'password' => 'Password123',
+            'password_confirmation' => 'Password123',
+        ])
+            ->assertRedirect(route('daftar'))
+            ->assertSessionHasErrors([
+                'email' => 'Email resmi guru belum tersedia atau tidak valid. Hubungi administrator.',
+            ]);
+
+        $this->assertDatabaseMissing('akun_pengguna', ['username' => $guru->nip]);
+        $this->assertSame(0, DB::table('akun_kode_otp')->count());
+    }
+
     public function test_teacher_registration_rejects_an_unknown_nip(): void
     {
         $this->from(route('daftar'))->post(route('daftar.post'), [
@@ -452,6 +496,36 @@ class WebAuthOtpTest extends TestCase
             ->assertSessionHasErrors(['kode']);
 
         $this->assertSame(1, DB::table('akun_kode_otp')->where('email', $pengguna->email)->count());
+    }
+
+    public function test_web_otp_verification_is_rate_limited_per_ip(): void
+    {
+        $pengguna = $this->buatAkunReset();
+        $sesi = ['auth_flow' => 'reset', 'auth_user_id' => $pengguna->id];
+        $this->withServerVariables(['REMOTE_ADDR' => '198.51.100.31']);
+
+        for ($percobaan = 1; $percobaan <= 6; $percobaan++) {
+            $this->withSession($sesi)
+                ->post(route('verifikasi-akun.post'), ['kode' => 'bukan-kode'])
+                ->assertSessionHasErrors(['kode']);
+        }
+
+        $this->withSession($sesi)
+            ->post(route('verifikasi-akun.post'), ['kode' => 'bukan-kode'])
+            ->assertStatus(429);
+    }
+
+    public function test_mobile_otp_resend_is_rate_limited_per_ip(): void
+    {
+        $this->withServerVariables(['REMOTE_ADDR' => '198.51.100.32']);
+
+        for ($percobaan = 1; $percobaan <= 3; $percobaan++) {
+            $this->postJson('/api/v1/kirim-ulang-otp', [])
+                ->assertStatus(422);
+        }
+
+        $this->postJson('/api/v1/kirim-ulang-otp', [])
+            ->assertStatus(429);
     }
 
     private function buatAkunReset(): Pengguna

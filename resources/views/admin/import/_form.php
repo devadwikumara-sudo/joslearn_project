@@ -56,8 +56,12 @@
             <div>
                 <label for="duplikat">{{ $type === 'siswa' ? 'Jika NISN/NIS sudah ada' : 'Jika NIP sudah ada' }}</label>
                 <select name="duplikat" id="duplikat">
-                    <option value="skip" {{ $type === 'siswa' ? 'selected' : '' }}>Lewati</option>
-                    @if($type === 'guru')
+                    @if($type === 'siswa')
+                        <option value="skip">Lewati perubahan biodata (riwayat tetap diproses)</option>
+                        <option value="lengkapi" selected>Lengkapi kolom biodata yang kosong</option>
+                        <option value="timpa">Perbarui dari kolom Excel yang terisi</option>
+                    @else
+                        <option value="skip">Lewati</option>
                         <option value="timpa" selected>Timpa</option>
                     @endif
                 </select>
@@ -94,7 +98,7 @@
         </p>
     @elseif($type === 'siswa')
         <p class="sub" style="margin:8px 0 0;font-size:12px">
-            Format Excel dideteksi otomatis. Siswa duplikat berdasarkan NISN atau NIS dan baris tidak valid dilewati dengan laporan alasan.
+            Format Excel dideteksi otomatis. Siswa dicocokkan berdasarkan NISN atau NIS; riwayat kelas tetap diproses untuk siswa yang sudah ada.
         </p>
     @endif
     @if($isAdmin && in_array($type, ['nilai', 'kehadiran', 'ekskul'], true))

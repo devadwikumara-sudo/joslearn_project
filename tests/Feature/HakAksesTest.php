@@ -63,6 +63,12 @@ class HakAksesTest extends TestCase
             ['get', '/admin/import/template/nilai'],
             ['get', '/admin/import/siswa'],
             ['get', '/admin/import/guru'],
+            ['post', '/admin/import/start-batch'],
+            ['post', '/admin/import/save-batch'],
+            ['post', '/admin/kenaikan-kelas/proses'],
+            ['post', '/admin/kenaikan-kelas/1/batalkan'],
+            ['get', '/admin/alumni'],
+            ['get', '/admin/alumni/export'],
             ['post', '/admin/setting/cadangan/unduh'],
         ];
 

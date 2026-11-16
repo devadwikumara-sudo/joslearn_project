@@ -311,6 +311,178 @@ class TeacherClassPromotionTest extends TestCase
         $this->assertSame([$student], $alumni->getData()['alumni']->getCollection()->pluck('id')->all());
     }
 
+    public function test_graduation_is_rejected_before_grade_twelve(): void
+    {
+        [$year, , , , $teacher, $student] = $this->seedPromotionData();
+        $user = $this->createUser('guru', 'guru-x1', $teacher);
+        $pageUrl = route('guru.kenaikan-mutasi', [
+            'tab' => 'kenaikan',
+            'tahun_ajaran' => $year,
+            'kelas' => 'X-1',
+        ]);
+
+        $this->from($pageUrl)->actingAs($user)
+            ->post(route('guru.kenaikan-kelas.proses'), [
+                'kelas_asal' => 'X-1',
+                'keputusan' => [$student => 'Lulus'],
+            ])
+            ->assertRedirect($pageUrl)
+            ->assertSessionHasErrors(["keputusan.{$student}"]);
+
+        $this->assertDatabaseHas('siswa_riwayat_kelas', [
+            'siswa_id' => $student,
+            'tahun_ajaran_id' => $year,
+            'status' => 'Aktif',
+        ]);
+        $this->assertDatabaseMissing('catatan_kenaikan_kelas', ['kelas_asal_id' => 1]);
+        $this->assertDatabaseMissing('catatan_aktivitas', ['aksi' => 'kenaikan_kelas']);
+    }
+
+    public function test_grade_twelve_cannot_be_promoted(): void
+    {
+        [$year, , $sourceClass, , $teacher, $student] = $this->seedPromotionData();
+        DB::table('sekolah_kelas')->where('id', $sourceClass)->update([
+            'nama' => 'XII-1',
+            'tingkat' => 'XII',
+        ]);
+        $user = $this->createUser('guru', 'guru-xii', $teacher);
+        $pageUrl = route('guru.kenaikan-mutasi', [
+            'tab' => 'kenaikan',
+            'tahun_ajaran' => $year,
+            'kelas' => 'XII-1',
+        ]);
+
+        $this->from($pageUrl)->actingAs($user)
+            ->post(route('guru.kenaikan-kelas.proses'), [
+                'kelas_asal' => 'XII-1',
+                'keputusan' => [$student => 'Naik'],
+                'kelas_tujuan' => [$student => 'XI-1'],
+            ])
+            ->assertRedirect($pageUrl)
+            ->assertSessionHasErrors(["keputusan.{$student}"]);
+
+        $this->assertDatabaseHas('siswa_riwayat_kelas', [
+            'siswa_id' => $student,
+            'tahun_ajaran_id' => $year,
+            'status' => 'Aktif',
+        ]);
+        $this->assertDatabaseMissing('catatan_aktivitas', ['aksi' => 'kenaikan_kelas']);
+    }
+
+    public function test_promotion_requires_a_valid_next_grade_destination(): void
+    {
+        [$year, , , , , $student] = $this->seedPromotionData();
+        DB::table('sekolah_kelas')->insert([
+            ['nama' => 'XII-1', 'tingkat' => 'XII'],
+        ]);
+        $admin = $this->createUser('admin', 'admin', null);
+        $pageUrl = route('admin.kenaikan-mutasi', [
+            'tab' => 'kenaikan',
+            'tahun_ajaran' => $year,
+            'kelas' => 'X-1',
+        ]);
+        $route = route('admin.kenaikan-kelas.proses');
+        $basePayload = [
+            'kelas_asal' => 'X-1',
+            'keputusan' => [$student => 'Naik'],
+        ];
+
+        $this->from($pageUrl)->actingAs($admin)
+            ->post($route, $basePayload)
+            ->assertRedirect($pageUrl)
+            ->assertSessionHasErrors(["kelas_tujuan.{$student}"]);
+
+        $this->from($pageUrl)->actingAs($admin)
+            ->post($route, $basePayload + ['kelas_tujuan' => [$student => 'XII-1']])
+            ->assertRedirect($pageUrl)
+            ->assertSessionHasErrors(["kelas_tujuan.{$student}"]);
+
+        $this->from($pageUrl)->actingAs($admin)
+            ->post($route, $basePayload + ['kelas_tujuan' => [$student => 'kelas-bebas']])
+            ->assertRedirect($pageUrl)
+            ->assertSessionHasErrors(["kelas_tujuan.{$student}"]);
+
+        $this->assertDatabaseMissing('sekolah_kelas', ['nama' => 'kelas-bebas']);
+        $this->assertDatabaseHas('siswa_riwayat_kelas', [
+            'siswa_id' => $student,
+            'tahun_ajaran_id' => $year,
+            'status' => 'Aktif',
+        ]);
+        $this->assertDatabaseMissing('catatan_aktivitas', ['aksi' => 'kenaikan_kelas']);
+    }
+
+    public function test_cancelling_graduation_restores_the_student_to_active_data(): void
+    {
+        [$year, , $sourceClass, , $teacher, $student] = $this->seedPromotionData();
+        DB::table('sekolah_kelas')->where('id', $sourceClass)->update([
+            'nama' => 'XII-1',
+            'tingkat' => 'XII',
+        ]);
+        $user = $this->createUser('guru', 'guru-xii', $teacher);
+        $pageUrl = route('guru.kenaikan-mutasi', [
+            'tab' => 'kenaikan',
+            'tahun_ajaran' => $year,
+            'kelas' => 'XII-1',
+        ]);
+
+        $this->from($pageUrl)->actingAs($user)
+            ->post(route('guru.kenaikan-kelas.proses'), [
+                'kelas_asal' => 'XII-1',
+                'keputusan' => [$student => 'Lulus'],
+            ])
+            ->assertRedirect($pageUrl);
+
+        $batchId = DB::table('catatan_kenaikan_kelas')->value('id');
+        $this->assertNotNull($batchId);
+        $this->assertFalse(SiswaBiodata::aktif()->whereKey($student)->exists());
+
+        $this->from($pageUrl)->actingAs($user)
+            ->post(route('guru.kenaikan-kelas.batalkan', $batchId))
+            ->assertRedirect($pageUrl);
+
+        $this->assertDatabaseHas('siswa_riwayat_kelas', [
+            'siswa_id' => $student,
+            'tahun_ajaran_id' => $year,
+            'status' => 'Aktif',
+            'keputusan_kenaikan' => null,
+        ]);
+        $this->assertDatabaseHas('siswa_biodata', [
+            'id' => $student,
+            'tahun_lulus' => null,
+            'alasan_keluar' => null,
+            'kelas_keluar' => null,
+            'tanggal_keluar' => null,
+        ]);
+        $this->assertTrue(SiswaBiodata::aktif()->whereKey($student)->exists());
+        $this->assertDatabaseHas('catatan_aktivitas', ['aksi' => 'batalkan_kenaikan']);
+
+        $alumni = app(AlumniController::class)->index(Request::create('/admin/alumni'));
+        $this->assertFalse($alumni->getData()['alumni']->getCollection()->contains('id', $student));
+    }
+
+    public function test_promotion_form_offers_only_classes_in_the_next_grade(): void
+    {
+        [$year, , , , , $student] = $this->seedPromotionData();
+        DB::table('sekolah_kelas')->insert([
+            ['nama' => 'XI-2', 'tingkat' => 'XI'],
+            ['nama' => 'XII-2', 'tingkat' => 'XII'],
+        ]);
+        $admin = $this->createUser('admin', 'admin', null);
+
+        $response = $this->actingAs($admin)->get(route('admin.kenaikan-mutasi', [
+            'tahun_ajaran' => $year,
+            'kelas' => 'X-1',
+        ]));
+        $html = (string) $response->assertOk()->getContent();
+        preg_match('/<select name="kelas_tujuan\['.$student.'\]"[\s\S]*?<\/select>/', $html, $matches);
+
+        $this->assertNotEmpty($matches);
+        $this->assertStringContainsString('value="XI-1"', $matches[0]);
+        $this->assertStringContainsString('value="XI-2"', $matches[0]);
+        $this->assertStringNotContainsString('value="X-1"', $matches[0]);
+        $this->assertStringNotContainsString('value="XII-1"', $matches[0]);
+    }
+
     public function test_promotion_list_excludes_a_graduate_with_an_active_history(): void
     {
         [, , $sourceClass, , $teacher, $activeStudent] = $this->seedPromotionData();

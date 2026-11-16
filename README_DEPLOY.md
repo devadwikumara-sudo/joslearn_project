@@ -11,6 +11,8 @@
 
 Salin `.env.example` menjadi `.env` di server. Isi `APP_URL`, koneksi database, `CORS_ALLOWED_ORIGINS` dengan origin resmi (dipisahkan koma), `SANCTUM_EXPIRATION` dalam menit, SMTP (`MAIL_SCHEME`, `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`), dan `ADMIN_REGISTRATION_CODE` dengan nilai acak yang kuat. Jangan mengunggah `.env` ke Git atau ke paket rilis.
 
+Jika `APP_KEY` lama pernah dibagikan, perlakukan sebagai bocor dan rencanakan rotasi di server. Rotasi dapat membatalkan sesi/cookie terenkripsi dan data yang dienkripsi dengan kunci lama; jangan memasukkan kunci baru ke repositori atau arsip.
+
 Sebelum seeder produksi pertama kali, atur `ADMIN_INITIAL_USERNAME`, `ADMIN_INITIAL_EMAIL`, dan `ADMIN_INITIAL_PASSWORD` di `.env` server. Kata sandi awal minimal 12 karakter; akun admin pertama diwajibkan mengganti kata sandi saat login. Hapus `ADMIN_INITIAL_PASSWORD` setelah akun dibuat. Seeder tidak akan membuat admin kedua jika admin sudah ada.
 
 ## 3. Pasang dan inisialisasi aplikasi
@@ -68,6 +70,12 @@ Pastikan cron berjalan dengan user aplikasi dan pantau log scheduler.
 ## 8. Isi paket rilis
 
 Paket untuk server tidak boleh menyertakan `.env`, `.env.backup`, `.env.production`, `.claude`, `.mcp.json`, `storage/logs/*.log`, `database/*.sqlite`, `.phpunit.result.cache`, `scratch_schema.php`, `www.lnk`, atau README lama. Jangan membuat ZIP dari seluruh checkout melalui file manager: `.gitignore` tidak mengecualikan berkas dari arsip ZIP. Gunakan perintah berikut dan periksa isi arsip sebelum mengirimkannya:
+
+Untuk membuat ZIP dari commit yang sudah ditinjau (hanya berkas terlacak, termasuk `.env.example` dan tidak termasuk `.env` lokal):
+
+```sh
+git archive --format=zip --output=josbook-release.zip HEAD
+```
 
 ```sh
 tar --exclude-vcs-ignores --exclude=.git --exclude=.env \
