@@ -152,7 +152,30 @@
 
     function readRows(sheet) {
         const rows = XLSX.utils.sheet_to_json(sheet, {header: 1, defval: ''});
+        const range = sheet?.['!ref'] && XLSX.utils.decode_range
+            ? XLSX.utils.decode_range(sheet['!ref'])
+            : null;
         const merges = sheet?.['!merges'] || [];
+        rows.forEach((row, rowIndex) => {
+            row.forEach((value, columnIndex) => {
+                if (typeof value !== 'number' || typeof XLSX.utils.encode_cell !== 'function') return;
+
+                const address = XLSX.utils.encode_cell({
+                    r: (range?.s.r || 0) + rowIndex,
+                    c: (range?.s.c || 0) + columnIndex
+                });
+                const cell = sheet[address];
+                if (!cell) return;
+
+                const formattedValue = cell.w
+                    || (typeof XLSX.utils.format_cell === 'function' ? XLSX.utils.format_cell(cell) : '');
+                if (typeof formattedValue === 'string'
+                    && /^0+\d+$/.test(formattedValue)
+                    && Number(formattedValue) === value) {
+                    row[columnIndex] = formattedValue;
+                }
+            });
+        });
         merges.forEach(range => {
             const {s, e} = range;
             if (!s || !e || s.r >= 30) return;
@@ -190,47 +213,47 @@
         tahun_ajaran: 'tahun ajaran|tahunajaran|tahun pelajaran|academic year|ta',
         alasan_keluar: 'alasan keluar|alasan meninggalkan sekolah|keluar karena',
         tgl_keluar: 'tgl keluar|tanggal keluar|tanggal lulus|tgl lulus',
-        kelas_keluar: 'kelas keluar|kelas terakhir',
+        kelas_keluar: 'kelas keluar|keluar kelas|kelas terakhir',
         tujuan: 'tujuan|sekolah tujuan',
-        nopes: 'nomor peserta psaj|nomor peserta|no peserta|nopes',
+        nopes: 'nomor peserta psaj|nomor peserta|no peserta|nopes psaj|nopes',
         no_skl: 'nomor skl|no skl',
         no_ijazah_sma: 'nomor ijazah sma|nomor ijazah nasional|no ijazah sma',
-        tgl_ijazah_sma: 'tanggal ijazah sma|tgl ijazah sma|tanggal pengesahan ijazah',
-        no_transkrip: 'nomor transkrip|no transkrip',
+        tgl_ijazah_sma: 'tanggal ijazah sma|tgl ijazah sma|tanggal pengesahan ijazah|tgl pengesahan ijazah',
+        no_transkrip: 'nomor transkrip|nomor transkrip nilai|no transkrip',
         tahun_lulus: 'tahun lulus|thn lulus|tahun kelulusan',
         lanjut: 'melanjutkan studi|melanjutkan studi bekerja|kegiatan setelah lulus|lanjut',
         agama: 'agama',
         kewarganegaraan: 'kewarganegaraan|warga negara|wn',
         nik: 'nik|no nik|nomor induk kependudukan',
         lama: 'lama belajar|lama belajar tahun',
-        masuk: 'jenis registrasi|jenis masuk|registrasi',
-        sekolah_pindah: 'sekolah pindahan|pindahan dari sekolah|sekolah asal pindahan',
-        alasan_pindah: 'alasan pindah|alasan mutasi',
-        kelas_masuk: 'kelas diterima|kelas masuk',
-        rombel_masuk: 'rombel diterima|rombel masuk',
-        tgl_masuk: 'tanggal diterima|tanggal masuk|tgl masuk',
+        masuk: 'jenis registrasi|jenis masuk|registrasi|pindahan',
+        sekolah_pindah: 'sekolah pindahan|pindahan dari sekolah|sekolah asal pindahan|dari sekolah',
+        alasan_pindah: 'alasan pindah|alasan mutasi|alasan',
+        kelas_masuk: 'kelas diterima|kelas masuk|diterima di kelas|masuk kelas',
+        rombel_masuk: 'rombel diterima|rombel masuk|rombel kelas ke|rombel kelas',
+        tgl_masuk: 'tanggal diterima|tanggal masuk|tgl masuk|tanggal',
         anak_ke: 'anak ke|anak',
-        jml_saudara: 'jml saudara|jumlah saudara|saudara',
-        yatim: 'yatim|status yatim|keadaan jasmani',
+        jml_saudara: 'jml saudara|jumlah saudara|jumlah saudara kandung|saudara',
+        yatim: 'yatim|status yatim|status anak yatim piatu|keadaan jasmani',
         bahasa: 'bahasa|bahasa sehari hari',
-        alamat: 'alamat|jalan|dusun|alamat jalan|jalan dusun|tempat tinggal',
+        alamat: 'alamat|jalan|dusun|alamat jalan|jalan dusun',
         rt_rw: 'rt rw|rt|rtrw|rt rw jalan',
         kelurahan: 'desa|kelurahan|desa kelurahan',
         kecamatan: 'kecamatan|kec',
         kab: 'kabupaten|kota|kabupaten kota|kab',
         prov: 'provinsi|prov',
         kodepos: 'kode pos|kodepos',
-        hp: 'hp|no hp|nomor hp|telepon|no telepon|nomor telepon|no telp|telp',
-        tinggal: 'tinggal dengan|jenis tinggal',
+        hp: 'hp|no hp|nomor hp|telepon|no telepon|nomor telepon|nomor telepon hp|no telp|telp',
+        tinggal: 'tinggal dengan|jenis tinggal|tempat tinggal',
         jarak: 'jarak|jarak ke sekolah',
         gol_darah: 'gol darah|golongan darah|darah',
-        penyakit: 'penyakit|riwayat penyakit',
-        kelainan: 'kelainan|kelainan fisik',
+        penyakit: 'penyakit|riwayat penyakit|penyakit yang diderita',
+        kelainan: 'kelainan|kelainan fisik|kelainan jasmani fisik',
         tinggi: 'tinggi|tinggi badan|tb',
         berat: 'berat|berat badan|bb',
         asal: 'asal|sekolah asal|asal sekolah|smp asal',
-        tgl_ijazah_smp: 'tgl ijazah smp|tanggal ijazah smp',
-        no_ijazah_smp: 'no ijazah smp|nomor ijazah smp',
+        tgl_ijazah_smp: 'tgl ijazah smp|tanggal ijazah smp|tanggal ijazah|tgl ijazah',
+        no_ijazah_smp: 'no ijazah smp|nomor ijazah smp|nomor ijazah|no ijazah',
         ayah: 'nama ayah|ayah|nama ayah kandung|nama bapak',
         agama_ayah: 'agama ayah',
         wn_ayah: 'kewarganegaraan ayah|wn ayah',
@@ -269,10 +292,10 @@
         al_prov: 'provinsi orang tua',
         al_pos: 'kode pos orang tua',
         catatan: 'catatan',
-        pend: 'pendidikan',
+        pend: 'pendidikan|pendidikan terakhir',
         kerja: 'pekerjaan|kerja',
-        gaji: 'penghasilan|gaji',
-        ket: 'keterangan',
+        gaji: 'penghasilan|penghasilan per bulan|gaji',
+        ket: 'keterangan|keadaan',
         sakit: 'sakit',
         izin: 'izin|ijin',
         alpa: 'alpa|alpha|alfa|tanpa keterangan',
@@ -374,6 +397,13 @@
     };
 
     const FAMILY_HEADERS = {
+        alamat: {ayah: 'al_jalan', ibu: 'al_jalan', wali: 'wali_jalan'},
+        rt_rw: {ayah: 'al_rt', ibu: 'al_rt', wali: 'wali_rt'},
+        kelurahan: {ayah: 'al_desa', ibu: 'al_desa', wali: 'wali_desa'},
+        kecamatan: {ayah: 'al_kec', ibu: 'al_kec', wali: 'wali_kec'},
+        kab: {ayah: 'al_kab', ibu: 'al_kab', wali: 'wali_kab'},
+        prov: {ayah: 'al_prov', ibu: 'al_prov', wali: 'wali_prov'},
+        kodepos: {ayah: 'al_pos', ibu: 'al_pos', wali: 'wali_pos'},
         agama: {ayah: 'agama_ayah', ibu: 'agama_ibu', wali: 'agama_wali'},
         kewarganegaraan: {ayah: 'wn_ayah', ibu: 'wn_ibu', wali: 'wn_wali'},
         pend: {ayah: 'pend_ayah', ibu: 'pend_ibu', wali: 'pend_wali'},
@@ -384,6 +414,7 @@
     };
     const FAMILY_PARTS = ['ayah', 'ibu', 'wali'];
     const FAMILY_GROUP_FIELDS = new Set(Object.keys(FAMILY_HEADERS));
+    const FAMILY_ADDRESS_FIELDS = new Set(['alamat', 'rt_rw', 'kelurahan', 'kecamatan', 'kab', 'prov', 'kodepos']);
     const STUDENT_REQUIRED_FIELDS = ['nisn', 'nama'];
 
     function headerStats(row, studentOnly = false) {
@@ -497,7 +528,7 @@
                     const occurrence = groupOccurrences[field] || 0;
                     groupOccurrences[field] = occurrence + 1;
                     const hasBaseField = Object.values(RMAP).includes(field);
-                    const groupOffset = hasBaseField && rawCounts[field] >= 4 ? 1 : 0;
+                    const groupOffset = hasBaseField && (rawCounts[field] >= 4 || FAMILY_ADDRESS_FIELDS.has(field)) ? 1 : 0;
                     if (groupOffset && occurrence === 0) {
                         mappedField = field;
                     } else {
@@ -514,17 +545,8 @@
                 return;
             }
 
-            if (assigned[mappedField] !== undefined || (rawCounts[field] > 1 && !FAMILY_GROUP_FIELDS.has(field))) {
+            if (assigned[mappedField] !== undefined) {
                 uncertain.push({index, header: text, field: mappedField, reason: 'Judul kolom ganda; pemetaan tidak dapat dipastikan.'});
-                if (assigned[mappedField] !== undefined) {
-                    const previous = assigned[mappedField];
-                    delete assigned[mappedField];
-                    const previousEntryIndex = recognized.findIndex(entry => entry.index === previous);
-                    if (previousEntryIndex >= 0) {
-                        const [previousEntry] = recognized.splice(previousEntryIndex, 1);
-                        uncertain.push({...previousEntry, reason: 'Judul kolom ganda; pemetaan tidak dapat dipastikan.'});
-                    }
-                }
                 return;
             }
 
@@ -568,6 +590,13 @@
             fields: [],
             detected: false
         };
+    }
+
+    function isNonStudentRecordName(value) {
+        const name = String(value ?? '').trim();
+        if (!name || !/[a-z]/i.test(name) || fieldOf(name) === 'nama') return true;
+
+        return /^(?:jumlah|total|subtotal|rata rata|keterangan|catatan)(?: siswa| peserta didik)?$/.test(nz(name));
     }
 
     // ─── Pembaca biodata berdasarkan judul kolom ──────────────────────────────
@@ -693,7 +722,7 @@
             const rawName = cl(row[nameIndex]);
             const rawNisn = cl(row[nisnIndex]);
             const rawNis = cl(row[nisIndex]);
-            if (!rawName || rawName === '-' || (!rawNisn && !rawNis)) return;
+            if (isNonStudentRecordName(rawName) || (!rawNisn && !rawNis)) return;
 
             const student = {};
             let numericNik = false;
@@ -769,6 +798,11 @@
             const isGraduated = graduationText.some(isGraduationStatus)
                 || /^\d{4}$/.test(String(student.tahun_lulus ?? '').trim());
             student.status = isGraduated ? 'Lulus' : (String(student.status ?? '').trim() || 'Aktif');
+            if (isGraduated) {
+                student.kelas = student.kelas_keluar
+                    ? normK(student.kelas_keluar)
+                    : (classFromSheet || '');
+            }
             if (isGraduated && !student.tahun_lulus && /^\d{4}-\d{2}-\d{2}$/.test(String(student.tgl_keluar ?? ''))) {
                 student.tahun_lulus = String(student.tgl_keluar).slice(0, 4);
             }
@@ -1135,6 +1169,16 @@
                 }
                 if (!r.nama) {
                     addError(idx, id, 'Nama kosong');
+                }
+                const hasGraduationSignal = isGraduationStatus(r.status)
+                    || isGraduationStatus(r.alasan_keluar)
+                    || /^\d{4}$/.test(String(r.tahun_lulus ?? '').trim());
+                if (!hasGraduationSignal) {
+                    if (S.imp.mode === 'kelas' && !normK(S.imp.kelas)) {
+                        addError(idx, id, 'Pilih kelas terlebih dahulu untuk siswa aktif.');
+                    } else if (S.imp.mode !== 'kelas' && !normK(r.kelas)) {
+                        addError(idx, id, 'Kelas wajib ditentukan untuk siswa aktif. Isi kolom kelas di file atau pilih mode "Satu kelas".');
+                    }
                 }
                 const hasGraduationYear = /^\d{4}$/.test(String(r.tahun_lulus ?? '').trim());
                 const statusIsActive = String(r.status ?? '').trim().toLowerCase() === 'aktif';
@@ -1599,6 +1643,14 @@
 
         container.innerHTML = detHtml + warnHtml + prevHtml;
     }
+
+    window.refreshImportPreviewOptions = function() {
+        readFormOptions();
+        if (!S.imp.rows) return;
+
+        S.imp.warningsConfirmed = false;
+        renderPreviewUI();
+    };
 
     // ─── Ubah Pemetaan Kolom Interaktif (C.cmap) ────────────────────────────────
     window.changeColMap = function(sheetIdx, colIdx, newMapping) {

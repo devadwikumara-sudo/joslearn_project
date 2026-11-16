@@ -1301,6 +1301,15 @@ class ImportBatchController extends Controller
 
                 continue;
             }
+            if ($statusSiswa === 'Aktif' && ($rowTa === null || $kStr === null)) {
+                $skipped++;
+                $errors[] = [
+                    'row' => $rowNumber,
+                    'reason' => 'Siswa aktif wajib memiliki kelas dan tahun ajaran agar tampil di Data Siswa.',
+                ];
+
+                continue;
+            }
 
             $validationError = $this->validateImportedStudent($data, $r)
                 ?? $this->validateImportedStudent($effectiveData, $r);

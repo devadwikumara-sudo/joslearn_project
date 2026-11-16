@@ -12,14 +12,14 @@
         @if($type === 'siswa')
             <div>
                 <label for="mode">Mode</label>
-                <select name="mode" id="mode">
+                <select name="mode" id="mode" onchange="window.refreshImportPreviewOptions()">
                     <option value="kelas">Satu kelas</option>
                     <option value="semua" selected>Semua kelas (dari kolom kelas di Excel)</option>
                 </select>
             </div>
             <div>
                 <label for="kelas">Kelas (ketik baru = dibuat otomatis)</label>
-                <input list="dlk" name="kelas" id="kelas" value="{{ $kelasList->first() ?? '' }}">
+                <input list="dlk" name="kelas" id="kelas" value="{{ $kelasList->first() ?? '' }}" onchange="window.refreshImportPreviewOptions()">
                 <datalist id="dlk">
                     @foreach($kelasList as $kelas)
                         <option value="{{ $kelas }}">

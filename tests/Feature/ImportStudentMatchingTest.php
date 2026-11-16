@@ -1588,6 +1588,7 @@ class ImportStudentMatchingTest extends TestCase
                 'nisn' => 1234567890,
                 'nis' => '1.003e3',
                 'nama' => '  Siswa   Masa Depan  ',
+                'kelas' => 'X-1',
                 'tgl' => '01/01/2999',
                 'tgl_masuk' => '12 Mei 2008',
                 'tgl_ijazah_smp' => $excelDate,
@@ -1601,6 +1602,7 @@ class ImportStudentMatchingTest extends TestCase
             [
                 'nisn' => 9876543210,
                 'nama' => 'Siswa Usia Tidak Wajar',
+                'kelas' => 'X-1',
                 'tgl' => '01-01-1800',
                 '__excel_row' => 3,
             ],
@@ -1832,6 +1834,39 @@ class ImportStudentMatchingTest extends TestCase
 
         $alumni = app(AlumniController::class)->index(Request::create('/admin/alumni'));
         $activeStudents = app(DataSiswaController::class)->index(Request::create('/admin/data-siswa'));
+        $this->assertContains($studentId, $alumni->getData()['alumni']->getCollection()->pluck('id')->all());
+        $this->assertNotContains($studentId, $activeStudents->getData()['siswaList']->getCollection()->pluck('id')->all());
+    }
+
+    public function test_active_student_without_class_is_not_saved_as_invisible_biodata(): void
+    {
+        $response = $this->import('siswa', [[
+            'nisn' => '0000000341',
+            'nama' => 'Siswa Aktif Tanpa Kelas',
+        ]], 'Ganjil', '');
+
+        $response->assertOk()
+            ->assertJsonPath('count', 0)
+            ->assertJsonPath('skipped', 1)
+            ->assertJsonPath('errors.0.reason', 'Siswa aktif wajib memiliki kelas dan tahun ajaran agar tampil di Data Siswa.');
+        $this->assertDatabaseMissing('siswa_biodata', ['nisn' => '0000000341']);
+    }
+
+    public function test_graduated_student_without_class_is_still_saved_and_listed_as_alumni(): void
+    {
+        $response = $this->import('siswa', [[
+            'nisn' => '0000000342',
+            'nama' => 'Siswa Alumni Tanpa Kelas',
+            'status' => 'Lulus',
+            'tahun_lulus' => '2025',
+        ]], 'Ganjil', '2024/2025');
+
+        $response->assertOk()->assertJsonPath('count', 1)->assertJsonPath('graduated_count', 1);
+        $studentId = (int) DB::table('siswa_biodata')->where('nisn', '0000000342')->value('id');
+        $alumni = app(AlumniController::class)->index(Request::create('/admin/alumni'));
+        $activeStudents = app(DataSiswaController::class)->index(Request::create('/admin/data-siswa'));
+
+        $this->assertNotNull($studentId);
         $this->assertContains($studentId, $alumni->getData()['alumni']->getCollection()->pluck('id')->all());
         $this->assertNotContains($studentId, $activeStudents->getData()['siswaList']->getCollection()->pluck('id')->all());
     }

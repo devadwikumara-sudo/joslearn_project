@@ -52,6 +52,7 @@ async function importWorkbook(workbook, expectedType = 'siswa', dictionaries = {
     const preview = {innerHTML: ''};
     let payload = null;
     const classField = expectedType === 'siswa' ? {value: 'X-1'} : null;
+    const modeField = expectedType === 'siswa' ? {value: 'semua'} : null;
     const csrfMeta = {getAttribute: () => 'csrf-test'};
     const endpointMeta = {getAttribute: () => '/test/save-batch'};
     const baseMeta = {getAttribute: () => '/test'};
@@ -61,6 +62,7 @@ async function importWorkbook(workbook, expectedType = 'siswa', dictionaries = {
         },
         querySelector(selector) {
             if (selector === '[name="kelas"]') return classField;
+            if (selector === 'select[name="mode"]') return modeField;
             if (selector === 'meta[name="csrf-token"]') return csrfMeta;
             if (selector === 'meta[name="batch-import-url"]') return endpointMeta;
             if (selector === 'meta[name="app-base-url"]') return baseMeta;
@@ -78,6 +80,16 @@ async function importWorkbook(workbook, expectedType = 'siswa', dictionaries = {
             sheet_to_json(sheet) {
                 const rows = Array.isArray(sheet) ? sheet : sheet.data;
                 return rows.map(row => row.map(cell => cell && typeof cell === 'object' && 'v' in cell ? cell.v : cell));
+            },
+            encode_cell({r, c}) {
+                let column = c + 1;
+                let address = '';
+                while (column > 0) {
+                    const remainder = (column - 1) % 26;
+                    address = String.fromCharCode(65 + remainder) + address;
+                    column = Math.floor((column - 1) / 26);
+                }
+                return `${address}${r + 1}`;
             }
         }
     };
@@ -157,7 +169,9 @@ async function importWorkbook(workbook, expectedType = 'siswa', dictionaries = {
         preview,
         window,
         requests,
+        modeField,
         getPayload: () => payload,
+        getState: () => JSON.parse(JSON.stringify(window.JosBookState.imp)),
         runImport: () => window.executeBatchImport()
     };
 }
@@ -175,6 +189,188 @@ test('reads student records across four sheet and header variations', async () =
         assert.equal(state.detection.legacyFallback, index === 3, fixtureName);
         assert.equal(state.detection.headerRow, index === 0 ? 2 : index === 1 ? 7 : index === 2 ? 1 : 5, fixtureName);
     }
+});
+
+test('preserves leading zeroes displayed by Excel numeric formats in NISN cells', async () => {
+    const sheet = {
+        data: [
+            ['NISN', 'Nama', 'Kelas'],
+            [123456789, 'Siswa Uji Format Nol', 'X-1']
+        ],
+        A2: {v: 123456789, w: '0123456789'}
+    };
+    const {state, alerts} = await importWorkbook({
+        SheetNames: ['Data Siswa'],
+        Sheets: {'Data Siswa': sheet}
+    });
+
+    assert.deepEqual(alerts, []);
+    assert.equal(state.rows.length, 1);
+    assert.equal(state.rows[0].nisn, '0123456789');
+    assert.equal(state.rows[0].nama, 'Siswa Uji Format Nol');
+});
+
+test('skips numeric and repeated-heading rows before validating imported students', async () => {
+    const headers = [
+        'NISN', 'Nomor Induk (NIS)', 'Nama Lengkap', 'Kelas', 'Jenis Kelamin',
+        'Tanggal Lahir', 'Nama Ayah', 'Nama Ibu'
+    ];
+    const {state, alerts} = await importWorkbook({
+        SheetNames: ['Data Siswa'],
+        Sheets: {
+            'Data Siswa': [
+                ['DATA SISWA'],
+                ['Tahun Ajaran: 2026/2027'],
+                [],
+                headers,
+                ['4', '1', '2', '37-38', '7', '40', '48', '3'],
+                headers,
+                ['0076665147', '5474', 'Agung Sanggar Widinata', 'XII-1', 'L', '21/08/2007', 'Warsito', 'Musrini']
+            ]
+        }
+    });
+
+    assert.deepEqual(alerts, []);
+    assert.equal(state.rows.length, 1);
+    assert.equal(state.rows[0].nama, 'Agung Sanggar Widinata');
+    assert.equal(state.rows[0].nisn, '0076665147');
+    assert.equal(state.rows[0].__excel_row, 7);
+    assert.equal(state.statuses.length, 1);
+    assert.equal(state.statuses[0].status, 'ready');
+});
+
+test('maps the DATABASE_SISWA workbook headers and links Kontrol Induk by NIS', async () => {
+    const studentHeaders = [
+        'No Induk', 'Nama Peserta Didik', 'Nama Panggilan', 'NISN', 'Agama', 'Kewarganegaraan',
+        'Jumlah Saudara Kandung', 'Status Anak Yatim/Piatu', 'Jalan/Dusun', 'RT/RW', 'Desa',
+        'Kecamatan', 'Kabupaten', 'Provinsi', 'Kode Pos', 'Nomor Telepon/HP', 'Tempat Tinggal',
+        'Penyakit yang diderita', 'Kelainan Jasmani/Fisik', 'Pindahan', 'Dari Sekolah', 'Alasan',
+        'Diterima di kelas', 'Rombel Kelas ke', 'Tanggal',
+        'Nama Ayah Kandung', 'Agama', 'Kewarganegaraan', 'Pendidikan Terakhir', 'Pekerjaan',
+        'Penghasilan per bulan', 'Nomor Telepon/HP', 'Keadaan',
+        'Nama Ibu Kandung', 'Agama', 'Kewarganegaraan', 'Pendidikan Terakhir', 'Pekerjaan',
+        'Penghasilan per bulan', 'Nomor Telepon/HP', 'Keadaan',
+        'Jalan', 'RT/RW', 'Desa', 'Kecamatan', 'Kabupaten', 'Provinsi', 'Kode Pos',
+        'Nama Wali', 'Agama', 'Kewarganegaraan', 'Pendidikan Terakhir', 'Pekerjaan',
+        'Penghasilan per bulan', 'Nomor Telepon/HP', 'Keadaan',
+        'Jalan', 'RT/RW', 'Desa', 'Kecamatan', 'Kabupaten', 'Provinsi', 'Kode Pos',
+        'NAMA Lengkap', 'NOPES PSAJ', 'NIS', 'NIS', 'CEK NIS'
+    ];
+    const valuesByHeader = {
+        'No Induk': ['1001'],
+        'Nama Peserta Didik': ['Nama Siswa Uji'],
+        'Nama Panggilan': ['Uji'],
+        NISN: ['0000000123'],
+        Agama: ['Islam', 'Islam', 'Islam', 'Islam'],
+        Kewarganegaraan: ['Indonesia', 'Indonesia', 'Indonesia', 'Indonesia'],
+        'Jumlah Saudara Kandung': ['2'],
+        'Status Anak Yatim/Piatu': ['Tidak'],
+        'Jalan/Dusun': ['Jalan Siswa'],
+        'RT/RW': ['01/02', '03/04', '05/06'],
+        Desa: ['Desa Siswa', 'Desa Orang Tua', 'Desa Wali'],
+        Kecamatan: ['Kecamatan Siswa', 'Kecamatan Orang Tua', 'Kecamatan Wali'],
+        Kabupaten: ['Kabupaten Siswa', 'Kabupaten Orang Tua', 'Kabupaten Wali'],
+        Provinsi: ['Provinsi Siswa', 'Provinsi Orang Tua', 'Provinsi Wali'],
+        'Kode Pos': ['11111', '22222', '33333'],
+        'Nomor Telepon/HP': ['0811111111', '0822222222', '0833333333', '0844444444'],
+        'Tempat Tinggal': ['Bersama Orang Tua'],
+        'Penyakit yang diderita': ['Tidak Ada'],
+        'Kelainan Jasmani/Fisik': ['Tidak Ada'],
+        Pindahan: ['Siswa Baru'],
+        'Dari Sekolah': ['SMP Uji'],
+        Alasan: ['-'],
+        'Diterima di kelas': ['X'],
+        'Rombel Kelas ke': ['1'],
+        Tanggal: ['01/07/2022'],
+        'Nama Ayah Kandung': ['Ayah Uji'],
+        'Nama Ibu Kandung': ['Ibu Uji'],
+        'Nama Wali': ['Wali Uji'],
+        'Pendidikan Terakhir': ['SMA', 'SMP', 'SMA'],
+        Pekerjaan: ['Pegawai', 'Ibu Rumah Tangga', 'Wiraswasta'],
+        'Penghasilan per bulan': ['5000000', '0', '3000000'],
+        Keadaan: ['Hidup', 'Hidup', 'Hidup'],
+        Jalan: ['Jalan Orang Tua', 'Jalan Wali'],
+        'NAMA Lengkap': ['Nama Duplikat'],
+        'NOPES PSAJ': ['PSAJ-UJI-2025'],
+        NIS: ['1001', '1001'],
+        'CEK NIS': ['Sesuai']
+    };
+    const studentRow = studentHeaders.map(header => valuesByHeader[header]?.shift() || '');
+    const controlHeaders = [
+        'No Induk', 'Nama Peserta Didik', 'Jenis Registrasi', 'Tanggal Masuk', 'Masuk Kelas',
+        'Sekolah Asal SMP', 'Keluar Karena', 'Tanggal Keluar', 'Keluar Kelas', 'Sekolah Tujuan',
+        'Nomor Peserta PSAJ', 'Nomor SKL', 'Nomor Ijazah Nasional', 'Tgl Pengesahan Ijazah',
+        'Nomor Transkrip Nilai'
+    ];
+    const workbook = {
+        SheetNames: ['Peserta Didik', 'Kontrol Induk'],
+        Sheets: {
+            'Peserta Didik': [studentHeaders, studentRow],
+            'Kontrol Induk': [
+                ['Registrasi Masuk', '', '', '', '', '', 'Registrasi Keluar'],
+                controlHeaders,
+                [
+                    '1001', 'Nama Siswa Uji', 'Siswa Baru', '01/07/2022', 'X', 'SMP Uji',
+                    'Lulus', '15/05/2025', 'XII-1', '-', 'PSAJ-UJI-2025', 'SKL-UJI-2025',
+                    'IJAZAH-UJI-2025', '15/05/2025', 'TRANSKRIP-UJI-2025'
+                ]
+            ]
+        }
+    };
+    const {state, alerts} = await importWorkbook(workbook);
+
+    assert.deepEqual(alerts, []);
+    assert.equal(state.detection.controlSheet, 'Kontrol Induk');
+    assert.equal(state.rows.length, 1);
+    assert.equal(state.rows[0].nis, '1001');
+    assert.equal(state.rows[0].nama, 'Nama Siswa Uji');
+    assert.equal(state.rows[0].nisn, '0000000123');
+    assert.equal(state.rows[0].kelas, 'XII-1');
+    assert.equal(state.rows[0].status, 'Lulus');
+    assert.equal(state.rows[0].tahun_lulus, '2025');
+    assert.equal(state.rows[0].jml_saudara, '2');
+    assert.equal(state.rows[0].yatim, 'Tidak');
+    assert.equal(state.rows[0].tinggal, 'Bersama Orang Tua');
+    assert.equal(state.rows[0].ayah, 'Ayah Uji');
+    assert.equal(state.rows[0].agama_ayah, 'Islam');
+    assert.equal(state.rows[0].ibu, 'Ibu Uji');
+    assert.equal(state.rows[0].wali, 'Wali Uji');
+    assert.equal(state.rows[0].al_jalan, 'Jalan Orang Tua');
+    assert.equal(state.rows[0].wali_jalan, 'Jalan Wali');
+    assert.equal(state.rows[0].no_skl, 'SKL-UJI-2025');
+    assert.equal(state.rows[0].no_ijazah_sma, 'IJAZAH-UJI-2025');
+    assert.equal(state.rows[0].tgl_ijazah_sma, '2025-05-15');
+    assert.equal(state.rows[0].no_transkrip, 'TRANSKRIP-UJI-2025');
+});
+
+test('requires a class for active students and allows selecting one after preview', async () => {
+    const fixture = {
+        headers: ['NISN', 'Nama'],
+        records: [['0000000123', 'Siswa Aktif Tanpa Kelas']]
+    };
+    const imported = await importWorkbook(workbookFromFixture(fixture));
+
+    assert.equal(imported.getState().statuses[0].status, 'error');
+    assert.match(imported.getState().errors[0].msg, /pilih mode "Satu kelas"/);
+
+    imported.modeField.value = 'kelas';
+    imported.window.refreshImportPreviewOptions();
+    assert.equal(imported.getState().statuses[0].status, 'ready');
+
+    await imported.runImport();
+    assert.equal(imported.getPayload().mode, 'kelas');
+    assert.equal(imported.getPayload().kelas, 'X-1');
+});
+
+test('allows an alumni row without a class when graduation is identified', async () => {
+    const fixture = {
+        headers: ['NISN', 'Nama', 'Status Kelulusan', 'Tahun Lulus'],
+        records: [['0000000124', 'Siswa Alumni Tanpa Kelas', 'Lulus', 2025]]
+    };
+    const {state} = await importWorkbook(workbookFromFixture(fixture));
+
+    assert.equal(state.rows[0].status, 'Lulus');
+    assert.equal(state.statuses[0].status, 'ready');
 });
 
 test('ignores Petunjuk sheets and recognizes the active Excel template headers', async () => {
@@ -519,8 +715,8 @@ test('requires confirmation before including warning rows', async () => {
         SheetNames: ['Data Siswa'],
         Sheets: {
             'Data Siswa': [
-                ['NISN', 'Nama Lengkap', 'NIK'],
-                ['0000000001', 'Siswa Uji', '12345']
+                ['NISN', 'Nama Lengkap', 'Kelas', 'NIK'],
+                ['0000000001', 'Siswa Uji', 'X-1', '12345']
             ]
         }
     };
@@ -564,11 +760,11 @@ test('normalizes supported dates and warns for future or implausibly old dates',
         SheetNames: ['Data Siswa'],
         Sheets: {
             'Data Siswa': [
-                ['NISN', 'Nama Lengkap', 'Tanggal Lahir', 'Tanggal Diterima'],
-                ['0000000001', 'Tanggal Teks', '12/05/2008', '12 Mei 2008'],
-                ['0000000002', 'Tanggal Serial', excelDate, excelDate],
-                ['0000000003', 'Tanggal Masa Depan', '01/01/2999', '01-01-2024'],
-                ['0000000004', 'Tanggal Usia Tidak Wajar', '01/01/1800', '01-01-2024']
+                ['NISN', 'Nama Lengkap', 'Kelas', 'Tanggal Lahir', 'Tanggal Diterima'],
+                ['0000000001', 'Tanggal Teks', 'X-1', '12/05/2008', '12 Mei 2008'],
+                ['0000000002', 'Tanggal Serial', 'X-1', excelDate, excelDate],
+                ['0000000003', 'Tanggal Masa Depan', 'X-1', '01/01/2999', '01-01-2024'],
+                ['0000000004', 'Tanggal Usia Tidak Wajar', 'X-1', '01/01/1800', '01-01-2024']
             ]
         }
     };
