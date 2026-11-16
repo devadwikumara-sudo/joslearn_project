@@ -117,6 +117,17 @@ class ImportStudentMatchingTest extends TestCase
             $table->id();
             $table->string('nama');
             $table->string('nip')->nullable();
+            $table->string('nuptk')->nullable();
+            $table->string('nik')->nullable();
+            $table->string('jenis_kelamin')->nullable();
+            $table->string('tempat_lahir')->nullable();
+            $table->date('tanggal_lahir')->nullable();
+            $table->string('pendidikan_terakhir')->nullable();
+            $table->string('status_kepegawaian')->nullable();
+            $table->unsignedSmallInteger('mulai_bertugas')->nullable();
+            $table->string('nomor_hp')->nullable();
+            $table->string('email')->nullable();
+            $table->string('alamat')->nullable();
             $table->softDeletes();
             $table->timestamps();
         });
@@ -1140,6 +1151,27 @@ class ImportStudentMatchingTest extends TestCase
         $this->assertMatchesRegularExpression('/class="[^"]*\bon\b[^"]*" data-menu="import-data"/', $academicImport->getContent());
     }
 
+    public function test_importing_teacher_biodata_does_not_create_an_account_with_a_default_password(): void
+    {
+        $response = $this->import('guru', [[
+            'nama' => 'Guru Import Uji',
+            'nip' => '1987000001',
+            'email' => 'guru-import@example.test',
+        ]]);
+
+        $response->assertOk()
+            ->assertJsonPath('count', 1)
+            ->assertJsonPath('message', 'Berhasil mengimpor 1 data guru. Akun login dapat dibuat terpisah melalui menu Guru & Master.');
+
+        $this->assertDatabaseHas('guru_biodata', [
+            'nama' => 'Guru Import Uji',
+            'nip' => '1987000001',
+        ]);
+        $this->assertDatabaseMissing('akun_pengguna', [
+            'username' => '1987000001',
+        ]);
+    }
+
     public function test_legacy_admin_import_url_redirects_to_the_selected_tab(): void
     {
         $this->actingAs($this->admin)->withoutMiddleware();
@@ -1572,6 +1604,39 @@ class ImportStudentMatchingTest extends TestCase
             'siswa_id' => $graduatedStudentId,
             'status' => 'Lulus',
         ]);
+    }
+
+    public function test_student_import_routes_alumni_to_alumni_and_belum_lulus_to_active_students(): void
+    {
+        $response = $this->import('siswa', [
+            [
+                'nisn' => '0000000111',
+                'nama' => 'Siswa Alumni',
+                'kelas' => 'XII-1',
+                'status' => 'Alumni',
+            ],
+            [
+                'nisn' => '0000000112',
+                'nama' => 'Siswa Belum Lulus',
+                'kelas' => 'XII-1',
+                'status' => 'Belum Lulus',
+            ],
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('count', 2)
+            ->assertJsonPath('active_count', 1)
+            ->assertJsonPath('graduated_count', 1);
+        $alumniId = DB::table('siswa_biodata')->where('nisn', '0000000111')->value('id');
+        $activeId = DB::table('siswa_biodata')->where('nisn', '0000000112')->value('id');
+        $alumni = app(AlumniController::class)->index(Request::create('/admin/alumni'));
+        $activeStudents = app(DataSiswaController::class)->index(Request::create('/admin/data-siswa'));
+        $alumniIds = $alumni->getData()['alumni']->getCollection()->pluck('id')->all();
+        $activeIds = $activeStudents->getData()['siswaList']->getCollection()->pluck('id')->all();
+
+        $this->assertContains($alumniId, $alumniIds);
+        $this->assertContains($activeId, $activeIds);
+        $this->assertNotContains($alumniId, $activeIds);
     }
 
     public function test_imported_students_are_partitioned_between_active_and_alumni_lists(): void

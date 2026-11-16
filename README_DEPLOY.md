@@ -25,7 +25,7 @@ php artisan config:cache
 php artisan route:cache
 ```
 
-Migrasi yang ada menyiapkan tabel master tingkat/kelas/mapel. `ProductionSeeder` hanya mengisi identitas sekolah dan admin pertama; `DatabaseSeeder` tidak menjalankan data demo di environment production. Jangan menjalankan `DemoDatabaseSeeder` atau `SiswaBiodataSeeder` pada database produksi.
+Migrasi yang ada menyiapkan tabel master tingkat/kelas/mapel. `ProductionSeeder` hanya mengisi identitas sekolah dan admin pertama; `DatabaseSeeder` tidak memasukkan data demo. Data siswa dan guru dimasukkan melalui alur pendataan atau import.
 
 ## 4. Izin direktori
 
@@ -76,7 +76,7 @@ tar --exclude-vcs-ignores --exclude=.git --exclude=.env \
     --exclude=.claude --exclude=.mcp.json \
     --exclude='storage/logs/*.log' --exclude='database/*.sqlite' \
     --exclude=.phpunit.result.cache --exclude=scratch_schema.php --exclude=www.lnk \
-    --exclude=README.txt --exclude=README-PASANG.md \
+    --exclude=README-PASANG.md \
     --exclude=josbook-release.tar.gz \
     -czf josbook-release.tar.gz .
 ```

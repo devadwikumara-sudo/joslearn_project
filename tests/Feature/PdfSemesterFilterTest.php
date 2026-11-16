@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Auth\Pengguna;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -14,6 +15,7 @@ class PdfSemesterFilterTest extends TestCase
         parent::setUp();
 
         foreach ([
+            'akun_pengguna',
             'guru_wali_kelas',
             'guru_biodata',
             'siswa_ekskul',
@@ -31,6 +33,15 @@ class PdfSemesterFilterTest extends TestCase
             Schema::dropIfExists($table);
         }
 
+        Schema::create('akun_pengguna', function (Blueprint $table): void {
+            $table->id();
+            $table->string('peran');
+            $table->string('username')->unique();
+            $table->string('password');
+            $table->boolean('aktif')->default(true);
+            $table->string('remember_token')->nullable();
+            $table->timestamps();
+        });
         Schema::create('siswa_biodata', function (Blueprint $table): void {
             $table->id();
             $table->string('nama_lengkap');
@@ -155,6 +166,7 @@ class PdfSemesterFilterTest extends TestCase
     protected function tearDown(): void
     {
         foreach ([
+            'akun_pengguna',
             'guru_wali_kelas',
             'guru_biodata',
             'siswa_ekskul',
@@ -172,6 +184,28 @@ class PdfSemesterFilterTest extends TestCase
         }
 
         parent::tearDown();
+    }
+
+    public function test_admin_can_render_single_and_batch_student_pdfs(): void
+    {
+        $admin = Pengguna::query()->create([
+            'peran' => 'admin',
+            'username' => 'admin-test',
+            'password' => 'test-password',
+            'aktif' => true,
+        ]);
+
+        $singleResponse = $this->actingAs($admin)->get(route('admin.data-siswa.pdf', 1));
+
+        $singleResponse->assertOk()
+            ->assertSee('I. BUKU INDUK REGISTER PESERTA DIDIK')
+            ->assertSee('Siswa Enam Semester');
+
+        $batchResponse = $this->get(route('admin.pdf.batch', ['ids' => '1']));
+
+        $batchResponse->assertOk()
+            ->assertSee('I. BUKU INDUK REGISTER PESERTA DIDIK')
+            ->assertSee('Siswa Enam Semester');
     }
 
     public function test_pdf_semester_six_filter_renders_only_the_matching_grade_history(): void

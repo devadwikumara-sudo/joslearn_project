@@ -87,4 +87,23 @@ class ProductionSeederTest extends TestCase
         $this->assertDatabaseCount('guru_biodata', 0);
         $this->assertDatabaseCount('siswa_biodata', 0);
     }
+
+    public function test_database_seeder_does_not_add_demo_records_to_a_local_database(): void
+    {
+        $this->app['env'] = 'local';
+        config([
+            'app.env' => 'local',
+            'auth.admin_initial_password' => null,
+        ]);
+
+        app(DatabaseSeeder::class)->run();
+
+        $this->assertDatabaseHas('sekolah_identitas', [
+            'id' => 1,
+            'nama' => 'SMA Negeri 1 Rejoso Nganjuk',
+        ]);
+        $this->assertDatabaseCount('akun_pengguna', 0);
+        $this->assertDatabaseCount('guru_biodata', 0);
+        $this->assertDatabaseCount('siswa_biodata', 0);
+    }
 }

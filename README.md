@@ -13,14 +13,14 @@ JosBook adalah sistem Buku Induk digital SMA Negeri 1 Rejoso Nganjuk. Aplikasi w
    ```
 
 3. Untuk development lokal, atur `.env` ke `APP_ENV=local`, `APP_DEBUG=true`, serta sesuaikan koneksi database.
-4. Buat app key dan jalankan migration serta data development:
+4. Buat app key dan jalankan migration serta bootstrap sekolah:
 
    ```powershell
    php artisan key:generate
    php artisan migrate --seed
    ```
 
-`DatabaseSeeder` membuat data demo hanya di luar environment production. Data siswa demo bersifat sintetis. Jangan gunakan seeder demo pada database produksi.
+`DatabaseSeeder` hanya menyiapkan identitas sekolah dan, bila dikonfigurasi, akun admin awal. Data siswa dan guru dimasukkan melalui alur pendataan atau import; tidak ada seeder data demo.
 
 ## Tes
 

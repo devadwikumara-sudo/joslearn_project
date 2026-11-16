@@ -98,6 +98,12 @@
         return match ? match[1] : '';
     };
 
+    const isGraduationStatus = value => {
+        const status = String(value ?? '').trim().toLowerCase();
+        if (/\b(?:belum|tidak|gagal)\s+(?:lulus|tamat)\b/.test(status)) return false;
+        return /\b(?:lulus|alumni|graduate(?:d)?|tamat)\b/.test(status);
+    };
+
     const normN = v => {
         let value = numStr(v).trim();
         if (/^[+-]?\d+(?:\.\d+)?e[+-]?\d+$/i.test(value)) {
@@ -280,7 +286,7 @@
         nip: 'nip|nomor induk pegawai',
         nuptk: 'nuptk',
         mulai_bertugas: 'mulai bertugas|tahun masuk|sejak tahun',
-        status: 'status|status kepegawaian|status siswa|status peserta didik'
+        status: 'status|status kepegawaian|status siswa|status peserta didik|status kelulusan|status alumni|kelulusan|alumni'
     };
 
     const MEX = {
@@ -421,6 +427,30 @@
         return best;
     }
 
+    function findUnmappedHeader(aoa) {
+        let best = null;
+        for (let rowIndex = 0; rowIndex < Math.min((aoa || []).length - 1, 30); rowIndex++) {
+            const cells = (aoa[rowIndex] || [])
+                .map((value, index) => ({index, text: String(value ?? '').trim()}))
+                .filter(cell => cell.text !== '');
+            if (cells.length < 2 || cells.some(cell => /^\d{8,}$/.test(cell.text))) continue;
+
+            const labels = cells.filter(cell => /[a-z]/i.test(cell.text));
+            const uniqueLabels = new Set(labels.map(cell => nz(cell.text)));
+            if (labels.length < 2 || uniqueLabels.size < 2 || uniqueLabels.size / labels.length < 0.75) continue;
+
+            const nextRowCells = (aoa[rowIndex + 1] || []).filter(value => String(value ?? '').trim() !== '');
+            if (nextRowCells.length < 2 || Math.abs(nextRowCells.length - cells.length) > 2) continue;
+
+            const score = cells.length * 3 + uniqueLabels.size - rowIndex / 100;
+            if (!best || score > best.score) {
+                best = {rowIndex, score, identityScore: 0, fields: []};
+            }
+        }
+
+        return best;
+    }
+
     function studentHeaderMapping(headers, overrides = {}) {
         const rawFields = (headers || []).map(fieldOf);
         const rawCounts = rawFields.reduce((counts, field) => {
@@ -555,6 +585,14 @@
                 best = {...sheet, header};
             }
         }
+        if (!best) {
+            for (const sheet of sheetRows) {
+                const header = findUnmappedHeader(sheet.rows);
+                if (header && (!best || header.score > best.header.score)) {
+                    best = {...sheet, header};
+                }
+            }
+        }
 
         const legacySheet = best ? null : (sheetRows.find(sheet => /peserta\s*didik/i.test(sheet.name))
             || sheetRows.find(sheet => !/kontrol\s*induk/i.test(sheet.name))
@@ -586,6 +624,7 @@
                 return {
                     index,
                     header: String(header ?? ''),
+                    sample: selected.rows[headerRowIndex + 1]?.[index] ?? '',
                     field: recognized?.field || uncertain?.field || '',
                     status: recognized ? 'recognized' : (uncertain ? 'uncertain' : (unknown ? 'unknown' : '')),
                     reason: uncertain?.reason || ''
@@ -728,9 +767,8 @@
                     configurable: true
                 });
             }
-            const isGraduated = graduationText.some(value =>
-                /\blulus\b/.test(value) && !/\b(belum|tidak)\s+lulus\b/.test(value)
-            ) || /^\d{4}$/.test(String(student.tahun_lulus ?? '').trim());
+            const isGraduated = graduationText.some(isGraduationStatus)
+                || /^\d{4}$/.test(String(student.tahun_lulus ?? '').trim());
             student.status = isGraduated ? 'Lulus' : (String(student.status ?? '').trim() || 'Aktif');
             if (isGraduated && !student.tahun_lulus && /^\d{4}-\d{2}-\d{2}$/.test(String(student.tgl_keluar ?? ''))) {
                 student.tahun_lulus = String(student.tgl_keluar).slice(0, 4);
@@ -1068,9 +1106,7 @@
             statuses[idx].warns.push(msg);
         };
         const classSelect = document.querySelector('[name="kelas"]') || document.getElementById('kelas');
-        const knownClasses = classSelect
-            ? [...classSelect.options].map(option => normK(option.value)).filter(Boolean)
-            : [];
+        const knownClasses = Array.from(classSelect?.options || [], option => normK(option.value)).filter(Boolean);
         const valueFields = new Set([...SC, ...(S.imp.newM || []).map(mapel => mapel.kode), 'nilai', 'nilaicol']);
         const dateFields = ['tgl', 'tgl_masuk', 'tgl_ijazah_smp', 'tgl_keluar', 'tgl_ijazah_sma'];
         const validDate = value => {
@@ -1391,10 +1427,11 @@
                     <p class="sub" style="margin:6px 0 10px;font-size:12px">Kolom yang tidak dikenali dapat dipetakan di sini. Kolom wajib: NISN dan Nama.</p>
                     ${I.mappingIssues.map(issue => `<p class="bd e">${escapeHtml(issue)}</p>`).join('')}
                     <div class="tw" style="max-height:260px;overflow:auto">
-                        <table><thead><tr><th>Kolom di Excel</th><th>Status deteksi</th><th>Dibaca sebagai</th></tr></thead><tbody>
+                        <table><thead><tr><th>Kolom di Excel</th><th>Contoh data</th><th>Status deteksi</th><th>Dibaca sebagai</th></tr></thead><tbody>
                             ${detected.columns.map(column => `
                                 <tr>
                                     <td>${escapeHtml(column.header)}</td>
+                                    <td>${escapeHtml(String(column.sample ?? '').slice(0, 40))}</td>
                                     <td><span class="bd ${column.status === 'recognized' ? 'ok' : 'w'}">${column.status === 'recognized' ? 'Dikenali' : escapeHtml(column.reason || 'Perlu pemetaan')}</span></td>
                                     <td><select style="width:100%;font-size:12px;padding:4px" onchange="window.changeStudentColumnMap(${column.index}, this.value)">
                                         <option value="">— abaikan —</option>
@@ -1506,6 +1543,16 @@
         const previewRows = rows;
         const statusByRow = statuses;
         const warningsAccepted = Boolean(I.warningsConfirmed);
+        const importDisabled = readyCount + warningCount <= 0
+            || I.mappingIssues.length > 0
+            || (warningCount > 0 && !warningsAccepted);
+        const importLabel = readyCount + warningCount <= 0
+            ? 'Tidak ada baris valid untuk diimpor'
+            : I.mappingIssues.length > 0
+                ? 'Perbaiki pemetaan kolom sebelum mengimpor'
+                : warningCount > 0 && !warningsAccepted
+                    ? 'Konfirmasi peringatan sebelum mengimpor'
+                    : `⬇ Impor ${readyCount + warningCount} Baris ${t === 'siswa' ? 'ke Data Siswa' : (tLabel[t] || t)}`;
 
         let prevHtml = `
             <div class="card" style="margin-top:14px">
@@ -1521,6 +1568,14 @@
 
                 <div class="bar" style="flex-wrap:wrap;gap:6px;margin-bottom:12px">
                     ${Object.entries(classBreakdown).map(([k, n]) => `<span class="bd ${k === '(Belum Ada Kelas)' ? 'e' : 'ok'}">${escapeHtml(k)}: <b>${n}</b> baris</span>`).join('')}
+                </div>
+
+                ${warningCount ? `<label style="display:flex;gap:8px;align-items:center;margin-bottom:12px;font-size:12px"><input type="checkbox" ${warningsAccepted ? 'checked' : ''} onchange="window.confirmImportWarnings(this.checked)"> Saya telah memeriksa peringatan dan tetap ingin mengimpor baris peringatan.</label>` : ''}
+                <div class="bar" style="margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid #e2e8f0">
+                    <button type="button" id="btn-do-import" class="btn a" style="font-size:12px;padding:6px 12px" ${importDisabled ? 'disabled' : ''} onclick="executeBatchImport()">
+                        ${escapeHtml(importLabel)}
+                    </button>
+                    <button type="button" class="btn o" onclick="resetImportPreview()">Batal / Ganti File</button>
                 </div>
 
                 <div class="tw"><table>
@@ -1540,18 +1595,6 @@
                             </tr>`).join('')}
                     </tbody>
                 </table></div>
-
-                ${warningCount ? `<label style="display:flex;gap:8px;align-items:center;margin-top:12px;font-size:12px"><input type="checkbox" ${warningsAccepted ? 'checked' : ''} onchange="window.confirmImportWarnings(this.checked)"> Saya telah memeriksa peringatan dan tetap ingin mengimpor baris peringatan.</label>` : ''}
-                <div class="bar" style="margin-top:16px;padding-top:14px;border-top:1px solid #e2e8f0">
-                    <button type="button" class="btn o" onclick="resetImportPreview()">Batal / Ganti File</button>
-                    <span class="sp"></span>
-                    ${(readyCount + warningCount) <= 0 || I.mappingIssues.length ?
-                        `<span class="bd e">Tidak ada baris valid untuk diimpor</span>` :
-                        `<button type="button" id="btn-do-import" class="btn a" style="font-size:12px;padding:6px 12px" ${warningCount && !warningsAccepted ? 'disabled' : ''} onclick="executeBatchImport()">
-                            ⬇ Impor ${readyCount + warningCount} Baris ${tLabel[t] || t}
-                        </button>`
-                    }
-                </div>
             </div>`;
 
         container.innerHTML = detHtml + warnHtml + prevHtml;
