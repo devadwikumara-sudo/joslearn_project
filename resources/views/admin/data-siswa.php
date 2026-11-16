@@ -6,13 +6,31 @@
 <style>
     .student-detail-modal{position:fixed;inset:0;z-index:1000;display:none;place-items:center;padding:20px;background:rgba(9,24,43,.62);backdrop-filter:blur(3px)}
     .student-detail-modal.on{display:grid}
-    .student-detail-box{display:flex;flex-direction:column;width:min(1040px,100%);max-height:92vh;overflow:hidden;border:1px solid #dce5ef;border-radius:20px;background:#f5f8fc;box-shadow:0 24px 80px #06172f55}
+    .student-detail-box{display:flex;flex-direction:column;width:min(980px,100%);max-height:92vh;overflow:hidden;border:1px solid #dce5ef;border-radius:20px;background:#f5f8fc;box-shadow:0 24px 80px #06172f55}
     .student-detail-head{display:flex;align-items:center;gap:14px;padding:18px 22px;background:#fff;border-bottom:1px solid #dce5ef}
     .student-detail-head h3{margin:0;color:#12355b;font-size:17px}
     .student-detail-head p{margin:3px 0 0;color:#64748b;font-size:12px}
     .student-detail-close{margin-left:auto;width:36px;height:36px;border:1px solid #dce5ef;border-radius:50%;background:#fff;color:#12355b;font-size:20px;cursor:pointer}
     .student-detail-body{overflow:auto;padding:20px}
     .student-detail-foot{display:flex;justify-content:flex-end;gap:8px;padding:14px 20px;border-top:1px solid #dce5ef;background:#fff}
+    .student-profile{display:grid;gap:12px}
+    .student-profile-identity{display:flex;align-items:center;gap:14px;padding:16px;border-radius:14px;background:linear-gradient(125deg,#12355b,#1d4f85);color:#fff}
+    .student-profile-photo,.student-profile-avatar{display:grid;place-items:center;width:58px;height:58px;flex:none;border:2px solid #ffffff44;border-radius:16px;object-fit:cover}
+    .student-profile-avatar{background:#ffffff20;font-size:23px;font-weight:800}
+    .student-profile-identity h4{margin:0 0 5px;color:#fff;font-size:17px}
+    .student-profile-identity p{margin:0;color:#d9e7f7;font-size:12px}
+    .student-profile-section{padding:15px;border:1px solid var(--ln);border-radius:13px;background:#fff}
+    .student-profile-section h4{margin:0 0 12px;color:var(--p);font-size:12px}
+    .student-profile-history{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px}
+    .student-profile-history-item{display:grid;gap:5px;padding:10px;border:1px solid #e2e8f0;border-radius:10px;color:#475569;font-size:11px}
+    .student-profile-history-item b{color:#1b2430}
+    .student-profile-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 18px}
+    .student-profile-item{min-width:0}
+    .student-profile-item span{display:block;margin-bottom:4px;color:var(--mu);font-size:9px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+    .student-profile-item b{display:block;overflow-wrap:anywhere;color:#1b2430;font-size:11px;white-space:pre-wrap}
+    .student-profile-item a{color:var(--p)}
+    .student-profile-note{grid-column:1/-1}
+    .student-profile-empty{margin:0;color:var(--mu);font-size:11px}
     .student-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
     .student-filters,.student-page-actions,.student-table-actions,.student-row-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
     .student-page-actions{margin-left:auto;justify-content:flex-end}
@@ -22,7 +40,7 @@
     .student-year-filter summary{cursor:pointer;color:var(--mu);white-space:nowrap}
     .student-year-filter form{position:absolute;z-index:5;top:24px;left:0;display:grid;gap:8px;min-width:190px;padding:10px;border:1px solid var(--ln);border-radius:8px;background:#fff;box-shadow:0 6px 18px #0b224020}
     .bulk-move-copy{margin:0;color:#64748b;font-size:12px}
-    @media(max-width:600px){.student-detail-modal{padding:8px}.student-detail-box{max-height:96vh;border-radius:14px}.student-detail-head{padding:14px}.student-detail-body{padding:12px}.student-detail-foot{padding:12px}}
+    @media(max-width:600px){.student-detail-modal{padding:8px}.student-detail-box{max-height:96vh;border-radius:14px}.student-detail-head{padding:14px}.student-detail-body{padding:12px}.student-detail-foot{padding:12px}.student-profile-grid{grid-template-columns:1fr}.student-profile-identity{align-items:flex-start;padding:13px}.student-profile-identity h4{font-size:15px}}
     @media(max-width:700px){.student-page-actions,.student-table-actions{margin-left:0;justify-content:flex-start}.student-toolbar{align-items:flex-start}}
 </style>
 @endpush
