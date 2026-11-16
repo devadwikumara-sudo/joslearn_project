@@ -117,6 +117,17 @@ class ImportStudentMatchingTest extends TestCase
             $table->id();
             $table->string('nama');
             $table->string('nip')->nullable();
+            $table->string('nuptk')->nullable();
+            $table->string('nik')->nullable();
+            $table->string('jenis_kelamin')->nullable();
+            $table->string('tempat_lahir')->nullable();
+            $table->date('tanggal_lahir')->nullable();
+            $table->string('pendidikan_terakhir')->nullable();
+            $table->string('status_kepegawaian')->nullable();
+            $table->unsignedSmallInteger('mulai_bertugas')->nullable();
+            $table->string('nomor_hp')->nullable();
+            $table->string('email')->nullable();
+            $table->string('alamat')->nullable();
             $table->softDeletes();
             $table->timestamps();
         });
@@ -1138,6 +1149,27 @@ class ImportStudentMatchingTest extends TestCase
             ->assertDontSee('loadDemoHadir')
             ->assertDontSee('Jumlah Siswa');
         $this->assertMatchesRegularExpression('/class="[^"]*\bon\b[^"]*" data-menu="import-data"/', $academicImport->getContent());
+    }
+
+    public function test_importing_teacher_biodata_does_not_create_an_account_with_a_default_password(): void
+    {
+        $response = $this->import('guru', [[
+            'nama' => 'Guru Import Uji',
+            'nip' => '1987000001',
+            'email' => 'guru-import@example.test',
+        ]]);
+
+        $response->assertOk()
+            ->assertJsonPath('count', 1)
+            ->assertJsonPath('message', 'Berhasil mengimpor 1 data guru. Akun login dapat dibuat terpisah melalui menu Guru & Master.');
+
+        $this->assertDatabaseHas('guru_biodata', [
+            'nama' => 'Guru Import Uji',
+            'nip' => '1987000001',
+        ]);
+        $this->assertDatabaseMissing('akun_pengguna', [
+            'username' => '1987000001',
+        ]);
     }
 
     public function test_legacy_admin_import_url_redirects_to_the_selected_tab(): void

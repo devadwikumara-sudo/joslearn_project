@@ -562,7 +562,7 @@ class ImportBatchController extends Controller
                     'graduated_count' => $graduatedStudentCount,
                     'created_years' => count($createdYearIds),
                     'created_histories' => count($createdHistoryIds),
-                    'message' => "Berhasil mengimpor {$savedCount} data {$type}".($skippedCount > 0 ? " ({$skippedCount} baris gagal/dilewati)" : '').$creationSummary.'.',
+                    'message' => "Berhasil mengimpor {$savedCount} data {$type}".($skippedCount > 0 ? " ({$skippedCount} baris gagal/dilewati)" : '').$creationSummary.'.'.($type === 'guru' ? ' Akun login dapat dibuat terpisah melalui menu Guru & Master.' : ''),
                     'errors' => $rowErrors,
                     'class_warning' => $type === 'siswa' && $unlinkedCount > 0
                         ? (! $ta
@@ -2114,21 +2114,6 @@ class ImportBatchController extends Controller
                 $guru->update($data);
             } else {
                 $guru = GuruBiodata::create($data);
-            }
-
-            // Buat akun login jika ada NIP
-            if ($guru && $guru->nip) {
-                Pengguna::firstOrCreate(
-                    ['username' => $guru->nip],
-                    [
-                        'peran' => 'guru',
-                        'email' => $guru->email,
-                        'password' => bcrypt('guru123'),
-                        'wajib_ganti_password' => 1,
-                        'aktif' => 1,
-                        'guru_id' => $guru->id,
-                    ]
-                );
             }
 
             $saved++;
