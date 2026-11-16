@@ -4,38 +4,7 @@
 
 @section('content')
 <h2>Kenaikan &amp; Mutasi</h2>
-<p class="sub">Tahun ajaran {{ $taAktif }}. Proses kenaikan kelas dan catat perubahan siswa pada halaman yang sama.</p>
-
-<form method="GET" action="{{ route($routePrefix . '.kenaikan-mutasi') }}" class="card">
-    <input type="hidden" name="tab" value="{{ $tab }}">
-    <div class="bar">
-        <div>
-            <label for="filter-tahun-ajaran">Tahun ajaran</label>
-            <select id="filter-tahun-ajaran" name="tahun_ajaran">
-                @forelse($tahunAjaranList as $tahunAjaran)
-                    <option value="{{ $tahunAjaran->id }}" {{ (int) $taAktifId === (int) $tahunAjaran->id ? 'selected' : '' }}>
-                        {{ $tahunAjaran->nama }}
-                    </option>
-                @empty
-                    <option value="">{{ $taAktif }}</option>
-                @endforelse
-            </select>
-        </div>
-        <div>
-            <label for="filter-kelas">Kelas</label>
-            <select id="filter-kelas" name="kelas">
-                @if($isAdmin)
-                    <option value="*" {{ $kelasAsal === '*' ? 'selected' : '' }}>Semua kelas</option>
-                @endif
-                @foreach($kelasAsalList as $namaKelas)
-                    <option value="{{ $namaKelas }}" {{ $kelasAsal === $namaKelas ? 'selected' : '' }}>{{ $namaKelas }}</option>
-                @endforeach
-            </select>
-        </div>
-        <span class="sp"></span>
-        <button type="submit" class="btn o">Terapkan filter</button>
-    </div>
-</form>
+<p class="sub">Tahun ajaran {{ $taAktif }} · proses kenaikan kelas dan catat perubahan siswa.</p>
 
 <nav class="seg" aria-label="Tab Kenaikan dan Mutasi">
     <a
@@ -51,6 +20,28 @@
         >Mutasi Siswa</a>
     @endif
 </nav>
+
+<form method="GET" action="{{ route($routePrefix . '.kenaikan-mutasi') }}" class="page-filter">
+    <input type="hidden" name="tab" value="{{ $tab }}">
+    <select name="tahun_ajaran" aria-label="Tahun ajaran" onchange="this.form.submit()">
+        @forelse($tahunAjaranList as $tahunAjaran)
+            <option value="{{ $tahunAjaran->id }}" {{ (int) $taAktifId === (int) $tahunAjaran->id ? 'selected' : '' }}>
+                Tahun ajaran {{ $tahunAjaran->nama }}
+            </option>
+        @empty
+            <option value="">Tahun ajaran {{ $taAktif }}</option>
+        @endforelse
+    </select>
+    <select name="kelas" aria-label="Kelas" onchange="this.form.submit()">
+        @if($isAdmin)
+            <option value="*" {{ $kelasAsal === '*' ? 'selected' : '' }}>Semua kelas</option>
+        @endif
+        @foreach($kelasAsalList as $namaKelas)
+            <option value="{{ $namaKelas }}" {{ $kelasAsal === $namaKelas ? 'selected' : '' }}>Kelas {{ $namaKelas }}</option>
+        @endforeach
+    </select>
+    <noscript><button type="submit" class="btn o">Terapkan</button></noscript>
+</form>
 
 @if($tab === 'kenaikan')
     @include('admin._kenaikan-mutasi-kenaikan')
