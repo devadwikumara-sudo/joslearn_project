@@ -202,15 +202,15 @@
 
     // ─── Kamus Alias Header (Mendukung Format Apapun) ─────────────────────────
     const ALX = {
-        nisn: 'nisn|nomor induk siswa nasional',
-        nis: 'nis|nomor induk|no induk|nomor induk siswa|no induk siswa|nipd',
-        nama: 'nama|nama lengkap|nama siswa|nama peserta didik|nama murid|peserta didik|siswa',
+        nisn: 'nisn|nomor induk siswa nasional|nomor induk nasional|no induk nasional|national student number',
+        nis: 'nis|nomor induk|no induk|nomor induk siswa|no induk siswa|nomor induk peserta didik|no induk peserta didik|nipd|student id',
+        nama: 'nama|nama lengkap|nama siswa|nama peserta didik|nama murid|nama peserta|nama guru|nama pengajar|nama pendidik|nama tenaga pendidik|peserta didik|siswa|student name|teacher name|full name',
         panggilan: 'nama panggilan|panggilan',
         jk: 'jk|l p|jenis kelamin|gender|kelamin',
         tmp: 'tempat lahir|tmp lahir|kota lahir',
         tgl: 'tanggal lahir|tgl lahir|tgl lhr',
-        kelas: 'kelas|kelas saat ini|kelas sekarang|rombel|rombongan belajar|nama rombel|kls',
-        tahun_ajaran: 'tahun ajaran|tahunajaran|tahun pelajaran|academic year|ta',
+        kelas: 'kelas|kelas saat ini|kelas sekarang|kelas belajar|rombel|rombongan belajar|nama rombel|kls|class|learning group',
+        tahun_ajaran: 'tahun ajaran|tahunajaran|tahun pelajaran|academic year|school year|ta',
         alasan_keluar: 'alasan keluar|alasan meninggalkan sekolah|keluar karena',
         tgl_keluar: 'tgl keluar|tanggal keluar|tanggal lulus|tgl lulus',
         kelas_keluar: 'kelas keluar|keluar kelas|kelas terakhir',
@@ -243,7 +243,7 @@
         kab: 'kabupaten|kota|kabupaten kota|kab',
         prov: 'provinsi|prov',
         kodepos: 'kode pos|kodepos',
-        hp: 'hp|no hp|nomor hp|telepon|no telepon|nomor telepon|nomor telepon hp|no telp|telp',
+        hp: 'hp|no hp|nomor hp|telepon|no telepon|nomor telepon|nomor telepon hp|no telp|telp|handphone|no handphone|nomor handphone|telepon seluler|mobile phone|phone number',
         tinggal: 'tinggal dengan|jenis tinggal|tempat tinggal',
         jarak: 'jarak|jarak ke sekolah',
         gol_darah: 'gol darah|golongan darah|darah',
@@ -296,17 +296,17 @@
         kerja: 'pekerjaan|kerja',
         gaji: 'penghasilan|penghasilan per bulan|gaji',
         ket: 'keterangan|keadaan',
-        sakit: 'sakit',
-        izin: 'izin|ijin',
-        alpa: 'alpa|alpha|alfa|tanpa keterangan',
+        sakit: 'sakit|jumlah hari sakit|hari sakit|sick days',
+        izin: 'izin|ijin|jumlah hari izin|jumlah hari ijin|hari izin|hari ijin|excused days',
+        alpa: 'alpa|alpha|alfa|tanpa keterangan|jumlah hari alpa|jumlah hari alpha|hari alpa|unexcused absence',
         kokur: 'kokurikuler|deskripsi kokurikuler|catatan kokurikuler|deskripsi nilai kokurikuler',
-        ekskul: 'ekskul|ekstrakurikuler|ekstra kurikuler|nama ekskul|kegiatan ekstrakurikuler',
-        predikat: 'predikat|nilai ekskul',
+        ekskul: 'ekskul|ekstrakurikuler|ekstra kurikuler|nama ekskul|kegiatan ekstrakurikuler|kegiatan ekstrakurikuler yang diikuti|nama kegiatan ekstrakurikuler|extracurricular activity',
+        predikat: 'predikat|nilai ekskul|nilai predikat|predikat nilai|grade',
         sem: 'semester|smt',
-        mapelcol: 'mata pelajaran|mapel|nama mapel',
-        nilaicol: 'nilai|nilai akhir|skor|nilai rapor',
-        nip: 'nip|nomor induk pegawai',
-        nuptk: 'nuptk',
+        mapelcol: 'mata pelajaran|mapel|nama mapel|nama mata pelajaran|subject',
+        nilaicol: 'nilai|nilai akhir|skor|nilai rapor|nilai siswa|score',
+        nip: 'nip|nomor induk pegawai|nip guru|employee number',
+        nuptk: 'nuptk|nomor unik pendidik dan tenaga kependidikan|unique educator number',
         mulai_bertugas: 'mulai bertugas|tahun masuk|sejak tahun',
         status: 'status|status kepegawaian|status siswa|status peserta didik|status kelulusan|status alumni|kelulusan|alumni'
     };
@@ -570,11 +570,18 @@
             if (name === excludedSheet) continue;
             const rows = readRows(w.Sheets[name]);
             for (let rowIndex = 0; rowIndex < Math.min(rows.length, 30); rowIndex++) {
-                const fields = (rows[rowIndex] || []).map(fieldOf);
+                const headers = rows[rowIndex] || [];
+                const fields = headers.map(fieldOf);
                 const exitScore = fields.filter(field => exitFields.includes(field)).length;
-                if (!fields.includes('nis') || exitScore < 1) continue;
+                let nisIndex = fields.indexOf('nis');
+                if (nisIndex < 0) {
+                    nisIndex = headers.findIndex((header, index) => index > 0
+                        && nz(header) === 'induk'
+                        && ['no', 'nomor'].includes(nz(headers[index - 1])));
+                }
+                if (nisIndex < 0 || exitScore < 1) continue;
                 if (!best || exitScore > best.exitScore) {
-                    best = {name, rows, rowIndex, fields, exitScore, detected: true};
+                    best = {name, rows, rowIndex, fields, nisIndex, exitScore, detected: true};
                 }
             }
         }
@@ -588,6 +595,7 @@
             rows: XLSX.utils.sheet_to_json(w.Sheets[legacyName], {header: 1, defval: ''}),
             rowIndex: -1,
             fields: [],
+            nisIndex: -1,
             detected: false
         };
     }
@@ -600,8 +608,9 @@
     }
 
     // ─── Pembaca biodata berdasarkan judul kolom ──────────────────────────────
-    function realRows(w, columnOverrides = {}) {
-        const sheetRows = w.SheetNames.filter(name => !/^(?:kontrol\s*induk|petunjuk)$/i.test(String(name).trim())).map(name => ({
+    function realRows(w, columnOverrides = {}, targetSheetName = null) {
+        const sheetRows = w.SheetNames.filter(name => !/^(?:kontrol\s*induk|petunjuk)$/i.test(String(name).trim())
+            && (targetSheetName === null || name === targetSheetName)).map(name => ({
             name,
             rows: readRows(w.Sheets[name])
         }));
@@ -684,7 +693,9 @@
         const controlColumn = (field, fallback = -1) => control?.detected
             ? (controlHeaderCounts[field] === 1 ? controlHeaderFields.indexOf(field) : -1)
             : fallback;
-        const controlNisIndex = controlColumn('nis', CI('C'));
+        const controlNisIndex = control?.detected
+            ? control.nisIndex
+            : controlColumn('nis', CI('C'));
         const controlDataStart = control?.detected ? control.rowIndex + 1 : 5;
         const controlMap = {};
         controlRows.slice(controlDataStart).forEach(row => {
@@ -844,6 +855,13 @@
                 && (!best || stats.score > best.sc
                     || (stats.score === best.sc && stats.identityScore > best.idf))) {
                 best = {r, sc: stats.score, idf: stats.identityScore};
+            }
+        }
+
+        if (!best) {
+            const header = findUnmappedHeader(aoa);
+            if (header) {
+                best = {r: header.rowIndex, sc: header.score, idf: 0};
             }
         }
 
@@ -1277,7 +1295,16 @@
             fileName: '',
             newM: [],
             errors: [],
-            warns: []
+            warns: [],
+            allWorkbook: null,
+            allSheets: [],
+            allGroups: [],
+            allIssues: [],
+            allDictionaries: {},
+            allFormats: {},
+            allBatchActive: false,
+            mappingCorrectionOverride: null,
+            formatIdOverride: null
         }
     };
     let studentWorkbook = null;
@@ -1761,6 +1788,518 @@
         a.click();
     };
 
+    const ALL_IMPORT_TYPES = ['siswa', 'nilai', 'hadir', 'ekskul'];
+    const ALL_IMPORT_LABELS = {
+        siswa: 'Siswa / Alumni',
+        nilai: 'Nilai',
+        hadir: 'Kehadiran',
+        ekskul: 'Ekskul'
+    };
+
+    function detectAllImportType(name, aoa) {
+        const sheetName = nz(name);
+        if (/nilai|rapor|mapel/.test(sheetName)) return 'nilai';
+        if (/kehadiran|absen|absensi|hadir/.test(sheetName)) return 'hadir';
+        if (/ekskul|ekstrakurikuler|ekstra kurikuler/.test(sheetName)) return 'ekskul';
+        if (/guru|pendidik|teacher/.test(sheetName)) return 'guru';
+
+        const detected = analyze(name, aoa, null);
+        const fields = Object.values(detected?.map || {});
+        if (fields.some(field => field.startsWith('m:')) || (fields.includes('mapelcol') && fields.includes('nilaicol'))) {
+            return 'nilai';
+        }
+        if (fields.includes('ekskul') || fields.includes('predikat')) return 'ekskul';
+        if (['sakit', 'izin', 'alpa', 'kokur'].some(field => fields.includes(field))) return 'hadir';
+        if (fields.includes('nip') || fields.includes('nuptk')) return 'guru';
+        if (fields.includes('nama') && ['nisn', 'nis', 'kelas', 'jk', 'agama', 'tmp', 'tgl'].some(field => fields.includes(field))) {
+            return 'siswa';
+        }
+        if (/siswa|peserta didik|biodata|induk/.test(sheetName)) return 'siswa';
+
+        return null;
+    }
+
+    function studentMapByColumn(detection) {
+        return Object.fromEntries(Object.entries(detection?.mapping || {}).map(([field, index]) => [index, field]));
+    }
+
+    async function loadAllSheetType(sheet, type, metadataReady = false) {
+        const I = S.imp;
+        I.dictionaries = metadataReady
+            ? (I.allDictionaries[type] || {columns: {}, subjects: {}})
+            : {columns: {}, subjects: {}};
+        const preliminary = analyze(sheet.name, sheet.aoa, type);
+        const headers = preliminary?.heads || sheet.headers || [];
+        const backendType = type === 'hadir' ? 'kehadiran' : type;
+        if (!metadataReady) {
+            const metadata = await postImportJson(importEndpoint('metadata'), {
+                type: backendType,
+                sheets: [{name: sheet.name, headers}]
+            });
+            I.allDictionaries[type] = metadata.dictionaries || {columns: {}, subjects: {}};
+            I.allFormats[sheet.name] = savedFormatFor(metadata.formats, 0);
+        }
+        const format = I.allFormats[sheet.name] || null;
+        sheet.type = type;
+        sheet.ignored = false;
+        I.dictionaries = I.allDictionaries[type];
+
+        if (type === 'siswa') {
+            const overrides = {};
+            if (format?.mapping) {
+                Object.entries(format.mapping).forEach(([column, mapping]) => {
+                    if (Number.isInteger(Number(column))) overrides[column] = mapping;
+                });
+                sheet.formatId = format.format_id;
+            }
+            const result = realRows(I.allWorkbook, overrides, sheet.name);
+            sheet.detection = result.detection;
+            sheet.error = result.error;
+            sheet.rows = result.rows;
+            sheet.headers = result.detection?.headers || headers;
+            sheet.heads = sheet.headers;
+            sheet.hr = Math.max(0, Number(result.detection?.headerRow || 1) - 1);
+            sheet.studentOverrides = overrides;
+            sheet.studentBaseOverrides = {...overrides};
+            sheet.studentInitialMap = studentMapByColumn(result.detection);
+            sheet.studentCorrections = {};
+            return;
+        }
+
+        const analyzed = analyze(sheet.name, sheet.aoa, type);
+        if (!analyzed) {
+            throw new Error(`Baris judul sheet "${sheet.name}" tidak dapat ditemukan.`);
+        }
+        applyFormatMapping(analyzed, format);
+        assignX(analyzed, type);
+        analyzed.initialMap = {...analyzed.map};
+        analyzed.correctedMap = {};
+        Object.assign(sheet, analyzed, {
+            type,
+            headers: analyzed.heads,
+            formatId: format?.format_id || null,
+            ignored: false
+        });
+    }
+
+    function rebuildAllGroups() {
+        const I = S.imp;
+        const groups = ALL_IMPORT_TYPES.map(type => {
+            const sheets = (I.allSheets || []).filter(sheet => sheet.type === type && !sheet.ignored);
+            if (!sheets.length) return null;
+
+            let rows;
+            let newM = [];
+            if (type === 'siswa') {
+                rows = sheets.flatMap(sheet => sheet.rows || []);
+            } else {
+                const temporary = {t: type, raws: sheets, newM: []};
+                rows = buildRows(temporary);
+                newM = temporary.newM;
+            }
+
+            const issues = type === 'siswa'
+                ? sheets.flatMap(sheet => {
+                    const missing = (sheet.detection?.missingRequired || []).map(field =>
+                        `Sheet "${sheet.name}": kolom wajib ${field === 'nisn' ? 'NISN' : 'Nama'} belum dipetakan.`
+                    );
+                    return [...missing, ...(sheet.error ? [sheet.error] : [])];
+                })
+                : mappingIssues({t: type, raws: sheets, newM});
+            I.newM = newM;
+            const validation = validateRows(rows, type);
+            return {
+                type,
+                sheets,
+                rows,
+                newM,
+                mappingIssues: [...new Set(issues)],
+                ...validation
+            };
+        }).filter(Boolean);
+
+        const unclassified = (I.allSheets || []).filter(sheet => !sheet.ignored && !ALL_IMPORT_TYPES.includes(sheet.type));
+        I.allIssues = unclassified.map(sheet =>
+            `Sheet "${sheet.name}" belum dikenali. Pilih jenis datanya atau abaikan sheet tersebut.`
+        );
+        I.allGroups = groups;
+        I.mappingIssues = [...I.allIssues, ...groups.flatMap(group => group.mappingIssues)];
+        I.errors = groups.flatMap(group => group.errors);
+        I.warns = groups.flatMap(group => group.warns);
+        I.rows = groups.flatMap(group => group.rows);
+        I.statuses = groups.flatMap(group => group.statuses);
+        I.newM = groups.flatMap(group => group.newM);
+    }
+
+    function allSheetMappingHtml(sheet, sheetIndex) {
+        const I = S.imp;
+        const typeOptions = [
+            ['', 'Pilih jenis sheet'],
+            ['siswa', ALL_IMPORT_LABELS.siswa],
+            ['nilai', ALL_IMPORT_LABELS.nilai],
+            ['hadir', ALL_IMPORT_LABELS.hadir],
+            ['ekskul', ALL_IMPORT_LABELS.ekskul],
+            ['abaikan', 'Abaikan sheet ini']
+        ];
+        const selectedType = sheet.ignored ? 'abaikan' : (sheet.type || '');
+        const typeSelect = `
+            <label>Jenis data
+                <select onchange="window.changeAllSheetType(${sheetIndex}, this.value)">
+                    ${typeOptions.map(([value, label]) => `<option value="${value}" ${selectedType === value ? 'selected' : ''}>${escapeHtml(label)}</option>`).join('')}
+                </select>
+            </label>`;
+        if (!ALL_IMPORT_TYPES.includes(sheet.type) || sheet.ignored) {
+            const note = sheet.type === 'guru'
+                ? 'Data guru tidak termasuk tombol Import Semua.'
+                : (sheet.ignored ? 'Sheet ini tidak akan diimpor.' : 'Pilih jenis untuk melanjutkan deteksi kolom.');
+            return `<div class="card" style="margin-top:10px"><strong>Sheet “${escapeHtml(sheet.name)}”</strong>${typeSelect}<p class="sub">${escapeHtml(note)}</p></div>`;
+        }
+
+        const columns = sheet.type === 'siswa'
+            ? (sheet.detection?.columns || [])
+            : (sheet.heads || []).map((header, index) => ({
+                index,
+                header: String(header ?? ''),
+                sample: sheet.aoa?.[sheet.hr + 1]?.[index] ?? '',
+                field: sheet.map?.[index] || ''
+            })).filter(column => column.header !== '');
+        const fields = sheet.type === 'siswa'
+            ? [...new Set([...Object.values(RMAP), ...Object.values(KMAP)])]
+            : FOPT(sheet.type).map(([field]) => field);
+        const currentStudentMap = sheet.type === 'siswa'
+            ? {...sheet.studentInitialMap, ...(sheet.studentOverrides || {})}
+            : {};
+        const mappingRows = columns.map(column => {
+            const field = sheet.type === 'siswa'
+                ? (currentStudentMap[column.index] || '')
+                : (sheet.map?.[column.index] || '');
+            return `<tr>
+                <td>${escapeHtml(column.header)}</td>
+                <td>${escapeHtml(String(column.sample ?? '').slice(0, 40))}</td>
+                <td>
+                    <select onchange="window.changeAllColumnMap(${sheetIndex}, ${column.index}, this.value)">
+                        <option value="">— abaikan —</option>
+                        ${fields.map(option => `<option value="${escapeHtml(option)}" ${field === option ? 'selected' : ''}>${escapeHtml(FL[option] || SN[option] || option)}</option>`).join('')}
+                    </select>
+                </td>
+            </tr>`;
+        }).join('');
+
+        return `<div class="card" style="margin-top:10px">
+            <div class="bar" style="justify-content:space-between"><strong>Sheet “${escapeHtml(sheet.name)}”</strong>${typeSelect}</div>
+            <p class="sub">Jenis: ${escapeHtml(ALL_IMPORT_LABELS[sheet.type])} · baris judul ${sheet.hr + 1} · ${sheet.rows?.length ?? 0} baris terbaca</p>
+            <details>
+                <summary style="cursor:pointer;font-weight:600">Periksa / ubah pemetaan kolom</summary>
+                <div class="tw" style="max-height:240px;overflow:auto"><table>
+                    <thead><tr><th>Kolom Excel</th><th>Contoh</th><th>Dibaca sebagai</th></tr></thead>
+                    <tbody>${mappingRows}</tbody>
+                </table></div>
+            </details>
+        </div>`;
+    }
+
+    function renderAllPreview() {
+        const I = S.imp;
+        const container = document.getElementById('josbook-import-preview-area');
+        if (!container) return;
+
+        rebuildAllGroups();
+        const errorCount = I.allGroups.reduce((count, group) => count + group.errors.length, 0);
+        const warningCount = I.allGroups.reduce((count, group) => count + group.warns.length, 0);
+        const readyCount = I.allGroups.reduce((count, group) => count + group.statuses.filter(status => status.status === 'ready').length, 0);
+        const blocking = I.mappingIssues.length > 0 || errorCount > 0;
+        const missingTypes = ALL_IMPORT_TYPES.filter(type => !I.allGroups.some(group => group.type === type));
+        const groupHtml = I.allGroups.map(group => {
+            const errors = group.errors.map(error =>
+                `<li>Baris ${error.no} · ${escapeHtml(error.id)}: ${escapeHtml(error.msg)}</li>`
+            ).join('');
+            const warnings = group.warns.map(warning =>
+                `<li>Baris ${warning.no} · ${escapeHtml(warning.id)}: ${escapeHtml(warning.msg)}</li>`
+            ).join('');
+            const keys = [...new Set(group.rows.slice(0, 15).flatMap(row => Object.keys(row).filter(key => !key.startsWith('__'))))].slice(0, 8);
+            const previewRows = group.rows.slice(0, 15).map((row, index) => {
+                const status = group.statuses[index];
+                return `<tr><td>${index + 1}</td><td>${escapeHtml(status?.status || 'siap')}</td>${keys.map(key => `<td>${escapeHtml(row[key] ?? '')}</td>`).join('')}</tr>`;
+            }).join('');
+            const messages = [
+                ...group.mappingIssues.map(issue => `<li>${escapeHtml(issue)}</li>`),
+                errors,
+                warnings
+            ].filter(Boolean).join('');
+            return `<div class="card" style="margin-top:12px">
+                <h3>${escapeHtml(ALL_IMPORT_LABELS[group.type])} · ${group.rows.length} baris</h3>
+                <div class="bar"><span class="bd ok">${group.statuses.filter(status => status.status === 'ready').length} Siap</span>
+                    ${group.warns.length ? `<span class="bd w">${group.warns.length} Peringatan</span>` : ''}
+                    ${group.errors.length ? `<span class="bd e">${group.errors.length} Error</span>` : ''}
+                </div>
+                ${messages ? `<details open style="margin-top:8px"><summary>Perlu diperiksa (${group.mappingIssues.length + group.errors.length + group.warns.length})</summary><ul>${messages}</ul></details>` : ''}
+                <div class="tw" style="margin-top:8px;max-height:280px;overflow:auto"><table>
+                    <thead><tr><th>#</th><th>Status</th>${keys.map(key => `<th>${escapeHtml(FL[key] || SN[key] || key)}</th>`).join('')}</tr></thead>
+                    <tbody>${previewRows}</tbody>
+                </table></div>
+            </div>`;
+        }).join('');
+        const sheetHtml = (I.allSheets || []).map(allSheetMappingHtml).join('');
+        const issuesHtml = I.allIssues.length
+            ? `<div class="card" style="margin-top:12px;border-left:3px solid #c0392b"><strong>Sheet belum dipetakan</strong><ul>${I.allIssues.map(issue => `<li>${escapeHtml(issue)}</li>`).join('')}</ul></div>`
+            : '';
+        const warningsAccepted = Boolean(I.warningsConfirmed);
+        const disabled = blocking || I.allGroups.length === 0 || (warningCount > 0 && !warningsAccepted);
+        const missingHtml = missingTypes.length
+            ? `<p class="sub">Sheet untuk kategori berikut tidak ditemukan: ${missingTypes.map(type => escapeHtml(ALL_IMPORT_LABELS[type])).join(', ')}.</p>`
+            : '';
+
+        container.innerHTML = `
+            <div class="card" style="margin-top:14px">
+                <h3>Deteksi otomatis workbook</h3>
+                <p class="sub">${escapeHtml(I.fileName)} · ${I.allSheets.length} sheet diperiksa</p>
+                <div class="bar">
+                    <span class="bd ok">${readyCount} baris siap</span>
+                    ${warningCount ? `<span class="bd w">${warningCount} peringatan</span>` : ''}
+                    ${errorCount ? `<span class="bd e">${errorCount} error</span>` : ''}
+                </div>
+                ${missingHtml}
+                ${I.allIssues.length ? `<p class="bd e">Pilih jenis atau abaikan setiap sheet yang belum dikenali sebelum melanjutkan.</p>` : ''}
+                ${errorCount || I.mappingIssues.some(issue => !I.allIssues.includes(issue))
+                    ? `<p class="bd e">Semua kategori ditahan sampai pemetaan dan baris error diperbaiki.</p>` : ''}
+                ${warningCount ? `<label style="display:flex;gap:8px;align-items:center;margin:10px 0"><input type="checkbox" ${warningsAccepted ? 'checked' : ''} onchange="window.confirmAllImportWarnings(this.checked)"> Saya telah memeriksa peringatan di semua kategori.</label>` : ''}
+                <div class="bar" style="margin-top:12px">
+                    <button type="button" id="btn-do-import" class="btn a" ${disabled ? 'disabled' : ''} onclick="window.executeAllBatchImport()">
+                        ${blocking ? 'Perbaiki semua validasi terlebih dahulu' : `Impor Semua Data (${I.allGroups.length} kategori)`}
+                    </button>
+                    <button type="button" class="btn o" onclick="window.resetImportPreview()">Batal / Ganti File</button>
+                </div>
+            </div>
+            ${issuesHtml}
+            ${sheetHtml}
+            ${groupHtml}`;
+    }
+
+    async function prepareAllWorkbook(workbook, fileName) {
+        const I = S.imp;
+        I.t = 'semua';
+        I.fileName = fileName || 'import.xlsx';
+        I.allWorkbook = workbook;
+        I.allSheets = [];
+        I.allGroups = [];
+        I.allIssues = [];
+        I.allDictionaries = {};
+        I.allFormats = {};
+        I.dictionaries = {columns: {}, subjects: {}};
+        I.mappingIssues = [];
+        I.warningsConfirmed = false;
+
+        const sheetNames = workbook.SheetNames.filter(name =>
+            !/^(?:kontrol\s*induk|petunjuk)$/i.test(String(name).trim())
+        );
+        I.allSheets = sheetNames.map(name => {
+            const aoa = readRows(workbook.Sheets[name]);
+            const preliminary = analyze(name, aoa, null);
+            const type = detectAllImportType(name, aoa);
+            return {
+                name,
+                aoa,
+                type,
+                ignored: type === 'guru',
+                headers: preliminary?.heads || [],
+                heads: preliminary?.heads || [],
+                hr: preliminary?.hr || 0
+            };
+        }).filter(sheet => sheet.aoa.some(row => row?.some(value => String(value ?? '').trim() !== '')));
+
+        I.dictionaries = {columns: {}, subjects: {}};
+        for (const type of ALL_IMPORT_TYPES) {
+            const sheets = I.allSheets.filter(sheet => sheet.type === type);
+            if (!sheets.length) continue;
+            const metadata = await postImportJson(importEndpoint('metadata'), {
+                type: type === 'hadir' ? 'kehadiran' : type,
+                sheets: sheets.map(sheet => ({name: sheet.name, headers: sheet.headers}))
+            });
+            I.allDictionaries[type] = metadata.dictionaries || {columns: {}, subjects: {}};
+            sheets.forEach((sheet, index) => {
+                I.allFormats[sheet.name] = savedFormatFor(metadata.formats, index);
+            });
+        }
+
+        for (const sheet of I.allSheets) {
+            if (!ALL_IMPORT_TYPES.includes(sheet.type)) continue;
+            await loadAllSheetType(sheet, sheet.type, true);
+        }
+        renderAllPreview();
+    }
+
+    window.changeAllSheetType = async function(sheetIndex, type) {
+        const I = S.imp;
+        const sheet = I.allSheets?.[sheetIndex];
+        if (!sheet) return;
+        if (type === 'abaikan') {
+            sheet.type = null;
+            sheet.ignored = true;
+            sheet.ignoredReason = 'Diabaikan oleh admin.';
+        } else if (ALL_IMPORT_TYPES.includes(type)) {
+            try {
+                await loadAllSheetType(sheet, type);
+            } catch (error) {
+                alert(`Sheet "${sheet.name}" tidak dapat dipetakan: ${error.message}`);
+                sheet.type = null;
+                sheet.ignored = false;
+            }
+        }
+        I.warningsConfirmed = false;
+        renderAllPreview();
+    };
+
+    window.changeAllColumnMap = function(sheetIndex, columnIndex, field) {
+        const I = S.imp;
+        const sheet = I.allSheets?.[sheetIndex];
+        if (!sheet || !ALL_IMPORT_TYPES.includes(sheet.type)) return;
+        if (sheet.type === 'siswa') {
+            sheet.studentOverrides ||= {};
+            sheet.studentCorrections ||= {};
+            const original = sheet.studentInitialMap?.[columnIndex] || '';
+            if (field === original) {
+                if (Object.prototype.hasOwnProperty.call(sheet.studentBaseOverrides || {}, columnIndex)) {
+                    sheet.studentOverrides[columnIndex] = sheet.studentBaseOverrides[columnIndex];
+                } else {
+                    delete sheet.studentOverrides[columnIndex];
+                }
+                delete sheet.studentCorrections[columnIndex];
+            } else {
+                sheet.studentOverrides[columnIndex] = field;
+                sheet.studentCorrections[columnIndex] = field;
+            }
+            I.dictionaries = I.allDictionaries.siswa || {columns: {}, subjects: {}};
+            const result = realRows(I.allWorkbook, sheet.studentOverrides, sheet.name);
+            sheet.detection = result.detection;
+            sheet.error = result.error;
+            sheet.rows = result.rows;
+            sheet.headers = result.detection?.headers || sheet.headers;
+        } else {
+            sheet.map[columnIndex] = field;
+            sheet.correctedMap ||= {};
+            if (field === (sheet.initialMap?.[columnIndex] || '')) {
+                delete sheet.correctedMap[columnIndex];
+            } else {
+                sheet.correctedMap[columnIndex] = field;
+            }
+        }
+        I.warningsConfirmed = false;
+        renderAllPreview();
+    };
+
+    window.refreshAllImportPreview = function() {
+        readFormOptions();
+        S.imp.warningsConfirmed = false;
+        renderAllPreview();
+    };
+
+    window.confirmAllImportWarnings = function(confirmed) {
+        S.imp.warningsConfirmed = Boolean(confirmed);
+        renderAllPreview();
+    };
+
+    function allMappingCorrections(type, sheets) {
+        if (type === 'siswa') {
+            return sheets.filter(sheet => Object.keys(sheet.studentCorrections || {}).length > 0).map(sheet => ({
+                name: sheet.name,
+                header_row: sheet.detection?.headerRow || sheet.hr + 1,
+                headers: sheet.headers || [],
+                mapping: {...(sheet.detection?.mapping || {}), ...(sheet.studentOverrides || {})},
+                corrected: sheet.studentCorrections
+            }));
+        }
+
+        return sheets.filter(sheet => Object.keys(sheet.correctedMap || {}).length > 0).map(sheet => ({
+            name: sheet.name,
+            header_row: sheet.hr + 1,
+            headers: sheet.heads || [],
+            mapping: sheet.map || {},
+            corrected: sheet.correctedMap
+        }));
+    }
+
+    function renderAllImportResult(summary, failure = null) {
+        const container = document.getElementById('josbook-import-preview-area');
+        if (!container) return;
+        const isSuccess = failure === null;
+        const rows = summary.map(item =>
+            `<li>${escapeHtml(ALL_IMPORT_LABELS[item.type])}: ${item.count} tersimpan${item.skipped ? `, ${item.skipped} gagal/dilewati` : ''}</li>`
+        ).join('');
+        container.innerHTML = `<div class="card" style="margin-top:14px;border-left:4px solid ${isSuccess ? '#27ae60' : '#c0392b'};padding:20px">
+            <h3>${isSuccess ? 'Import Semua selesai' : 'Import Semua berhenti'}</h3>
+            ${failure ? `<p class="bd e">${escapeHtml(failure)}</p>` : ''}
+            ${summary.length ? `<ul>${rows}</ul>` : '<p class="sub">Belum ada kategori yang berhasil diproses.</p>'}
+            <button type="button" class="btn o" onclick="window.resetImportPreview()">⬆ Import File Lain</button>
+        </div>`;
+    }
+
+    window.executeAllBatchImport = async function() {
+        const I = S.imp;
+        readFormOptions();
+        rebuildAllGroups();
+        const errors = I.allGroups.flatMap(group => group.errors);
+        const groupIssues = I.allGroups.flatMap(group => group.mappingIssues);
+        if (I.allIssues.length || groupIssues.length || errors.length) {
+            alert('Semua kategori ditahan. Perbaiki sheet, pemetaan, dan baris error sebelum mengimpor.');
+            renderAllPreview();
+            return;
+        }
+        if (I.warns.length && !I.warningsConfirmed) {
+            alert('Konfirmasikan peringatan di semua kategori sebelum mengimpor.');
+            return;
+        }
+        if (!I.allGroups.some(group => group.rows.length > 0)) {
+            alert('Tidak ada baris siswa, nilai, kehadiran, atau ekskul yang dapat diimpor.');
+            return;
+        }
+
+        I.allBatchActive = true;
+        const summary = [];
+        const orderedGroups = ALL_IMPORT_TYPES.map(type => I.allGroups.find(group => group.type === type)).filter(Boolean);
+        for (const group of orderedGroups) {
+            if (!group.rows.length) continue;
+            I.t = group.type;
+            I.rows = group.rows;
+            I.statuses = group.statuses;
+            I.errors = group.errors;
+            I.warns = group.warns;
+            I.mappingIssues = group.mappingIssues;
+            I.newM = group.newM;
+            I.raws = group.type === 'siswa' ? null : group.sheets;
+            I.detection = group.type === 'siswa' ? group.sheets[0]?.detection : null;
+            I.savedFormats = group.sheets.map(sheet => I.allFormats[sheet.name]).filter(Boolean);
+            I.studentColumnOverrides = group.sheets[0]?.studentOverrides || {};
+            I.studentColumnCorrections = group.sheets[0]?.studentCorrections || {};
+            I.studentOriginalMap = group.sheets[0]?.studentInitialMap || {};
+            I.mappingCorrectionOverride = allMappingCorrections(group.type, group.sheets);
+            I.formatIdOverride = group.sheets.find(sheet => sheet.formatId)?.formatId || null;
+            I.warningsConfirmed = true;
+
+            const result = await window.executeBatchImport();
+            summary.push({
+                type: group.type,
+                count: Number(result?.count) || 0,
+                skipped: Number(result?.skipped) || 0
+            });
+            if (!result) {
+                I.allBatchActive = false;
+                I.t = 'semua';
+                renderAllImportResult(summary, `Impor ${ALL_IMPORT_LABELS[group.type]} gagal; kategori berikutnya tidak diproses.`);
+                return;
+            }
+            if (result.errors?.length || result.skipped > 0) {
+                I.allBatchActive = false;
+                I.t = 'semua';
+                renderAllImportResult(summary, `Server melewati sebagian baris ${ALL_IMPORT_LABELS[group.type]}; kategori berikutnya dihentikan. Periksa laporan batch sebelum mencoba kembali.`);
+                return;
+            }
+        }
+
+        I.allBatchActive = false;
+        I.t = 'semua';
+        renderAllImportResult(summary);
+    };
+
     // ─── Entry Point: Baca File Excel (smartFile) ───────────────────────────────
     window.smartFile = function(e, expectedType) {
         const fileInput = e.target || e;
@@ -1796,6 +2335,18 @@
             I.warningsConfirmed = false;
             I.newM = [];
             I.newX = [];
+            I.allBatchActive = false;
+            I.mappingCorrectionOverride = null;
+            I.formatIdOverride = null;
+
+            if (I.t === 'semua') {
+                try {
+                    await prepareAllWorkbook(w, f.name);
+                } catch (error) {
+                    alert('Workbook tidak dapat dipetakan: ' + error.message);
+                }
+                return;
+            }
 
             try {
                 const metadata = await postImportJson(importEndpoint('metadata'), {type: I.t});
@@ -1918,6 +2469,15 @@
         S.imp.fileName = '';
         S.imp.errors = [];
         S.imp.warns = [];
+        S.imp.allWorkbook = null;
+        S.imp.allSheets = [];
+        S.imp.allGroups = [];
+        S.imp.allIssues = [];
+        S.imp.allDictionaries = {};
+        S.imp.allFormats = {};
+        S.imp.allBatchActive = false;
+        S.imp.mappingCorrectionOverride = null;
+        S.imp.formatIdOverride = null;
         studentWorkbook = null;
         const c = document.getElementById('josbook-import-preview-area');
         if (c) c.innerHTML = '';
@@ -1931,11 +2491,11 @@
 
         if (I.mappingIssues?.length) {
             alert('Perbaiki pemetaan kolom sebelum mengimpor: ' + I.mappingIssues.join(' '));
-            return;
+            return null;
         }
         if (I.warns?.length && !I.warningsConfirmed) {
             alert('Konfirmasikan peringatan sebelum mengimpor.');
-            return;
+            return null;
         }
 
         const invalidRows = new Set((I.statuses || [])
@@ -1944,7 +2504,7 @@
         const rowsToSend = (I.rows || []).filter((row, index) => !invalidRows.has(index));
         if (!rowsToSend.length) {
             alert('Tidak ada baris yang valid untuk diimpor.');
-            return;
+            return null;
         }
 
         const btn = document.getElementById('btn-do-import');
@@ -1974,7 +2534,7 @@
                 btn.disabled = false;
                 btn.textContent = '⬇ Coba Impor Lagi';
             }
-            return;
+            return null;
         }
 
         const payload = {
@@ -1986,8 +2546,8 @@
             mode: I.mode || 'semua',
             kelas: I.kelas || '',
             dup: I.dup || (I.t === 'siswa' ? 'lengkapi' : 'skip'),
-            format_id: I.savedFormats?.find(format => format?.format_id)?.format_id || null,
-            mapping_corrections: mappingCorrections(I),
+            format_id: I.formatIdOverride || I.savedFormats?.find(format => format?.format_id)?.format_id || null,
+            mapping_corrections: I.mappingCorrectionOverride || mappingCorrections(I),
             new_classes: [...new Set(rowsToSend.map(r => normK(r.kelas || '')).filter(Boolean))],
             new_mapel: (I.newM || []).filter(mapel => rowsToSend.some(row => row[mapel.kode] !== '' && row[mapel.kode] != null))
         };
@@ -2038,7 +2598,7 @@
                     : `Berhasil mengimpor ${count} data ${I.t}${skipped ? ` (${skipped} baris gagal/dilewati)` : ''}.`
             };
             const container = document.getElementById('josbook-import-preview-area');
-            if (container) {
+            if (container && !I.allBatchActive) {
                 const escapedErrors = errors.map(error => {
                     const reason = escapeHtml(error.reason || 'Baris dilewati');
                     return `<li>Baris ${Number(error.row) || '-'}: ${reason}</li>`;
@@ -2064,7 +2624,8 @@
                         </div>
                     </div>`;
             }
-            if (window.toast) window.toast(data.message, 4000);
+            if (window.toast && !I.allBatchActive) window.toast(data.message, 4000);
+            return data;
         } catch (error) {
             let message = error.message;
             if (batchId !== null) {
@@ -2082,6 +2643,7 @@
                 btn.disabled = false;
                 btn.textContent = '⬇ Coba Impor Lagi';
             }
+            return null;
         }
     };
 

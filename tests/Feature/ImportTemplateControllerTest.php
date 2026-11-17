@@ -34,6 +34,19 @@ class ImportTemplateControllerTest extends TestCase
             $table->rememberToken();
             $table->timestamps();
         });
+
+        Schema::dropIfExists('sekolah_tahun_ajaran');
+        Schema::create('sekolah_tahun_ajaran', function (Blueprint $table): void {
+            $table->id();
+            $table->string('nama');
+            $table->boolean('sedang_berjalan')->default(false);
+        });
+
+        Schema::dropIfExists('sekolah_kelas');
+        Schema::create('sekolah_kelas', function (Blueprint $table): void {
+            $table->id();
+            $table->string('nama');
+        });
     }
 
     /**
@@ -89,5 +102,20 @@ class ImportTemplateControllerTest extends TestCase
         $this->assertStringContainsString('Header/urutan kolom boleh berbeda', (string) $workbook->getSheetByName('Petunjuk')->getCell('A2')->getValue());
         $this->assertStringContainsString('Tidak ada baris contoh', $workbook->getSheetByName('Petunjuk')->getCell('A3')->getValue());
         $workbook->disconnectWorksheets();
+    }
+
+    public function test_admin_can_open_the_combined_import_tab(): void
+    {
+        $admin = Pengguna::create([
+            'peran' => 'admin',
+            'username' => 'combined-import-admin',
+            'password' => 'unused',
+            'aktif' => true,
+        ]);
+
+        $this->actingAs($admin)->get(route('admin.import', ['tab' => 'semua']))
+            ->assertOk()
+            ->assertSee('Import Semua Data')
+            ->assertSee('Kelas siswa default');
     }
 }

@@ -124,6 +124,14 @@ class AlumniController extends Controller
         ], static fn ($value): bool => $value !== null && $value !== '');
 
         $selectedAlumni = $alumni->firstWhere('id', $selectedStudentId);
+        $activeAcademicYearId = SekolahTahunAjaran::query()
+            ->where('sedang_berjalan', true)
+            ->value('id');
+        $canCancelGraduation = $activeAcademicYearId !== null
+            && ($selectedAlumni?->isGraduated() ?? false)
+            && $selectedAlumni->riwayatKelas->contains(
+                static fn ($history): bool => (int) $history->tahun_ajaran_id === (int) $activeAcademicYearId
+            );
 
         return view('admin.alumni', [
             'aj' => $aj,
@@ -137,6 +145,7 @@ class AlumniController extends Controller
             'panelTab' => $panelTab,
             'selectedStudentId' => $selectedStudentId,
             'selectedAlumni' => $selectedAlumni,
+            'canCancelGraduation' => $canCancelGraduation,
             'panelQuery' => $panelQuery,
         ]);
     }
@@ -144,6 +153,38 @@ class AlumniController extends Controller
     public function show(int $id): RedirectResponse
     {
         return redirect()->route('admin.data-siswa.show', $id);
+    }
+
+    public function editBiodata(Request $request, int $id, FormPendataanController $formPendataan): View
+    {
+        $siswa = SiswaBiodata::alumni()
+            ->with([
+                'berkas',
+                'riwayatKelas' => static function ($query): void {
+                    $query->with(['kelas', 'tahunAjaran'])->orderByDesc('tahun_ajaran_id');
+                },
+            ])
+            ->findOrFail($id);
+
+        $formData = $formPendataan->formOptions($siswa);
+        $formData['alumniEdit'] = true;
+        $formData['alumniReturn'] = [
+            'tab' => $this->selectedPanelTab($request->query('tab')),
+            'aj' => $this->selectedType($request),
+            'ay' => $this->queryString($request, 'ay'),
+            'aq' => trim($this->queryString($request, 'aq')),
+            'page' => $request->integer('page') ?: null,
+        ];
+        $formCloseUrl = route('admin.alumni', array_filter([
+            'tab' => $formData['alumniReturn']['tab'],
+            'aj' => $formData['alumniReturn']['aj'],
+            'ay' => $formData['alumniReturn']['ay'],
+            'aq' => $formData['alumniReturn']['aq'],
+            'page' => $formData['alumniReturn']['page'],
+            'siswa' => $siswa->id,
+        ], static fn ($value): bool => $value !== null && $value !== ''));
+
+        return view('admin.alumni-edit', compact('formData', 'formCloseUrl'));
     }
 
     public function update(Request $request, int $id): RedirectResponse

@@ -3,6 +3,8 @@
     $kelasList = $formData['kelasList'];
     $tahunAjaranList = $formData['tahunAjaranList'];
     $tahunAjaranTerpilih = $formData['tahunAjaranTerpilih'];
+    $alumniEdit = (bool) ($formData['alumniEdit'] ?? false);
+    $alumniReturn = $formData['alumniReturn'] ?? [];
     $tahunAjaranForm = old('tahun_ajaran', $tahunAjaranTerpilih);
     $riwayatTerpilih = $edit?->riwayatKelas->firstWhere('tahunAjaran.nama', $tahunAjaranForm);
     $lampiranBerkas = [
@@ -19,28 +21,28 @@
 @push('styles')
 <style>
     .student-form-backdrop{position:fixed;inset:0;z-index:1100;background:rgba(9,24,43,.62);backdrop-filter:blur(3px)}
-    .student-form-panel{position:fixed;top:0;right:0;z-index:1101;display:flex;flex-direction:column;width:min(940px,100%);height:100dvh;background:#f5f8fc;box-shadow:-18px 0 55px #06172f33}
+    .student-form-panel{position:fixed;top:50%;left:50%;right:auto;z-index:1101;display:flex;flex-direction:column;width:min(940px,calc(100vw - 32px));height:min(90dvh,960px);max-height:calc(100dvh - 32px);transform:translate(-50%,-50%);border:1px solid #dce5ef;border-radius:20px;background:#f5f8fc;box-shadow:0 24px 80px #06172f55}
     .student-form-head{display:flex;align-items:center;gap:14px;padding:16px 20px;background:#fff;border-bottom:1px solid var(--ln)}
     .student-form-head h3{margin:0;color:var(--p);font-size:17px}
     .student-form-head p{margin:3px 0 0;color:var(--mu);font-size:12px}
     .student-form-close{margin-left:auto;width:36px;height:36px;border:1px solid var(--ln);border-radius:50%;background:#fff;color:var(--p);font-size:20px;text-align:center;text-decoration:none}
-    .student-form-body{overflow-y:auto;padding:16px}
-    @media(max-width:600px){.student-form-body{padding:8px}.student-form-head{padding:12px}}
+    .student-form-body{flex:1;min-height:0;overflow-y:auto;padding:16px}
+    @media(max-width:600px){.student-form-panel{width:calc(100vw - 16px);height:96dvh;max-height:calc(100dvh - 16px);border-radius:14px}.student-form-body{padding:8px}.student-form-head{padding:12px}}
 </style>
 @endpush
 
-<a class="student-form-backdrop" href="{{ $cancelUrl }}" aria-label="Tutup form pendataan"></a>
+<a class="student-form-backdrop" href="{{ $cancelUrl }}" aria-label="Tutup form pendataan" onclick="return closeStudentForm(event)"></a>
 <aside id="student-form-panel" class="student-form-panel" role="dialog" aria-modal="true" aria-labelledby="student-form-title">
     <div class="student-form-head">
         <div>
-            <h3 id="student-form-title">{{ $edit ? 'Ubah Data Siswa' : 'Tambah Siswa' }}</h3>
+            <h3 id="student-form-title">{{ $edit ? ($alumniEdit ? 'Ubah Data Alumni' : 'Ubah Data Siswa') : 'Tambah Siswa' }}</h3>
             @if($edit)
                 <p>{{ $edit->nama_lengkap }} · NISN {{ $edit->nisn }}</p>
             @else
                 <p>Lengkapi biodata, riwayat, dan dokumen peserta didik.</p>
             @endif
         </div>
-        <a class="student-form-close" href="{{ $cancelUrl }}" aria-label="Tutup panel">&times;</a>
+        <a class="student-form-close" href="{{ $cancelUrl }}" aria-label="Tutup panel" onclick="return closeStudentForm(event)">&times;</a>
     </div>
     <div class="student-form-body">
         @if($errors->any())
@@ -55,7 +57,9 @@
             </div>
         @endif
         <p class="sub">
-            @if($edit)
+            @if($alumniEdit)
+                Biodata, Kontrol Induk, dan lampiran dapat diperbarui tanpa mengubah riwayat kelas alumni.
+            @elseif($edit)
                 Data pribadi berlaku untuk seluruh tahun ajaran.
             @else
                 Isi bagian yang diperlukan, lalu simpan data siswa.
@@ -69,6 +73,14 @@
     @if($edit)
         @method('PUT')
         <input type="hidden" name="_form_siswa" value="{{ $edit->id }}">
+    @endif
+    @if($alumniEdit)
+        <input type="hidden" name="alumni_edit" value="1">
+        <input type="hidden" name="return_tab" value="{{ $alumniReturn['tab'] ?? 'kontrol-induk' }}">
+        <input type="hidden" name="return_aj" value="{{ $alumniReturn['aj'] ?? '' }}">
+        <input type="hidden" name="return_ay" value="{{ $alumniReturn['ay'] ?? '' }}">
+        <input type="hidden" name="return_aq" value="{{ $alumniReturn['aq'] ?? '' }}">
+        <input type="hidden" name="return_page" value="{{ $alumniReturn['page'] ?? '' }}">
     @endif
 
     <div class="card">
@@ -177,30 +189,32 @@
                     <label>Bahasa Sehari-hari</label>
                     <input type="text" name="bahasa_sehari_hari" value="{{ old('bahasa_sehari_hari', $edit->bahasa_sehari_hari ?? 'Indonesia') }}">
                 </div>
-                <div>
-                    <label>Tahun Ajaran *</label>
-                    <select name="tahun_ajaran" required>
-                        @foreach($tahunAjaranList as $tahunAjaran)
-                            <option value="{{ $tahunAjaran }}" {{ $tahunAjaranForm === $tahunAjaran ? 'selected' : '' }}>{{ $tahunAjaran }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label>Kelas Saat Ini *</label>
-                    <select name="kelas" required>
-                        @foreach($kelasList as $k)
-                            <option value="{{ $k }}" {{ old('kelas', $riwayatTerpilih?->kelas?->nama ?? '') == $k ? 'selected' : '' }}>{{ $k }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label>Status Siswa</label>
-                    <select name="status">
-                        @foreach(['Aktif', 'Pindah keluar', 'Keluar', 'Lulus'] as $st)
-                            <option value="{{ $st }}" {{ old('status', $riwayatTerpilih?->status ?? 'Aktif') == $st ? 'selected' : '' }}>{{ $st }}</option>
-                        @endforeach
-                    </select>
-                </div>
+                @unless($alumniEdit)
+                    <div>
+                        <label>Tahun Ajaran *</label>
+                        <select name="tahun_ajaran" required>
+                            @foreach($tahunAjaranList as $tahunAjaran)
+                                <option value="{{ $tahunAjaran }}" {{ $tahunAjaranForm === $tahunAjaran ? 'selected' : '' }}>{{ $tahunAjaran }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label>Kelas Saat Ini *</label>
+                        <select name="kelas" required>
+                            @foreach($kelasList as $k)
+                                <option value="{{ $k }}" {{ old('kelas', $riwayatTerpilih?->kelas?->nama ?? '') == $k ? 'selected' : '' }}>{{ $k }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label>Status Siswa</label>
+                        <select name="status">
+                            @foreach(['Aktif', 'Pindah keluar', 'Keluar', 'Lulus'] as $st)
+                                <option value="{{ $st }}" {{ old('status', $riwayatTerpilih?->status ?? 'Aktif') == $st ? 'selected' : '' }}>{{ $st }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                @endunless
             </div>
         </div>
 
@@ -560,7 +574,7 @@
         <div class="bar" style="margin-top:18px;border-top:1px solid #e2e8f0;padding-top:14px">
             <button type="button" class="btn o" id="btn-prev" style="display:none">‹ Sebelumnya</button>
             <span class="sp"></span>
-            <a href="{{ $cancelUrl }}" class="btn o">Batal</a>
+            <a href="{{ $cancelUrl }}" class="btn o" onclick="return closeStudentForm(event)">Batal</a>
             <button type="button" class="btn" id="btn-next">Berikutnya ›</button>
             <button type="submit" class="btn a">{{ $edit ? 'Simpan Perubahan' : 'Simpan Data Siswa' }}</button>
         </div>
@@ -571,6 +585,34 @@
 
 @push('scripts')
 <script>
+function closeStudentForm(event) {
+    var closeUrl = @json($cancelUrl);
+    var isAlumniEdit = @json($alumniEdit);
+
+    if (isAlumniEdit) {
+        var referrer = document.referrer;
+        if (referrer && new URL(referrer, window.location.href).origin === window.location.origin) {
+            event.preventDefault();
+            window.history.back();
+            return false;
+        }
+
+        return true;
+    }
+
+    var formPanel = document.getElementById('student-form-panel');
+    if (!formPanel) return true;
+
+    event.preventDefault();
+    formPanel.remove();
+    document.querySelector('.student-form-backdrop')?.remove();
+
+    var destination = new URL(closeUrl, window.location.href);
+    window.history.replaceState(window.history.state, '', destination.pathname + destination.search + destination.hash);
+
+    return false;
+}
+
 (function() {
     var formPanel = document.getElementById('student-form-panel');
     if (!formPanel) return;

@@ -331,6 +331,7 @@ class DataSiswaBulkActionsTest extends TestCase
 
         $response->assertOk()
             ->assertSee('id="student-form-panel"', false)
+            ->assertSee('onclick="return closeStudentForm(event)"', false)
             ->assertSee('Tambah Siswa')
             ->assertSee('name="foto_file"', false)
             ->assertSee('name="berkas[kk]"', false)

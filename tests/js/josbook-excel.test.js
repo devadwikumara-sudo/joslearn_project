@@ -22,6 +22,14 @@ function columnIndex(column) {
     return [...column].reduce((index, letter) => index * 26 + letter.charCodeAt(0) - 64, 0) - 1;
 }
 
+function rowFromColumns(columns) {
+    const row = [];
+    Object.entries(columns).forEach(([column, value]) => {
+        row[columnIndex(column)] = value;
+    });
+    return row;
+}
+
 function workbookFromFixture(fixture) {
     let rows;
     if (fixture.legacyPrefixRows) {
@@ -51,18 +59,30 @@ async function importWorkbook(workbook, expectedType = 'siswa', dictionaries = {
     const window = {toast() {}};
     const preview = {innerHTML: ''};
     let payload = null;
-    const classField = expectedType === 'siswa' ? {value: 'X-1'} : null;
-    const modeField = expectedType === 'siswa' ? {value: 'semua'} : null;
+    const classField = ['siswa', 'semua'].includes(expectedType) ? {value: expectedType === 'semua' ? '*' : 'X-1'} : null;
+    const modeField = ['siswa', 'semua'].includes(expectedType) ? {value: 'semua'} : null;
+    const yearField = expectedType === 'semua' ? {value: '2025/2026'} : null;
+    const semesterField = expectedType === 'semua' ? {value: 'auto'} : null;
+    const duplicateField = expectedType === 'semua' ? {value: 'lengkapi'} : null;
     const csrfMeta = {getAttribute: () => 'csrf-test'};
     const endpointMeta = {getAttribute: () => '/test/save-batch'};
     const baseMeta = {getAttribute: () => '/test'};
     const document = {
         getElementById(id) {
-            return id === 'josbook-import-preview-area' ? preview : null;
+            if (id === 'josbook-import-preview-area') return preview;
+            if (id === 'tahun_ajaran') return yearField;
+            if (id === 'semester') return semesterField;
+            if (id === 'duplikat') return duplicateField;
+            if (id === 'mode') return modeField;
+            if (id === 'kelas') return classField;
+            return null;
         },
         querySelector(selector) {
             if (selector === '[name="kelas"]') return classField;
             if (selector === 'select[name="mode"]') return modeField;
+            if (selector === 'input[name="tahun_ajaran"]') return yearField;
+            if (selector === 'select[name="semester"]') return semesterField;
+            if (selector === 'select[name="duplikat"]') return duplicateField;
             if (selector === 'meta[name="csrf-token"]') return csrfMeta;
             if (selector === 'meta[name="batch-import-url"]') return endpointMeta;
             if (selector === 'meta[name="app-base-url"]') return baseMeta;
@@ -172,7 +192,8 @@ async function importWorkbook(workbook, expectedType = 'siswa', dictionaries = {
         modeField,
         getPayload: () => payload,
         getState: () => JSON.parse(JSON.stringify(window.JosBookState.imp)),
-        runImport: () => window.executeBatchImport()
+        runImport: () => window.executeBatchImport(),
+        runAllImport: () => window.executeAllBatchImport()
     };
 }
 
@@ -341,6 +362,260 @@ test('maps the DATABASE_SISWA workbook headers and links Kontrol Induk by NIS', 
     assert.equal(state.rows[0].no_ijazah_sma, 'IJAZAH-UJI-2025');
     assert.equal(state.rows[0].tgl_ijazah_sma, '2025-05-15');
     assert.equal(state.rows[0].no_transkrip, 'TRANSKRIP-UJI-2025');
+});
+
+test('reads the attached student workbook layout and the first split-Induk control row', async () => {
+    const studentHeaders = rowFromColumns({
+        B: 'No', C: 'Induk', D: 'Nama Peserta Didik', E: 'Nama Panggilan', F: 'NISN',
+        G: 'Jenis Kelamin', H: 'Tempat Lahir', I: 'Tanggal Lahir', J: 'Agama',
+        K: 'Kewarganegaraan', L: 'NIK', M: 'Anak Ke', N: 'Jumlah Saudara Kandung',
+        O: 'Status Anak Yatim/Piatu', P: 'Bahasa Sehari-hari', Q: 'Jalan/Dusun',
+        R: 'RT/RW', S: 'Desa', T: 'Kecamatan', U: 'Kabupaten', V: 'Provinsi',
+        W: 'Kode Pos', X: 'Nomor Telepon/HP', Y: 'Tempat Tinggal', Z: 'Jarak ke sekolah',
+        AA: 'Golongan Darah', AB: 'Penyakit yang diderita', AC: 'Kelainan Jasmani/Fisik',
+        AD: 'Tinggi Badan', AE: 'Berat Badan', AF: 'Sekolah Asal', AG: 'Tanggal Ijazah',
+        AH: 'Nomor Ijazah', AI: 'Lama Belajar', AJ: 'Pindahan', AK: 'Dari Sekolah',
+        AL: 'Alasan', AM: 'Diterima di kelas', AN: 'Rombel Kelas ke', AO: 'Tanggal',
+        AP: 'Nama Ayah Kandung', AQ: 'Agama', AR: 'Kewarganegaraan',
+        AS: 'Pendidikan Terakhir', AT: 'Pekerjaan', AU: 'Penghasilan per bulan',
+        AV: 'Nomor Telepon/HP', AW: 'Keadaan', AX: 'Nama Ibu Kandung', AY: 'Agama',
+        AZ: 'Kewarganegaraan', BA: 'Pendidikan Terakhir', BB: 'Pekerjaan',
+        BC: 'Penghasilan per bulan', BD: 'Nomor Telepon/HP', BE: 'Keadaan',
+        BF: 'Jalan', BG: 'RT/RW', BH: 'Desa', BI: 'Kecamatan', BJ: 'Kabupaten',
+        BK: 'Provinsi', BL: 'Kode Pos', BM: 'Nama Wali', BN: 'Agama',
+        BO: 'Kewarganegaraan', BP: 'Pendidikan Terakhir', BQ: 'Pekerjaan',
+        BR: 'Penghasilan per bulan', BS: 'Nomor Telepon/HP', BT: 'Keadaan',
+        BU: 'Jalan', BV: 'RT/RW', BW: 'Desa', BX: 'Kecamatan', BY: 'Kabupaten',
+        BZ: 'Provinsi', CA: 'Kode Pos', CB: 'NIS', CC: 'NAMA Lengkap',
+        CD: 'NOPES PSAJ', CE: 'NIS', CF: 'CEK NIS'
+    });
+    const studentRow = rowFromColumns({
+        B: 1, C: '5474', D: 'Siswa Uji Workbook', E: 'Uji', F: '0012345678',
+        G: 'L', H: 'Nganjuk', I: '21/08/2007', J: 'Islam', K: 'Indonesia',
+        L: '3512345678901234', M: 2, N: 2, O: 'Tidak', X: '08123456789',
+        Y: 'Bersama Orang Tua', AG: '01/06/2022', AH: 'IJAZAH-SMP-UJI',
+        AJ: 'Siswa Baru', AK: 'SMP Uji', AL: '-', AM: 'X', AN: 1,
+        AO: '01/07/2022', AP: 'Ayah Uji', AQ: 'Islam', AR: 'Indonesia',
+        AS: 'SMA', AT: 'Pegawai', AU: 5000000, AV: '0821111111', AW: 'Hidup',
+        AX: 'Ibu Uji', AY: 'Islam', AZ: 'Indonesia', BA: 'SMP',
+        BB: 'Ibu Rumah Tangga', BC: 0, BD: '0831111111', BE: 'Hidup',
+        BF: 'Jalan Orang Tua', BG: '01/02', BH: 'Desa Uji', BI: 'Kecamatan Uji',
+        BJ: 'Kabupaten Uji', BK: 'Jawa Timur', BL: '64400', BM: 'Wali Uji',
+        BN: 'Islam', BO: 'Indonesia', BP: 'SMA', BQ: 'Wiraswasta',
+        BR: 3000000, BS: '0841111111', BT: 'Hidup', BU: 'Jalan Wali',
+        BV: '03/04', BW: 'Desa Wali', BX: 'Kecamatan Wali', BY: 'Kabupaten Wali',
+        BZ: 'Jawa Timur', CA: '64401', CB: '5474', CC: 'Nama Duplikat',
+        CD: 'PSAJ-UJI-2025', CE: '5474', CF: 'Sesuai'
+    });
+    const controlHeaders = rowFromColumns({
+        B: 'No', C: 'Induk', D: 'Nama Peserta Didik', E: 'Jenis Registrasi',
+        F: 'Tanggal Masuk', G: 'Masuk Kelas', H: 'Sekolah Asal SMP',
+        I: 'Keluar Karena', J: 'Tanggal Keluar', K: 'Keluar Kelas',
+        L: 'Sekolah Tujuan', M: 'Nomor Peserta PSAJ', N: 'Nomor SKL',
+        O: 'Nomor Ijazah Nasional', P: 'Tgl Pengesahan Ijazah',
+        Q: 'Nomor Transkrip Nilai'
+    });
+    const controlRow = rowFromColumns({
+        B: 1, C: '5474', D: 'Siswa Uji Workbook', E: 'Siswa Baru',
+        F: '01/07/2022', G: 'X', H: 'SMP Uji', I: 'Lulus',
+        J: '15/05/2025', K: 'XII-1', L: '-', M: 'PSAJ-UJI-2025',
+        N: 'SKL-UJI-2025', O: 'IJAZAH-UJI-2025', P: '15/05/2025',
+        Q: 'TRANSKRIP-UJI-2025'
+    });
+    const workbook = {
+        SheetNames: ['PesertaDidik', 'Kontrol Induk'],
+        Sheets: {
+            PesertaDidik: [[], [], [], studentHeaders, studentRow],
+            'Kontrol Induk': [
+                [], [], rowFromColumns({B: 'Kontrol Induk', F: 'Registrasi Masuk', I: 'Registrasi Keluar'}),
+                controlHeaders, controlRow
+            ]
+        }
+    };
+    const {state, alerts} = await importWorkbook(workbook);
+
+    assert.deepEqual(alerts, []);
+    assert.equal(state.detection.sheet, 'PesertaDidik');
+    assert.equal(state.detection.controlSheet, 'Kontrol Induk');
+    assert.equal(state.detection.controlHeaderRow, 4);
+    assert.equal(state.rows.length, 1);
+    assert.equal(state.rows[0].nis, '5474');
+    assert.equal(state.rows[0].nama, 'Siswa Uji Workbook');
+    assert.equal(state.rows[0].nisn, '0012345678');
+    assert.equal(state.rows[0].kelas, 'XII-1');
+    assert.equal(state.rows[0].status, 'Lulus');
+    assert.equal(state.rows[0].tahun_lulus, '2025');
+    assert.equal(state.rows[0].no_skl, 'SKL-UJI-2025');
+    assert.equal(state.rows[0].no_ijazah_sma, 'IJAZAH-UJI-2025');
+    assert.equal(state.rows[0].no_transkrip, 'TRANSKRIP-UJI-2025');
+});
+
+test('automatically maps common alternate headers for grades, attendance, extracurriculars, and teachers', async () => {
+    const workbooks = [
+        {
+            type: 'nilai',
+            sheet: 'Nilai Semester',
+            headers: [
+                'Nomor Induk Siswa Nasional', 'Nama Peserta Didik', 'Rombongan Belajar',
+                'Semester', 'Matematika Wajib', 'Bahasa Indonesia'
+            ],
+            row: ['0000000125', 'Siswa Nilai', 'XI-2', 'Ganjil', 88.5, 90],
+            assertions: row => {
+                assert.equal(row.mtk, 88.5);
+                assert.equal(row.ind, 90);
+                assert.equal(row.sem, 'Ganjil');
+            }
+        },
+        {
+            type: 'hadir',
+            sheet: 'Rekap Ketidakhadiran',
+            headers: [
+                'NISN', 'Nama Murid', 'Rombongan Belajar', 'Jumlah Hari Sakit',
+                'Jumlah Hari Izin', 'Tanpa Keterangan', 'Deskripsi Kokurikuler'
+            ],
+            row: ['0000000126', 'Siswa Hadir', 'XI-2', 2, 1, 0, 'Aktif'],
+            assertions: row => {
+                assert.equal(row.sakit, 2);
+                assert.equal(row.izin, 1);
+                assert.equal(row.alpa, 0);
+                assert.equal(row.kokur, 'Aktif');
+            }
+        },
+        {
+            type: 'ekskul',
+            sheet: 'Kegiatan Siswa',
+            headers: [
+                'Nomor Induk Siswa Nasional', 'Nama Siswa', 'Kelas Sekarang',
+                'Kegiatan Ekstrakurikuler yang Diikuti', 'Nilai Predikat'
+            ],
+            row: ['0000000127', 'Siswa Ekskul', 'XI-2', 'Pramuka', 'A'],
+            assertions: row => {
+                assert.equal(row.ekskul, 'Pramuka');
+                assert.equal(row.predikat, 'A');
+            }
+        },
+        {
+            type: 'guru',
+            sheet: 'Tenaga Pendidik',
+            headers: [
+                'Nama Tenaga Pendidik', 'Nomor Induk Pegawai (NIP)',
+                'Nomor Unik Pendidik dan Tenaga Kependidikan', 'Jenis Kelamin',
+                'Telepon Seluler', 'Status Kepegawaian'
+            ],
+            row: ['Guru Uji', '197001012000011001', '1234567890123456', 'P', '08123456789', 'PNS'],
+            assertions: row => {
+                assert.equal(row.nip, '197001012000011001');
+                assert.equal(row.nuptk, '1234567890123456');
+                assert.equal(row.jk, 'P');
+                assert.equal(row.hp, '08123456789');
+                assert.equal(row.status, 'PNS');
+            }
+        }
+    ];
+
+    for (const fixture of workbooks) {
+        const {state, alerts} = await importWorkbook({
+            SheetNames: [fixture.sheet],
+            Sheets: {
+                [fixture.sheet]: [
+                    [`Daftar ${fixture.sheet}`],
+                    fixture.headers,
+                    fixture.row
+                ]
+            }
+        }, fixture.type);
+
+        assert.deepEqual(alerts, [], fixture.type);
+        assert.equal(state.rows.length, 1, fixture.type);
+        assert.equal(state.statuses[0].status, 'ready', fixture.type);
+        fixture.assertions(state.rows[0]);
+    }
+});
+
+test('previews all detected workbook categories and imports them in dependency order', async () => {
+    const workbook = {
+        SheetNames: ['Data Siswa', 'Nilai Semester', 'Rekap Kehadiran', 'Kegiatan Ekstrakurikuler'],
+        Sheets: {
+            'Data Siswa': [
+                ['NISN', 'Nama', 'Kelas'],
+                ['0000000123', 'Siswa Uji Semua', 'X-1']
+            ],
+            'Nilai Semester': [
+                ['NISN', 'Nama', 'Kelas', 'Semester', 'Matematika'],
+                ['0000000123', 'Siswa Uji Semua', 'X-1', 'Ganjil', 90]
+            ],
+            'Rekap Kehadiran': [
+                ['NISN', 'Nama', 'Kelas', 'Semester', 'Sakit', 'Izin', 'Alpa'],
+                ['0000000123', 'Siswa Uji Semua', 'X-1', 'Ganjil', 0, 1, 0]
+            ],
+            'Kegiatan Ekstrakurikuler': [
+                ['NISN', 'Nama', 'Kelas', 'Semester', 'Nama Ekskul', 'Predikat'],
+                ['0000000123', 'Siswa Uji Semua', 'X-1', 'Ganjil', 'Pramuka', 'A']
+            ]
+        }
+    };
+    const imported = await importWorkbook(workbook, 'semua');
+    const preview = imported.getState();
+
+    assert.deepEqual(imported.alerts, []);
+    assert.deepEqual(preview.allGroups.map(group => group.type), ['siswa', 'nilai', 'hadir', 'ekskul']);
+    assert.equal(preview.allGroups.every(group => group.errors.length === 0 && group.mappingIssues.length === 0), true);
+
+    await imported.runAllImport();
+
+    const batchTypes = imported.requests
+        .filter(({endpoint}) => endpoint.endsWith('/start-batch'))
+        .map(({request}) => request.type);
+    assert.deepEqual(batchTypes, ['siswa', 'nilai', 'hadir', 'ekskul']);
+});
+
+test('blocks every category when a workbook contains an unclassified sheet', async () => {
+    const imported = await importWorkbook({
+        SheetNames: ['Data Siswa', 'Catatan Tambahan'],
+        Sheets: {
+            'Data Siswa': [
+                ['NISN', 'Nama', 'Kelas'],
+                ['0000000123', 'Siswa Uji Semua', 'X-1']
+            ],
+            'Catatan Tambahan': [
+                ['Informasi'],
+                ['Data ini bukan kategori import']
+            ]
+        }
+    }, 'semua');
+
+    assert.equal(imported.getState().allIssues.length, 1);
+    await imported.runAllImport();
+    assert.equal(imported.requests.some(({endpoint}) => endpoint.endsWith('/start-batch')), false);
+    assert.match(imported.alerts[0], /Semua kategori ditahan/);
+});
+
+test('stops later categories after a server reports skipped rows', async () => {
+    const workbook = {
+        SheetNames: ['Data Siswa', 'Nilai Semester'],
+        Sheets: {
+            'Data Siswa': [
+                ['NISN', 'Nama', 'Kelas'],
+                ['0000000123', 'Siswa Uji Semua', 'X-1']
+            ],
+            'Nilai Semester': [
+                ['NISN', 'Nama', 'Kelas', 'Semester', 'Matematika'],
+                ['0000000123', 'Siswa Uji Semua', 'X-1', 'Ganjil', 90]
+            ]
+        }
+    };
+    const imported = await importWorkbook(workbook, 'semua', {columns: {}, subjects: {}}, {
+        skipped: 1,
+        errors: [{row: 2, reason: 'Data ditolak oleh server'}]
+    });
+
+    await imported.runAllImport();
+
+    const batchTypes = imported.requests
+        .filter(({endpoint}) => endpoint.endsWith('/start-batch'))
+        .map(({request}) => request.type);
+    assert.deepEqual(batchTypes, ['siswa']);
+    assert.match(imported.preview.innerHTML, /Import Semua berhenti/);
 });
 
 test('requires a class for active students and allows selecting one after preview', async () => {

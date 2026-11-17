@@ -41,10 +41,17 @@ class ImportDataController extends Controller
         $isAdmin = $user->peran === 'admin';
         $indexRoute = $isAdmin ? 'admin.import' : 'guru.import-data';
         $type = (string) $request->query('tab', $request->query('jenis', $allowedTypes[0]));
-        abort_unless(isset(self::TYPES[$type]), 404);
-        abort_unless(in_array($type, $allowedTypes, true), 403);
+        $allTab = $type === 'semua';
+        if ($allTab) {
+            abort_unless($isAdmin, 403);
+        } else {
+            abort_unless(isset(self::TYPES[$type]), 404);
+            abort_unless(in_array($type, $allowedTypes, true), 403);
+        }
         $tab = $type;
-        $tabView = in_array($type, ['nilai', 'kehadiran', 'ekskul'], true) ? 'academic' : $type;
+        $tabView = $allTab
+            ? 'all'
+            : (in_array($type, ['nilai', 'kehadiran', 'ekskul'], true) ? 'academic' : $type);
 
         if ($request->query->has('jenis') && ! $request->query->has('tab')) {
             $query = $request->query->all();
@@ -94,9 +101,12 @@ class ImportDataController extends Controller
         }
 
         $templateRoute = $isAdmin ? 'admin.import.template' : 'guru.import-data.template';
-        $typeLabel = self::TYPES[$type];
-        $typeJs = $type === 'kehadiran' ? 'hadir' : $type;
+        $typeLabel = $allTab ? 'Semua Data' : self::TYPES[$type];
+        $typeJs = $allTab ? 'semua' : ($type === 'kehadiran' ? 'hadir' : $type);
         $availableTypes = array_intersect_key(self::TYPES, array_flip($allowedTypes));
+        if ($isAdmin) {
+            $availableTypes = ['semua' => 'Semua Data'] + $availableTypes;
+        }
         $batches = collect();
         $riwayatImport = collect();
         $totalGuru = null;

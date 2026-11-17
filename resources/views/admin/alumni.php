@@ -50,7 +50,7 @@
     .alumni-row{cursor:pointer}
     .alumni-row:hover{background:#f3f7fc}
     .alumni-side-backdrop{position:fixed;inset:0;z-index:1100;background:rgba(9,24,43,.42)}
-    .alumni-side-panel{position:fixed;top:0;right:0;z-index:1101;display:flex;flex-direction:column;width:min(560px,100%);height:100dvh;background:#f5f8fc;box-shadow:-18px 0 55px #06172f33}
+    .alumni-side-panel{position:fixed;top:50%;left:50%;right:auto;z-index:1101;display:flex;flex-direction:column;width:min(760px,calc(100vw - 32px));height:min(88dvh,900px);max-height:calc(100dvh - 32px);transform:translate(-50%,-50%);border:1px solid #dce5ef;border-radius:20px;background:#f5f8fc;box-shadow:0 24px 80px #06172f55}
     .alumni-side-head{display:flex;align-items:flex-start;gap:12px;padding:18px;border-bottom:1px solid var(--ln);background:#fff}
     .alumni-side-head h3{margin:0;color:var(--p);font-size:17px}
     .alumni-side-head p{margin:4px 0 0;color:var(--mu);font-size:12px}
@@ -58,20 +58,20 @@
     .alumni-side-tabs{display:flex;gap:8px;padding:12px 18px;border-bottom:1px solid var(--ln);background:#fff}
     .alumni-side-tabs a{padding:8px 12px;border:1px solid var(--ln);border-radius:8px;color:var(--p);font-size:12px;font-weight:700;text-decoration:none}
     .alumni-side-tabs a.on{background:var(--p);border-color:var(--p);color:#fff}
-    .alumni-side-body{overflow-y:auto;padding:16px}
+    .alumni-side-body{flex:1;min-height:0;overflow-y:auto;padding:16px}
     .alumni-tracking-row{display:flex;align-items:flex-start;gap:10px;padding:12px 0;border-bottom:1px solid #e8edf3}
     .alumni-tracking-row form{margin-left:auto}
     .alumni-side-form{margin-top:14px;padding:14px;border:1px solid var(--ln);border-radius:12px;background:#fff}
     .alumni-side-form label{display:block;margin:8px 0 4px;color:var(--mu);font-size:11px;font-weight:700}
     .alumni-side-form input,.alumni-side-form select{width:100%}
     .alumni-side-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
-    @media(max-width:600px){.alumni-modal{padding:8px}.alumni-modal-box{max-height:96vh;border-radius:14px}.alumni-modal-head{padding:14px}.alumni-modal-body{padding:12px}.alumni-detail-grid,.alumni-form-grid,.student-profile-grid{grid-template-columns:1fr}.alumni-identity{align-items:flex-start;padding:15px}.alumni-identity h4{font-size:16px}.alumni-identity .bd{margin-left:auto}.student-profile-identity{align-items:flex-start;padding:13px}.student-profile-identity h4{font-size:15px}}
+    @media(max-width:600px){.alumni-modal{padding:8px}.alumni-modal-box{max-height:96vh;border-radius:14px}.alumni-modal-head{padding:14px}.alumni-modal-body{padding:12px}.alumni-side-panel{width:calc(100vw - 16px);height:96dvh;max-height:calc(100dvh - 16px);border-radius:14px}.alumni-detail-grid,.alumni-form-grid,.student-profile-grid{grid-template-columns:1fr}.alumni-identity{align-items:flex-start;padding:15px}.alumni-identity h4{font-size:16px}.alumni-identity .bd{margin-left:auto}.student-profile-identity{align-items:flex-start;padding:13px}.student-profile-identity h4{font-size:15px}}
 </style>
 @endpush
 
 @section('content')
 <h2>Alumni</h2>
-<p class="sub">Data lulus dan pindah/keluar, kontrol induk, serta pelacakan alumni · {{ $totalFiltered }} data · klik baris untuk membuka panel samping</p>
+<p class="sub">Data lulus dan pindah/keluar, kontrol induk, serta pelacakan alumni · {{ $totalFiltered }} data · klik baris untuk membuka detail alumni</p>
 
 @if(session('success'))
 <div class="note ok">{{ session('success') }}</div>
@@ -101,7 +101,7 @@
             @endforeach
         </select>
         <input type="text" name="aq" placeholder="Cari nama / induk / NISN" value="{{ $aq }}">
-        <button type="submit" class="btn" style="display:none"></button>
+        <button type="submit" class="btn">Cari</button>
         <span class="sp"></span>
         <a href="{{ route('admin.alumni.export', ['aj' => $aj, 'ay' => $ay, 'aq' => $aq]) }}" class="btn">⬇ Ekspor Excel (Kontrol Induk + biodata)</a>
     </div>
@@ -175,7 +175,7 @@
                         'status_kontrol_induk' => $s->status_kontrol_induk,
                         'status_pelacakan' => $s->status_pelacakan,
                         'edit_url' => route('admin.alumni.update', $s->id),
-                        'full_edit_url' => route('admin.form-pendataan.edit', $s->id),
+                        'full_edit_url' => route('admin.alumni.biodata.edit', array_merge($panelQuery, ['id' => $s->id])),
                         'pdf_url' => route('admin.data-siswa.pdf', $s->id),
                         'tracking_url' => route('admin.alumni', array_merge($panelQuery, [
                             'tab' => 'pelacakan',
@@ -275,14 +275,14 @@
             $selectedAlumni->alamat_kabupaten,
         ])->filter()->implode(', ');
     @endphp
-    <a class="alumni-side-backdrop" href="{{ $panelClosedUrl }}" aria-label="Tutup panel Alumni"></a>
+    <a class="alumni-side-backdrop" href="{{ $panelClosedUrl }}" aria-label="Tutup panel Alumni" onclick="return closeAlumniSidePanel(event)"></a>
     <aside id="alumni-side-panel" class="alumni-side-panel" role="dialog" aria-modal="true" aria-labelledby="alumni-side-title">
         <div class="alumni-side-head">
             <div>
                 <h3 id="alumni-side-title">{{ $selectedAlumni->nama_lengkap }}</h3>
                 <p>NISN {{ $selectedAlumni->nisn ?: '-' }} · Induk {{ $selectedAlumni->nomor_induk ?: '-' }}</p>
             </div>
-            <a class="btn o alumni-side-close" href="{{ $panelClosedUrl }}" aria-label="Tutup panel">&times;</a>
+            <a class="btn o alumni-side-close" href="{{ $panelClosedUrl }}" aria-label="Tutup panel" onclick="return closeAlumniSidePanel(event)">&times;</a>
         </div>
         <nav class="alumni-side-tabs" aria-label="Detail alumni">
             <a href="{{ $controlPanelUrl }}" class="{{ $panelTab === 'kontrol-induk' ? 'on' : '' }}">Kontrol Induk</a>
@@ -391,21 +391,26 @@
                             'nomor_transkrip' => $selectedAlumni->nomor_transkrip,
                             'kegiatan_setelah_lulus' => $selectedAlumni->kegiatan_setelah_lulus,
                             'edit_url' => route('admin.alumni.update', $selectedAlumni->id),
-                            'full_edit_url' => route('admin.form-pendataan.edit', $selectedAlumni->id),
+                            'full_edit_url' => route('admin.alumni.biodata.edit', array_merge($panelQuery, ['id' => $selectedAlumni->id])),
                         ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) }}" onclick="openAlumniEdit(this)">Edit Kontrol Induk</button>
-                        <a class="btn o" href="{{ route('admin.form-pendataan.edit', $selectedAlumni->id) }}">Edit biodata lengkap</a>
+                        <a class="btn o" href="{{ route('admin.alumni.biodata.edit', array_merge($panelQuery, ['id' => $selectedAlumni->id])) }}">Edit biodata lengkap</a>
                         <a class="btn o" href="{{ route('admin.data-siswa.pdf', $selectedAlumni->id) }}" target="_blank" rel="noopener">Cetak PDF</a>
                     </div>
                 </section>
                 @if($selectedAlumni->isGraduated())
-                    <form class="alumni-side-form" method="POST" action="{{ route('admin.alumni.cancel-graduation', $selectedAlumni->id) }}" onsubmit="return confirm('Batalkan kelulusan dan kembalikan siswa menjadi aktif?')">
-                        @csrf
-                        <input type="hidden" name="aj" value="{{ $aj }}">
-                        <input type="hidden" name="ay" value="{{ $ay }}">
-                        <input type="hidden" name="aq" value="{{ $aq }}">
-                        <input type="hidden" name="page" value="{{ $alumni->currentPage() }}">
-                        <button type="submit" class="btn o">Batalkan kelulusan</button>
-                    </form>
+                    @if($canCancelGraduation)
+                        <form class="alumni-side-form" method="POST" action="{{ route('admin.alumni.cancel-graduation', $selectedAlumni->id) }}" onsubmit="return confirm('Batalkan kelulusan dan kembalikan siswa menjadi aktif?')">
+                            @csrf
+                            <input type="hidden" name="aj" value="{{ $aj }}">
+                            <input type="hidden" name="ay" value="{{ $ay }}">
+                            <input type="hidden" name="aq" value="{{ $aq }}">
+                            <input type="hidden" name="page" value="{{ $alumni->currentPage() }}">
+                            <button type="submit" class="btn o">Batalkan kelulusan</button>
+                        </form>
+                    @else
+                        <button type="button" class="btn o" disabled>Batalkan kelulusan</button>
+                        <p class="sub">Tidak dapat dibatalkan karena belum ada riwayat pada tahun ajaran aktif.</p>
+                    @endif
                 @endif
             @endif
         </div>
@@ -470,6 +475,8 @@
         <input type="hidden" name="aj" value="{{ $aj }}">
         <input type="hidden" name="ay" value="{{ $ay }}">
         <input type="hidden" name="aq" value="{{ $aq }}">
+        <input type="hidden" name="tab" value="{{ $panelTab }}">
+        <input type="hidden" name="page" value="{{ $alumni->currentPage() }}">
         <div class="alumni-modal-head">
             <div>
                 <h3 id="alumni-edit-title">Edit Kontrol Induk</h3>
@@ -498,7 +505,7 @@
             </div>
         </div>
         <div class="alumni-modal-foot">
-            <a id="alumni-full-edit-link" class="btn o" target="_blank" rel="noopener">Biodata lengkap</a>
+            <a id="alumni-full-edit-link" class="btn o">Biodata lengkap</a>
             <button type="button" class="btn o" onclick="closeAlumniModal(null, document.getElementById('alumni-edit-modal'))">Batal</button>
             <button type="submit" class="btn a">Simpan perubahan</button>
         </div>
@@ -587,6 +594,24 @@ function closeAlumniModal(event, modal) {
         document.getElementById('alumni-pdf-frame').src = 'about:blank';
     }
     if (!document.querySelector('.alumni-modal.on')) document.body.style.overflow = '';
+}
+
+function closeAlumniSidePanel(event) {
+    const panel = document.getElementById('alumni-side-panel');
+    const backdrop = document.querySelector('.alumni-side-backdrop');
+    if (!panel || !backdrop) return true;
+
+    event.preventDefault();
+    const destination = new URL(event.currentTarget.href, window.location.href);
+    panel.remove();
+    backdrop.remove();
+    window.history.replaceState(
+        window.history.state,
+        '',
+        destination.pathname + destination.search + destination.hash
+    );
+
+    return false;
 }
 
 document.querySelectorAll('.alumni-row').forEach((row) => {

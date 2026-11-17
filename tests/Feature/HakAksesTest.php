@@ -3,8 +3,10 @@
 namespace Tests\Feature;
 
 use App\Models\Auth\Pengguna;
+use App\Services\AksesGuru;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Mockery\MockInterface;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Tests\TestCase;
 
@@ -75,6 +77,17 @@ class HakAksesTest extends TestCase
         foreach ($adminRoutes as [$method, $uri]) {
             $this->actingAs($teacher)->call($method, $uri)->assertForbidden();
         }
+    }
+
+    public function test_teacher_cannot_open_administrator_import_all_tab(): void
+    {
+        $teacher = $this->createAccount('guru');
+        $this->mock(AksesGuru::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('adalahGuruMapel')->once()->andReturn(true);
+            $mock->shouldReceive('adalahWali')->once()->andReturn(false);
+        });
+
+        $this->actingAs($teacher)->get('/guru/import-data?tab=semua')->assertForbidden();
     }
 
     private function createAccount(string $role): Pengguna

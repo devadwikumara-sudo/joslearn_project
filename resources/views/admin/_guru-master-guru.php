@@ -100,7 +100,7 @@
 
 {{-- MODAL TAMBAH / EDIT GURU (Sesuai Prototype gedit) --}}
 <div id="modal-guru" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:999;align-items:center;justify-content:center;overflow-y:auto;padding:20px">
-    <div class="card" style="max-width:720px;width:100%;margin:auto;background:#fff;border-radius:10px">
+    <div class="card" style="max-width:720px;width:100%;max-height:90dvh;overflow-y:auto;margin:auto;background:#fff;border-radius:10px">
         <h3 id="modal-title">Tambah Guru</h3>
         <p class="sub">Lengkapi data guru lalu tentukan perannya.</p>
 

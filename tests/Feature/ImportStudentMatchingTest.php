@@ -88,6 +88,10 @@ class ImportStudentMatchingTest extends TestCase
             ] as $column) {
                 $table->text($column)->nullable();
             }
+            $table->boolean('kk_ada')->default(false);
+            $table->boolean('akta_ada')->default(false);
+            $table->boolean('ijazah_smp_ada')->default(false);
+            $table->boolean('surat_pindah_ada')->default(false);
         });
 
         Schema::create('sekolah_tahun_ajaran', function (Blueprint $table): void {
@@ -2285,6 +2289,10 @@ class ImportStudentMatchingTest extends TestCase
             ->assertSee('Status Pelacakan')
             ->assertSee('Sudah dilacak')
             ->assertSee('id="alumni-side-panel"', false)
+            ->assertSee('onclick="return closeAlumniSidePanel(event)"', false)
+            ->assertSee('>Cari</button>', false)
+            ->assertSee('id="alumni-full-edit-link" class="btn o"', false)
+            ->assertDontSee('id="alumni-full-edit-link" class="btn o" target="_blank"', false)
             ->assertSee('Kegiatan Setelah Lulus')
             ->assertSee('Riwayat Pelacakan')
             ->assertSee('Jurusan Informatika')
@@ -2297,6 +2305,87 @@ class ImportStudentMatchingTest extends TestCase
             ->assertViewHas('alumni', fn ($alumni): bool => $alumni->total() === 1)
             ->assertSee('Belum dilacak')
             ->assertDontSee('Kampus Contoh');
+    }
+
+    public function test_alumni_can_edit_full_biodata_without_changing_class_history(): void
+    {
+        DB::table('siswa_biodata')->where('id', 1)->update(['tahun_lulus' => '2025']);
+        DB::table('siswa_riwayat_kelas')->where('siswa_id', 1)->update(['status' => 'Lulus']);
+        $historyBefore = DB::table('siswa_riwayat_kelas')->where('siswa_id', 1)->first();
+        $filters = [
+            'aj' => 'Alumni (Lulus)',
+            'ay' => '2025',
+            'aq' => 'Nama',
+            'page' => 1,
+        ];
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.alumni', array_merge($filters, ['siswa' => 1])))
+            ->assertOk()
+            ->assertSee('Edit biodata lengkap');
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.alumni.biodata.edit', array_merge($filters, ['id' => 1])))
+            ->assertOk()
+            ->assertSee('Edit Biodata Alumni')
+            ->assertSee('name="alumni_edit" value="1"', false);
+
+        $this->put(route('admin.data-siswa.update', 1), [
+            'alumni_edit' => '1',
+            'nama_lengkap' => 'Nama Alumni Diperbarui',
+            'nisn' => '0000000001',
+            'return_tab' => 'kontrol-induk',
+            'return_aj' => 'Alumni (Lulus)',
+            'return_ay' => '2025',
+            'return_aq' => 'Nama',
+            'return_page' => '1',
+        ])->assertRedirect(route('admin.alumni', [
+            'tab' => 'kontrol-induk',
+            'aj' => 'Alumni (Lulus)',
+            'ay' => '2025',
+            'aq' => 'Nama',
+            'page' => 1,
+            'siswa' => 1,
+        ]));
+
+        $this->assertDatabaseHas('siswa_biodata', [
+            'id' => 1,
+            'nama_lengkap' => 'Nama Alumni Diperbarui',
+            'tahun_lulus' => '2025',
+        ]);
+        $this->assertDatabaseHas('siswa_riwayat_kelas', [
+            'id' => $historyBefore->id,
+            'siswa_id' => 1,
+            'tahun_ajaran_id' => $historyBefore->tahun_ajaran_id,
+            'kelas_id' => $historyBefore->kelas_id,
+            'status' => 'Lulus',
+        ]);
+        $this->assertDatabaseHas('catatan_aktivitas', [
+            'aksi' => 'edit_biodata_alumni',
+            'objek_id' => 1,
+        ]);
+    }
+
+    public function test_active_student_cannot_open_alumni_biodata_editor(): void
+    {
+        $this->actingAs($this->admin)
+            ->get(route('admin.alumni.biodata.edit', 2))
+            ->assertNotFound();
+    }
+
+    public function test_graduation_cancellation_is_explained_when_active_year_history_is_missing(): void
+    {
+        DB::table('siswa_biodata')->where('id', 1)->update(['tahun_lulus' => '2025']);
+        DB::table('siswa_riwayat_kelas')->where('siswa_id', 1)->delete();
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.alumni', [
+                'aj' => 'Alumni (Lulus)',
+                'siswa' => 1,
+            ]))
+            ->assertOk()
+            ->assertSee('disabled>Batalkan kelulusan', false)
+            ->assertSee('Tidak dapat dibatalkan karena belum ada riwayat pada tahun ajaran aktif.');
     }
 
     public function test_legacy_tracking_page_redirects_to_alumni_with_tracking_context(): void

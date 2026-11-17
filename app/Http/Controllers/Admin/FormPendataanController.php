@@ -216,6 +216,10 @@ class FormPendataanController extends Controller
 
     public function update(Request $request, int $id): RedirectResponse
     {
+        if ($request->boolean('alumni_edit')) {
+            return $this->updateAlumniBiodata($request, $id);
+        }
+
         $siswa = SiswaBiodata::findOrFail($id);
         $data = $request->validate($this->validationRules($siswa->id));
         $tahunAjaran = SekolahTahunAjaran::firstOrCreate(
@@ -281,6 +285,77 @@ class FormPendataanController extends Controller
                 'tahun_ajaran' => $tahunAjaran->id,
             ])
             ->with('success', 'Perubahan biodata siswa berhasil disimpan.');
+    }
+
+    private function updateAlumniBiodata(Request $request, int $id): RedirectResponse
+    {
+        $siswa = SiswaBiodata::alumni()->findOrFail($id);
+        $rules = $this->validationRules($siswa->id);
+        unset($rules['kelas'], $rules['tahun_ajaran'], $rules['status']);
+        $data = $request->validate($rules);
+        unset($data['foto_file'], $data['berkas']);
+        $this->normalizeDocumentFlags($request, $data);
+        $fotoPath = null;
+        $uploadedAttachmentPaths = [];
+        $replacedAttachmentPaths = [];
+
+        try {
+            DB::transaction(function () use ($request, $data, $siswa, &$fotoPath, &$uploadedAttachmentPaths, &$replacedAttachmentPaths): void {
+                $this->storePhoto($request, $data, $fotoPath);
+                $siswa->update($data);
+                $this->storeAttachments($request, $siswa, $uploadedAttachmentPaths, $replacedAttachmentPaths);
+
+                CatatanAktivitas::create([
+                    'pengguna_id' => auth()->id(),
+                    'peran' => auth()->user()->peran ?? 'admin',
+                    'aksi' => 'edit_biodata_alumni',
+                    'keterangan' => "Memperbarui biodata lengkap alumni: {$siswa->nama_lengkap} ({$siswa->nisn})",
+                    'objek_tipe' => 'siswa',
+                    'objek_id' => $siswa->id,
+                    'alamat_ip' => $request->ip(),
+                ]);
+            });
+        } catch (\Throwable $exception) {
+            if ($fotoPath !== null) {
+                Storage::disk('local')->delete($fotoPath);
+            }
+            $this->deleteStoredFiles($uploadedAttachmentPaths);
+
+            if (! $exception instanceof RuntimeException) {
+                throw $exception;
+            }
+
+            Log::error('Gagal memperbarui biodata alumni.', [
+                'admin_id' => auth()->id(),
+                'siswa_id' => $siswa->id,
+                'exception' => $exception,
+            ]);
+
+            return back()->withInput()->with('error', 'Gagal memperbarui biodata alumni. Periksa log aplikasi atau hubungi administrator.');
+        }
+
+        $this->deleteStoredFiles($replacedAttachmentPaths);
+
+        $type = $request->input('return_aj');
+        $type = is_string($type) && in_array($type, ['Alumni (Lulus)', 'Pindah / Keluar'], true)
+            ? $type
+            : 'Alumni (Lulus)';
+        $year = $request->input('return_ay');
+        $year = is_string($year) && preg_match('/^\d{4}$/', $year) === 1 ? $year : '';
+        $search = $request->input('return_aq');
+        $search = is_string($search) ? trim($search) : '';
+        $page = $request->integer('return_page') ?: null;
+        $tab = $request->input('return_tab') === 'pelacakan' ? 'pelacakan' : 'kontrol-induk';
+
+        return redirect()->route('admin.alumni', array_filter([
+            'tab' => $tab,
+            'aj' => $type,
+            'ay' => $year,
+            'aq' => $search,
+            'page' => $page,
+            'siswa' => $siswa->id,
+        ], static fn ($value): bool => $value !== null && $value !== ''))
+            ->with('success', "Biodata lengkap {$siswa->nama_lengkap} berhasil diperbarui.");
     }
 
     /**
