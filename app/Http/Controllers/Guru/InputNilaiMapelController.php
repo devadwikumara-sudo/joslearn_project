@@ -83,6 +83,8 @@ class InputNilaiMapelController extends Controller
             'kelas' => ['required', 'string', 'exists:sekolah_kelas,nama'],
             'mapel_id' => ['required', 'integer', 'exists:sekolah_mapel,id'],
             'semester' => ['required', 'in:Ganjil,Genap'],
+            'tahun_ajaran_id' => ['sometimes', 'integer'],
+            'tahun_ajaran' => ['sometimes', 'string', 'max:20'],
             'nilai' => ['nullable', 'array'],
             'nilai.*' => ['nullable', 'numeric', 'between:0,100'],
         ]);
@@ -97,10 +99,17 @@ class InputNilaiMapelController extends Controller
             "Anda bukan guru mapel {$mapel->nama} di kelas {$kelas->nama}."
         );
 
-        $tahunAjaranId = SekolahTahunAjaran::query()
+        $tahunAjaran = SekolahTahunAjaran::query()
             ->where('sedang_berjalan', true)
-            ->value('id');
-        abort_unless($tahunAjaranId !== null, 403, 'Tidak ada tahun ajaran berjalan.');
+            ->first(['id', 'nama']);
+        abort_unless($tahunAjaran !== null, 403, 'Tidak ada tahun ajaran berjalan.');
+        abort_if(
+            (isset($data['tahun_ajaran_id']) && (int) $data['tahun_ajaran_id'] !== (int) $tahunAjaran->id)
+            || (isset($data['tahun_ajaran']) && $data['tahun_ajaran'] !== $tahunAjaran->nama),
+            403,
+            'Guru hanya dapat mengisi nilai pada tahun ajaran berjalan.'
+        );
+        $tahunAjaranId = (int) $tahunAjaran->id;
 
         $riwayatSiswa = SiswaRiwayatKelas::query()
             ->where('tahun_ajaran_id', $tahunAjaranId)
@@ -110,7 +119,15 @@ class InputNilaiMapelController extends Controller
             ->get()
             ->keyBy('id');
         $nilaiInput = $data['nilai'] ?? [];
-        $riwayatTidakValid = array_diff(array_map('strval', array_keys($nilaiInput)), $riwayatSiswa->keys()->map('strval')->all());
+        $invalidHistoryIds = array_diff(array_map('strval', array_keys($nilaiInput)), $riwayatSiswa->keys()->map('strval')->all());
+        $historicalHistoryIds = SiswaRiwayatKelas::query()
+            ->whereIn('id', $invalidHistoryIds)
+            ->where('tahun_ajaran_id', '!=', $tahunAjaranId)
+            ->pluck('id')
+            ->map(static fn (int $id): string => (string) $id)
+            ->all();
+        abort_if($historicalHistoryIds !== [], 403, 'Guru hanya dapat mengisi nilai pada riwayat tahun ajaran berjalan.');
+        $riwayatTidakValid = $invalidHistoryIds;
         abort_if($riwayatTidakValid !== [], 422, 'Daftar siswa tidak sesuai dengan kelas aktif yang dipilih.');
 
         DB::transaction(function () use ($nilaiInput, $riwayatSiswa, $data, $kelas, $mapel, $pengguna, $request): void {

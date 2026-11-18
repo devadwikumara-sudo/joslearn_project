@@ -5,6 +5,12 @@
 @section('content')
 @php
     $queryFilters = array_merge(request()->query(), ['tahun_ajaran' => $filters['tahun_ajaran']]);
+    $bookPdfFilters = [
+        'target_kelas' => $filters['kelas'] !== '' ? $filters['kelas'] : '*',
+        'target_ta' => (string) $filters['tahun_ajaran'],
+        'q' => $filters['q'],
+        'st' => $filters['st'],
+    ];
 @endphp
 
 <div class="bar" style="align-items:flex-start">
@@ -43,6 +49,14 @@
         <span class="sp"></span>
         <button type="submit" form="pdf-siswa-terpilih" class="btn o" id="pdf-selected-button" disabled>PDF terpilih</button>
         <a href="{{ route('guru.data-siswa.pdf-all', $queryFilters) }}" class="btn o">PDF semua tampil</a>
+        <button type="button" class="btn o" id="book-pdf-selected-button" disabled onclick="cetakBukuIndukTerpilih()">Buku induk terpilih</button>
+        <a href="{{ route('guru.data-siswa.pdf-batch', [
+            'target_kelas' => $filters['kelas'] !== '' ? $filters['kelas'] : '*',
+            'target_ta' => (string) $filters['tahun_ajaran'],
+            'q' => $filters['q'],
+            'st' => $filters['st'],
+        ]) }}" class="btn o">Buku induk hasil filter</a>
+        <a href="{{ route('guru.data-siswa.pdf-batch', ['target_kelas' => '*', 'target_ta' => (string) $filters['tahun_ajaran']]) }}" class="btn o">Buku induk semua siswa</a>
     </div>
 
     <form id="pdf-siswa-terpilih" method="POST" action="{{ route('guru.data-siswa.pdf-selected') }}">
@@ -115,9 +129,14 @@
     const selectAllStudents = document.getElementById('pilih-semua');
     const studentCheckboxes = document.querySelectorAll('.pilih-siswa');
     const selectedPdfButton = document.getElementById('pdf-selected-button');
+    const selectedBookPdfButton = document.getElementById('book-pdf-selected-button');
+    const bookPdfBatchUrl = @json(route('guru.data-siswa.pdf-batch'));
+    const bookPdfFilters = @json($bookPdfFilters);
 
     const updateSelectedPdfButton = () => {
-        selectedPdfButton.disabled = !document.querySelector('.pilih-siswa:checked');
+        const hasSelectedStudents = Boolean(document.querySelector('.pilih-siswa:checked'));
+        selectedPdfButton.disabled = !hasSelectedStudents;
+        selectedBookPdfButton.disabled = !hasSelectedStudents;
     };
 
     selectAllStudents?.addEventListener('change', () => {
@@ -128,5 +147,13 @@
     });
 
     studentCheckboxes.forEach((checkbox) => checkbox.addEventListener('change', updateSelectedPdfButton));
+
+    function cetakBukuIndukTerpilih() {
+        const ids = Array.from(document.querySelectorAll('.pilih-siswa:checked')).map((checkbox) => checkbox.value);
+        if (!ids.length) return;
+
+        const parameters = new URLSearchParams({ ...bookPdfFilters, ids: ids.join(',') });
+        window.open(bookPdfBatchUrl + '?' + parameters.toString(), '_blank');
+    }
 </script>
 @endsection

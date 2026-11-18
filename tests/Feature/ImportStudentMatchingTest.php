@@ -504,7 +504,7 @@ class ImportStudentMatchingTest extends TestCase
         ];
 
         $firstImport = $this->import('nilai', [$row])->assertOk();
-        $secondImport = $this->import('nilai', [array_merge($row, ['mtk' => 90])])->assertOk();
+        $secondImport = $this->import('nilai', [array_merge($row, ['mtk' => 90])], duplicateMode: 'timpa')->assertOk();
         $record = DB::table('siswa_nilai')->where('riwayat_kelas_id', 2)->first();
 
         $this->assertSame((int) $firstImport->json('batch_id'), (int) $record->import_unggahan_id);
@@ -545,9 +545,366 @@ class ImportStudentMatchingTest extends TestCase
             ->assertJsonPath('errors.1.row', 9)
             ->assertJsonPath('errors.2.row', 10)
             ->assertJsonFragment(['reason' => 'NISN dan NIS mengarah ke siswa berbeda; baris ini dilewati.'])
-            ->assertJsonFragment(['reason' => 'Nama yang sama ditemukan lebih dari sekali pada kelas dan tahun ajaran ini; tambahkan NISN atau NIS.'])
+            ->assertJsonFragment(['reason' => 'Nama ambigu; lebih dari satu siswa memiliki nama yang sama. Tambahkan NISN atau NIS.'])
             ->assertJsonFragment(['reason' => 'NISN tidak ditemukan; baris ini dilewati dan tidak dicocokkan dengan identitas lain.']);
 
+        $this->assertSame(0, DB::table('siswa_nilai')->count());
+    }
+
+    public function test_preview_matches_by_nisn_nis_and_normalized_unique_name_without_writing(): void
+    {
+        DB::table('siswa_biodata')->where('id', 1)->update(['nama_lengkap' => 'Citra Ayu, S.Pd.']);
+
+        $response = $this->actingAs($this->admin)->withoutMiddleware()->postJson(route('admin.import.preview-match'), [
+            'type' => 'nilai',
+            'tahun_ajaran' => '2025/2026',
+            'semester' => 'Ganjil',
+            'kelas' => 'X-1',
+            'rows' => [
+                ['nisn' => '0000000002', 'kelas' => 'X-1'],
+                ['nis' => '1002', 'kelas' => 'X-1'],
+                ['nama' => '  citra   ayu! ', 'kelas' => 'X-1'],
+            ],
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('results.0.student.id', 2)
+            ->assertJsonPath('results.0.metode', 'nisn')
+            ->assertJsonPath('results.0.level', 'ok')
+            ->assertJsonPath('results.1.student.id', 2)
+            ->assertJsonPath('results.1.metode', 'nis')
+            ->assertJsonPath('results.1.level', 'ok')
+            ->assertJsonPath('results.2.student.id', 1)
+            ->assertJsonPath('results.2.metode', 'nama')
+            ->assertJsonPath('results.2.level', 'ok');
+
+        $this->assertSame(0, DB::table('import_unggahan')->count());
+        $this->assertSame(0, DB::table('siswa_nilai')->count());
+    }
+
+    public function test_preview_reports_ambiguous_names_with_candidate_nisn_and_class(): void
+    {
+        $response = $this->actingAs($this->admin)->withoutMiddleware()->postJson(route('admin.import.preview-match'), [
+            'type' => 'nilai',
+            'tahun_ajaran' => '2025/2026',
+            'rows' => [['nama' => 'Nama Sama', 'kelas' => 'X-1']],
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('results.0.student', null)
+            ->assertJsonPath('results.0.metode', 'nama')
+            ->assertJsonPath('results.0.level', 'error')
+            ->assertJsonPath('results.0.kandidat.0.nisn', '0000000001')
+            ->assertJsonPath('results.0.kandidat.0.kelas', 'X-1')
+            ->assertJsonPath('results.0.kandidat.1.nisn', '0000000002');
+    }
+
+    public function test_preview_name_matching_uses_the_selected_class_not_an_academic_year(): void
+    {
+        DB::table('siswa_biodata')->where('id', 1)->update(['nama_lengkap' => 'Nama Berbeda']);
+        DB::table('sekolah_tahun_ajaran')->insert([
+            'id' => 2,
+            'nama' => '2026/2027',
+            'sedang_berjalan' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->actingAs($this->admin)->withoutMiddleware()->postJson(route('admin.import.preview-match'), [
+            'type' => 'nilai',
+            'tahun_ajaran' => '2026/2027',
+            'semester' => '1',
+            'kelas' => 'X-1',
+            'rows' => [['nama' => 'Nama Sama', 'kelas' => 'X-1']],
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('results.0.student.id', 2)
+            ->assertJsonPath('results.0.student.nama_lengkap', 'Nama Sama')
+            ->assertJsonPath('results.0.level', 'ok');
+        $this->assertDatabaseHas('sekolah_tahun_ajaran', ['nama' => '2026/2027']);
+    }
+
+    public function test_preview_and_save_use_historical_class_year_and_keep_semesters_separate(): void
+    {
+        DB::table('sekolah_tahun_ajaran')->insert([
+            'id' => 2,
+            'nama' => '2024/2025',
+            'sedang_berjalan' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('siswa_biodata')->insert([
+            'id' => 3,
+            'nama_lengkap' => 'Siswa Riwayat Lama',
+            'nisn' => '0000000003',
+            'nomor_induk' => '1003',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('siswa_riwayat_kelas')->insert([
+            'id' => 3,
+            'siswa_id' => 3,
+            'tahun_ajaran_id' => 2,
+            'kelas_id' => 1,
+            'status' => 'Aktif',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        foreach ([
+            ['selection' => '1', 'term' => 'Ganjil', 'score' => 81],
+            ['selection' => '2', 'term' => 'Genap', 'score' => 82],
+        ] as $semester) {
+            $row = [
+                'nisn' => '0000000003',
+                'nama' => 'Siswa Riwayat Lama',
+                'kelas' => 'X-1',
+                'mtk' => $semester['score'],
+            ];
+            $preview = $this->actingAs($this->admin)->withoutMiddleware()->postJson(route('admin.import.preview-match'), [
+                'type' => 'nilai',
+                'kelas' => 'X-1',
+                'semester' => $semester['selection'],
+                'rows' => [$row],
+            ]);
+            $preview->assertOk()
+                ->assertJsonPath('results.0.student.id', 3)
+                ->assertJsonPath('results.0.target.kelas', 'X-1')
+                ->assertJsonPath('results.0.target.tahun_ajaran', '2024/2025')
+                ->assertJsonPath('results.0.target.semester', $semester['term']);
+
+            $this->import('nilai', [$row], $semester['selection'])
+                ->assertOk()
+                ->assertJsonPath('count', 1);
+        }
+
+        $this->assertSame(2, DB::table('siswa_nilai')->where('riwayat_kelas_id', 3)->count());
+        $this->assertDatabaseHas('siswa_nilai', [
+            'riwayat_kelas_id' => 3,
+            'semester' => 'Ganjil',
+            'nilai_angka' => 81,
+        ]);
+        $this->assertDatabaseHas('siswa_nilai', [
+            'riwayat_kelas_id' => 3,
+            'semester' => 'Genap',
+            'nilai_angka' => 82,
+        ]);
+        $this->assertSame(1, DB::table('sekolah_tahun_ajaran')->where('sedang_berjalan', true)->count());
+    }
+
+    public function test_matching_name_similarity_warns_at_or_above_threshold_and_errors_below_it(): void
+    {
+        DB::table('siswa_biodata')->where('id', 2)->update(['nama_lengkap' => 'Siti Aminah']);
+        DB::table('siswa_biodata')->where('id', 1)->update(['nama_lengkap' => 'abcdefghijklmnopqrst']);
+
+        $preview = $this->actingAs($this->admin)->withoutMiddleware()->postJson(route('admin.import.preview-match'), [
+            'type' => 'nilai',
+            'tahun_ajaran' => '2025/2026',
+            'semester' => '1',
+            'kelas' => 'X-1',
+            'rows' => [
+                ['nisn' => '0000000002', 'nama' => 'Siti Aminahh', 'kelas' => 'X-1'],
+                ['nisn' => '0000000002', 'nama' => 'Budi Santoso', 'kelas' => 'X-1'],
+                ['nisn' => '0000000001', 'nama' => 'abcdefghijklmnopqXYZ', 'kelas' => 'X-1'],
+            ],
+        ]);
+
+        $preview->assertOk()
+            ->assertJsonPath('results.0.student.id', 2)
+            ->assertJsonPath('results.0.level', 'peringatan')
+            ->assertJsonPath('results.1.student', null)
+            ->assertJsonPath('results.1.level', 'error')
+            ->assertJsonPath('results.2.level', 'peringatan')
+            ->assertJsonFragment(['pesan' => 'Nama tidak sesuai NISN/NIS; periksa kembali identitas pada file.']);
+
+        $saved = $this->import('nilai', [
+            ['nisn' => '0000000002', 'nama' => 'Siti Aminahh', 'kelas' => 'X-1', 'mtk' => 88],
+            ['nisn' => '0000000002', 'nama' => 'Budi Santoso', 'kelas' => 'X-1', 'mtk' => 77],
+        ]);
+
+        $saved->assertOk()
+            ->assertJsonPath('count', 1)
+            ->assertJsonPath('skipped', 1)
+            ->assertJsonFragment(['warning' => true, 'reason' => 'Nama berbeda dari data siswa, tetapi kemiripannya minimal 85%. Periksa kembali sebelum melanjutkan.'])
+            ->assertJsonFragment(['reason' => 'Nama tidak sesuai NISN/NIS; periksa kembali identitas pada file.']);
+    }
+
+    public function test_teacher_cannot_preview_matches_for_an_unassigned_class(): void
+    {
+        $teacher = $this->buatAkunGuru('preview-math-teacher');
+        $this->tugaskanMapel($teacher, 1, 1, 1);
+
+        $response = $this->actingAs($teacher)->withoutMiddleware()->postJson(route('guru.import.preview-match'), [
+            'type' => 'nilai',
+            'tahun_ajaran' => '2025/2026',
+            'semester' => '1',
+            'kelas' => 'auto',
+            'rows' => [[
+                'nisn' => '0000000002',
+                'nama' => 'Nama Sama',
+                'kelas' => 'XI-1',
+                'mtk' => 88,
+            ]],
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('results.0.student', null)
+            ->assertJsonPath('results.0.level', 'error')
+            ->assertJsonPath('results.0.pesan', 'Anda bukan guru mapel Matematika di kelas XI-1.');
+        $this->assertSame(0, DB::table('siswa_nilai')->count());
+        $this->assertSame(0, DB::table('import_unggahan')->count());
+    }
+
+    public function test_teacher_imports_are_limited_to_active_students_in_the_assigned_class_and_current_year(): void
+    {
+        DB::table('sekolah_tahun_ajaran')->insert([
+            'id' => 2,
+            'nama' => '2024/2025',
+            'sedang_berjalan' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('sekolah_kelas')->insert([
+            'id' => 3,
+            'nama' => 'XII-1',
+            'tingkat' => 'XII',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('siswa_biodata')->insert([
+            'id' => 3,
+            'nama_lengkap' => 'Alumni Contoh',
+            'nisn' => '0000000003',
+            'nomor_induk' => '1003',
+            'tahun_lulus' => '2025',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('siswa_riwayat_kelas')->insert([
+            'id' => 3,
+            'siswa_id' => 3,
+            'tahun_ajaran_id' => 2,
+            'kelas_id' => 3,
+            'status' => 'Lulus',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $teacher = $this->buatAkunGuru('historical-import-teacher');
+        $this->tugaskanMapel($teacher, 1, 1, 1);
+        $row = [
+            'nisn' => '0000000003',
+            'nama' => 'Alumni Contoh',
+            'kelas' => 'X-1',
+            'mtk' => 88,
+        ];
+
+        $this->actingAs($teacher)->withoutMiddleware()
+            ->postJson(route('guru.import.preview-match'), [
+                'type' => 'nilai',
+                'semester' => '1',
+                'kelas' => 'X-1',
+                'rows' => [$row],
+            ])
+            ->assertOk()
+            ->assertJsonPath('results.0.level', 'error')
+            ->assertJsonPath('results.0.pesan', 'bukan siswa kelas Anda.');
+
+        $this->postJson(route('guru.import.save-batch'), [
+            'type' => 'nilai',
+            'semester' => '1',
+            'kelas' => 'X-1',
+            'rows' => [$row],
+        ])
+            ->assertOk()
+            ->assertJsonPath('count', 0)
+            ->assertJsonPath('errors.0.reason', 'bukan siswa kelas Anda.');
+        $this->assertSame(0, DB::table('siswa_nilai')->count());
+
+        $historicalRow = array_merge($row, [
+            'nisn' => '0000000001',
+            'nama' => 'Nama Sama',
+            'tahun_ajaran' => '2024/2025',
+        ]);
+        $this->postJson(route('guru.import.preview-match'), [
+            'type' => 'nilai',
+            'semester' => '1',
+            'kelas' => 'X-1',
+            'rows' => [$historicalRow],
+        ])
+            ->assertOk()
+            ->assertJsonPath('results.0.level', 'error')
+            ->assertJsonPath('results.0.pesan', 'Data tahun ajaran selain tahun berjalan hanya dapat diisi oleh admin.');
+        $this->postJson(route('guru.import.save-batch'), [
+            'type' => 'nilai',
+            'semester' => '1',
+            'kelas' => 'X-1',
+            'rows' => [$historicalRow],
+        ])
+            ->assertOk()
+            ->assertJsonPath('count', 0)
+            ->assertJsonPath('errors.0.reason', 'Data tahun ajaran selain tahun berjalan hanya dapat diisi oleh admin.');
+        $this->assertSame(0, DB::table('siswa_nilai')->count());
+    }
+
+    public function test_teacher_cannot_select_an_old_year_for_preview_or_batch_import(): void
+    {
+        DB::table('sekolah_tahun_ajaran')->insert([
+            'id' => 2,
+            'nama' => '2024/2025',
+            'sedang_berjalan' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $teacher = $this->buatAkunGuru('old-year-selection-teacher');
+        $this->tugaskanMapel($teacher, 1, 1, 1);
+        $payload = [
+            'type' => 'nilai',
+            'tahun_ajaran' => '2024/2025',
+            'semester' => '1',
+            'kelas' => 'X-1',
+            'rows' => [[
+                'nisn' => '0000000001',
+                'nama' => 'Nama Sama',
+                'kelas' => 'X-1',
+                'mtk' => 88,
+            ]],
+        ];
+
+        $this->actingAs($teacher)->withoutMiddleware()
+            ->postJson(route('guru.import.preview-match'), $payload)
+            ->assertForbidden()
+            ->assertJsonPath('message', 'Guru hanya dapat mengisi data akademik pada tahun ajaran berjalan.');
+        $this->postJson(route('guru.import.save-batch'), $payload)
+            ->assertForbidden()
+            ->assertJsonPath('message', 'Guru hanya dapat mengisi data akademik pada tahun ajaran berjalan.');
+        $this->assertSame(0, DB::table('import_unggahan')->count());
+        $this->assertSame(0, DB::table('siswa_nilai')->count());
+    }
+
+    public function test_teacher_cannot_create_history_during_preview(): void
+    {
+        $teacher = $this->buatAkunGuru('preview-history-teacher');
+        $this->tugaskanMapel($teacher, 1, 1, 1);
+
+        $response = $this->actingAs($teacher)->withoutMiddleware()->postJson(route('guru.import.preview-match'), [
+            'type' => 'nilai',
+            'semester' => '1',
+            'kelas' => 'X-1',
+            'create_riwayat' => true,
+            'create_tahun_ajaran_id' => 1,
+            'create_kelas_id' => 1,
+            'rows' => [[
+                'nisn' => '0000000001',
+                'nama' => 'Nama Sama',
+                'kelas' => 'X-1',
+                'mtk' => 90,
+            ]],
+        ]);
+
+        $response->assertForbidden()
+            ->assertJsonPath('message', 'Hanya admin yang dapat membuat riwayat kelas saat import.');
         $this->assertSame(0, DB::table('siswa_nilai')->count());
     }
 
@@ -557,6 +914,8 @@ class ImportStudentMatchingTest extends TestCase
 
         $response = $this->import('nilai', [[
             'nama' => 'Nama Sama',
+            'kelas' => 'X-1',
+            'sem' => '1',
             'tahun_ajaran' => '2025/2026',
             'mtk' => 82,
             '__excel_row' => 11,
@@ -581,12 +940,12 @@ class ImportStudentMatchingTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('count', 0)
             ->assertJsonPath('skipped', 1)
-            ->assertJsonFragment(['reason' => 'Kelas pada file berbeda dari riwayat siswa untuk tahun ajaran ini; data tidak dipindahkan otomatis.']);
+            ->assertJsonFragment(['reason' => 'Siswa belum punya riwayat kelas XI.']);
         $this->assertSame(1, DB::table('siswa_riwayat_kelas')->where('siswa_id', 2)->value('kelas_id'));
         $this->assertSame(0, DB::table('siswa_kehadiran')->count());
     }
 
-    public function test_import_uses_a_valid_year_per_row_and_skips_a_row_that_conflicts_with_selected_class(): void
+    public function test_academic_import_uses_the_matching_class_history_year_and_skips_a_class_conflict(): void
     {
         $newYearImport = $this->import('nilai', [[
             'nisn' => '0000000002',
@@ -598,13 +957,9 @@ class ImportStudentMatchingTest extends TestCase
         ]]);
         $newYearImport->assertOk()->assertJsonPath('count', 1);
 
-        $newHistory = DB::table('siswa_riwayat_kelas')
-            ->where('siswa_id', 2)
-            ->where('tahun_ajaran_id', 2)
-            ->first();
-        $this->assertNotNull($newHistory);
+        $this->assertSame(1, DB::table('siswa_riwayat_kelas')->where('siswa_id', 2)->count());
         $this->assertSame(1, DB::table('siswa_nilai')
-            ->where('riwayat_kelas_id', $newHistory->id)
+            ->where('riwayat_kelas_id', 2)
             ->count());
 
         $classConflict = $this->withoutMiddleware()->postJson(route('admin.import.save-batch'), [
@@ -623,7 +978,7 @@ class ImportStudentMatchingTest extends TestCase
         ]);
         $classConflict->assertOk()
             ->assertJsonPath('count', 0)
-            ->assertJsonFragment(['reason' => 'Kelas pada baris berbeda dari kelas yang dipilih; baris ini dilewati.']);
+            ->assertJsonFragment(['reason' => 'Tingkat kelas pada baris (XI) berbeda dari pilihan (X).']);
         $this->assertSame(0, DB::table('siswa_kehadiran')->count());
     }
 
@@ -769,13 +1124,20 @@ class ImportStudentMatchingTest extends TestCase
         $this->assertSame(3, DB::table('sekolah_tahun_ajaran')->count());
     }
 
-    public function test_row_year_overrides_form_year_and_creates_missing_year_and_class_history(): void
+    public function test_optional_admin_history_creation_uses_selected_year_and_class(): void
     {
         DB::table('siswa_biodata')->insert([
             'id' => 3,
             'nama_lengkap' => 'Siswa Tanpa Riwayat',
             'nisn' => '0000000003',
             'nomor_induk' => '1003',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('sekolah_tahun_ajaran')->insert([
+            'id' => 2,
+            'nama' => '2026/2027',
+            'sedang_berjalan' => false,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -787,15 +1149,19 @@ class ImportStudentMatchingTest extends TestCase
             'tahun_ajaran' => '2026/2027',
             'sem' => 'Ganjil',
             'mtk' => 91,
-        ]]);
+        ]], targetOptions: [
+            'create_riwayat' => true,
+            'create_tahun_ajaran_id' => 2,
+            'create_kelas_id' => 1,
+        ]);
 
         $response->assertOk()
             ->assertJsonPath('count', 1)
-            ->assertJsonPath('created_years', 1)
+            ->assertJsonPath('created_years', 0)
             ->assertJsonPath('created_histories', 1)
-            ->assertJsonPath('message', 'Berhasil mengimpor 1 data nilai (termasuk 1 tahun ajaran baru dan 1 riwayat kelas baru).');
+            ->assertJsonPath('message', 'Berhasil mengimpor 1 data nilai (termasuk 1 riwayat kelas baru).');
 
-        $newYearId = DB::table('sekolah_tahun_ajaran')->where('nama', '2026/2027')->value('id');
+        $newYearId = 2;
         $newHistoryId = DB::table('siswa_riwayat_kelas')
             ->where('siswa_id', 3)
             ->where('tahun_ajaran_id', $newYearId)
@@ -837,7 +1203,7 @@ class ImportStudentMatchingTest extends TestCase
         ]], 'auto')
             ->assertOk()
             ->assertJsonPath('count', 0)
-            ->assertJsonPath('errors.0.reason', 'Riwayat kelas X-1 ditemukan lebih dari satu pada beberapa tahun ajaran; isi kolom tahun_ajaran agar tidak salah memilih.');
+            ->assertJsonPath('errors.0.reason', 'Riwayat kelas X-1 ditemukan pada beberapa tahun ajaran; isi tahun_ajaran di file untuk menentukan target.');
 
         $this->assertSame(0, DB::table('siswa_nilai')->count());
     }
@@ -859,7 +1225,11 @@ class ImportStudentMatchingTest extends TestCase
             'tahun_ajaran' => '2025/2026',
             'sem' => '3',
             'mtk' => 87,
-        ]], 'auto')
+        ]], 'auto', targetOptions: [
+            'create_riwayat' => true,
+            'create_tahun_ajaran_id' => 1,
+            'create_kelas_id' => 2,
+        ])
             ->assertOk()
             ->assertJsonPath('count', 1)
             ->assertJsonPath('created_histories', 1);
@@ -964,29 +1334,33 @@ class ImportStudentMatchingTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        $response = $this->import('nilai', [
-            [
-                'nisn' => '0000000002',
-                'kelas' => 'X-1',
-                'sem' => '1',
-                'mtk' => 90,
-                '__excel_row' => 21,
-            ],
-            [
-                'nisn' => '0000000002',
-                'kelas' => 'X-1',
-                'sem' => '3',
-                'mtk' => 91,
-                '__excel_row' => 22,
-            ],
-        ], 'auto');
+        $ambiguousHistory = $this->import('nilai', [[
+            'nisn' => '0000000002',
+            'kelas' => 'X-1',
+            'sem' => '1',
+            'mtk' => 90,
+            '__excel_row' => 21,
+        ]], 'auto');
 
-        $response->assertOk()
+        $ambiguousHistory->assertOk()
             ->assertJsonPath('count', 0)
-            ->assertJsonPath('skipped', 2)
+            ->assertJsonPath('skipped', 1)
             ->assertJsonPath('errors.0.row', 21)
-            ->assertJsonPath('errors.1.row', 22)
-            ->assertJsonFragment(['reason' => 'Riwayat kelas X-1 ditemukan lebih dari satu pada beberapa tahun ajaran; isi kolom tahun_ajaran agar tidak salah memilih.'])
+            ->assertJsonFragment(['reason' => 'Riwayat kelas X-1 ditemukan pada beberapa tahun ajaran; isi tahun_ajaran di file untuk menentukan target.']);
+
+        DB::table('siswa_riwayat_kelas')->where('id', 3)->delete();
+        $wrongSemesterGrade = $this->import('nilai', [[
+            'nisn' => '0000000002',
+            'kelas' => 'X-1',
+            'sem' => '3',
+            'mtk' => 91,
+            '__excel_row' => 22,
+        ]], 'auto');
+
+        $wrongSemesterGrade->assertOk()
+            ->assertJsonPath('count', 0)
+            ->assertJsonPath('skipped', 1)
+            ->assertJsonPath('errors.0.row', 22)
             ->assertJsonFragment(['reason' => 'Kelas X-1 tidak sesuai dengan semester 3 yang dipilih (semester 3 harus kelas XI).']);
 
         $this->assertSame(0, DB::table('siswa_nilai')->count());
@@ -1300,7 +1674,8 @@ class ImportStudentMatchingTest extends TestCase
             ->assertSee('Import Nilai')
             ->assertSee('Riwayat Import Nilai Saya')
             ->assertDontSee('Import Kehadiran')
-            ->assertDontSee('Import Ekskul');
+            ->assertDontSee('Import Ekskul')
+            ->assertDontSee('Kelas X (tingkat)');
 
         $this->actingAs($guruWali)
             ->get(route('guru.import-data'))
@@ -1314,7 +1689,8 @@ class ImportStudentMatchingTest extends TestCase
         $this->actingAs($guruRangkap)
             ->get(route('guru.import-data'))
             ->assertOk()
-            ->assertViewHas('allowedTypes', ['nilai', 'kehadiran', 'ekskul']);
+            ->assertViewHas('allowedTypes', ['nilai', 'kehadiran', 'ekskul'])
+            ->assertSee('Input Nilai Mapel');
     }
 
     public function test_teacher_cannot_open_or_download_unassigned_import_type(): void
@@ -1443,6 +1819,48 @@ class ImportStudentMatchingTest extends TestCase
             'mapel_id' => 1,
             'semester' => 'Ganjil',
             'nilai' => [1 => '80'],
+        ])->assertForbidden();
+
+        $this->assertSame(0, DB::table('siswa_nilai')->count());
+        $this->assertSame(0, DB::table('catatan_aktivitas')->count());
+    }
+
+    public function test_teacher_cannot_submit_old_year_or_historical_student_to_grade_input(): void
+    {
+        DB::table('sekolah_tahun_ajaran')->insert([
+            'id' => 2,
+            'nama' => '2024/2025',
+            'sedang_berjalan' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('siswa_riwayat_kelas')->insert([
+            'id' => 3,
+            'siswa_id' => 1,
+            'tahun_ajaran_id' => 2,
+            'kelas_id' => 2,
+            'status' => 'Lulus',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $teacher = $this->buatAkunGuru('old-year-grade-teacher');
+        $this->tugaskanMapel($teacher, 1, 1, 1);
+        $this->actingAs($teacher)->withoutMiddleware()
+            ->post(route('guru.input-nilai-mapel.store'), [
+                'kelas' => 'X-1',
+                'mapel_id' => 1,
+                'semester' => 'Ganjil',
+                'tahun_ajaran_id' => 2,
+                'nilai' => [1 => '87'],
+            ])
+            ->assertForbidden();
+
+        $this->post(route('guru.input-nilai-mapel.store'), [
+            'kelas' => 'X-1',
+            'mapel_id' => 1,
+            'semester' => 'Ganjil',
+            'nilai' => [3 => '87'],
         ])->assertForbidden();
 
         $this->assertSame(0, DB::table('siswa_nilai')->count());
@@ -1660,7 +2078,7 @@ class ImportStudentMatchingTest extends TestCase
         $skippedUpdate = $this->import('siswa', [[
             'nisn' => '0000000001',
             'nis' => '1001',
-            'nama' => 'Nama Baru Diabaikan',
+            'nama' => 'Nama Sama',
             'alamat' => 'Alamat Diabaikan',
             'kelas' => 'XI-1',
         ]], 'Ganjil', '2024/2025', 'skip');
@@ -1680,7 +2098,7 @@ class ImportStudentMatchingTest extends TestCase
         $completedUpdate = $this->import('siswa', [[
             'nisn' => '0000000002',
             'nis' => '1002',
-            'nama' => 'Nama Berubah',
+            'nama' => 'Nama Sama',
             'alamat' => 'Alamat Baru',
             'kelas' => 'XI-1',
         ]], 'Ganjil', '2024/2025', 'lengkapi');
@@ -1695,7 +2113,7 @@ class ImportStudentMatchingTest extends TestCase
         $overwrittenUpdate = $this->import('siswa', [[
             'nisn' => '0000000001',
             'nis' => '1001',
-            'nama' => 'Nama Ditimpa',
+            'nama' => 'Nama Sama',
             'alamat' => 'Alamat Ditimpa',
             'kelas' => 'XI-1',
         ]], 'Ganjil', '2024/2025', 'timpa');
@@ -1703,7 +2121,7 @@ class ImportStudentMatchingTest extends TestCase
         $overwrittenUpdate->assertOk()->assertJsonPath('count', 1);
         $this->assertDatabaseHas('siswa_biodata', [
             'id' => 1,
-            'nama_lengkap' => 'Nama Ditimpa',
+            'nama_lengkap' => 'Nama Sama',
             'alamat_jalan' => 'Alamat Ditimpa',
         ]);
     }
@@ -1713,7 +2131,7 @@ class ImportStudentMatchingTest extends TestCase
         $this->import('siswa', [[
             'nisn' => '0000000001',
             'nis' => '1001',
-            'nama' => 'Nama Baru Diabaikan',
+            'nama' => 'Nama Sama',
             'alamat' => 'Alamat Pelengkap',
             'kelas' => 'X-1',
         ]])->assertOk()->assertJsonPath('count', 1);
@@ -1753,7 +2171,7 @@ class ImportStudentMatchingTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('count', 0)
             ->assertJsonPath('skipped', 1)
-            ->assertJsonFragment(['reason' => 'NISN dan NIS mengarah ke siswa berbeda; periksa kembali identitas pada file.']);
+            ->assertJsonFragment(['reason' => 'NISN dan NIS mengarah ke siswa berbeda; baris ini dilewati.']);
         $this->assertDatabaseCount('siswa_biodata', 2);
     }
 
@@ -1789,9 +2207,9 @@ class ImportStudentMatchingTest extends TestCase
             ->assertJsonPath('count', 0)
             ->assertJsonFragment(['reason' => 'Riwayat untuk tahun ajaran ini sudah ada pada kelas berbeda; kelas lama tidak diubah.']);
 
-        $this->import('siswa', [array_merge($studentRow, ['kelas' => 'XI-1'])], 'Ganjil', '2024/2025')
+        $this->import('siswa', [array_merge($studentRow, ['kelas' => 'X-1'])], 'Ganjil', '2024/2025')
             ->assertOk()->assertJsonPath('count', 1);
-        $this->import('siswa', [array_merge($studentRow, ['kelas' => 'XII-1'])], 'Ganjil', '2025/2026')
+        $this->import('siswa', [array_merge($studentRow, ['kelas' => 'XI-1'])], 'Ganjil', '2025/2026')
             ->assertOk()->assertJsonPath('count', 1);
 
         $fourthHistory = $this->import('siswa', [array_merge($studentRow, ['kelas' => 'XII-1'])], 'Ganjil', '2026/2027');
@@ -1802,12 +2220,34 @@ class ImportStudentMatchingTest extends TestCase
         $studentId = DB::table('siswa_biodata')->where('nisn', '0000000330')->value('id');
         $this->assertSame(3, DB::table('siswa_riwayat_kelas')->where('siswa_id', $studentId)->count());
 
+        $createYearId = DB::table('sekolah_tahun_ajaran')->where('nama', '2026/2027')->value('id');
+        if ($createYearId === null) {
+            $createYearId = DB::table('sekolah_tahun_ajaran')->insertGetId([
+                'nama' => '2026/2027',
+                'sedang_berjalan' => false,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+        $createClassId = DB::table('sekolah_kelas')->where('nama', 'XII-1')->value('id');
+        if ($createClassId === null) {
+            $createClassId = DB::table('sekolah_kelas')->insertGetId([
+                'nama' => 'XII-1',
+                'tingkat' => 'XII',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
         $fourthAcademicHistory = $this->import('nilai', [[
             'nisn' => '0000000330',
             'nama' => 'Siswa Tiga Tahun',
             'kelas' => 'XII-1',
             'mtk' => 88,
-        ]], 'Ganjil', '2026/2027');
+        ]], 'Ganjil', '2026/2027', targetOptions: [
+            'create_riwayat' => true,
+            'create_tahun_ajaran_id' => $createYearId,
+            'create_kelas_id' => $createClassId,
+        ]);
         $fourthAcademicHistory->assertOk()
             ->assertJsonPath('count', 0)
             ->assertJsonFragment(['reason' => 'Siswa sudah memiliki 3 riwayat kelas; riwayat ke-4 tidak dapat dibuat.']);
@@ -2572,6 +3012,7 @@ class ImportStudentMatchingTest extends TestCase
                 'tahun_ajaran' => '2025/2026',
                 'semester' => 'Ganjil',
                 'mode' => 'semua',
+                'dup' => 'timpa',
                 'rows' => $rows,
                 'final_chunk' => $chunkIndex === 2,
             ]);
@@ -2642,20 +3083,23 @@ class ImportStudentMatchingTest extends TestCase
         array $rows,
         string $semester = 'Ganjil',
         ?string $academicYear = null,
-        ?string $duplicateMode = null
+        ?string $duplicateMode = null,
+        array $targetOptions = []
     ): TestResponse {
-        $sixSemesterFlow = $semester === 'auto' || in_array($semester, ['1', '2', '3', '4', '5', '6'], true);
+        $academicImport = in_array($type, ['nilai', 'hadir', 'kehadiran', 'ekskul'], true);
 
         $payload = [
             'type' => $type,
-            'tahun_ajaran' => $sixSemesterFlow ? '' : ($academicYear ?? '2025/2026'),
+            'tahun_ajaran' => $academicImport ? ($academicYear ?? '') : ($academicYear ?? '2025/2026'),
             'semester' => $semester,
             'mode' => 'semua',
+            'kelas' => $academicImport ? 'auto' : '',
             'rows' => $rows,
         ];
         if ($duplicateMode !== null) {
             $payload['dup'] = $duplicateMode;
         }
+        $payload = array_replace($payload, $targetOptions);
 
         return $this->actingAs($this->admin)->withoutMiddleware()->postJson(route('admin.import.save-batch'), $payload);
     }

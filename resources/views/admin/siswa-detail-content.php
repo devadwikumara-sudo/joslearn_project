@@ -156,6 +156,8 @@
         'canManageAcademicRecords' => $canManageAcademicRecords ?? false,
         'academicManagePermissions' => $academicManagePermissions ?? [],
         'academicMapelOptions' => $academicMapelOptions ?? collect(),
+        'academicYearOptions' => $academicYearOptions ?? collect(),
+        'academicClassOptions' => $academicClassOptions ?? collect(),
     ])
 
     @foreach($sections as $sectionTitle => $fields)

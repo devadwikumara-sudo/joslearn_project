@@ -47,6 +47,9 @@ class PdfSemesterFilterTest extends TestCase
             $table->string('nama_lengkap');
             $table->string('nisn')->nullable();
             $table->string('nomor_induk')->nullable();
+            $table->string('tahun_lulus')->nullable();
+            $table->string('alasan_keluar')->nullable();
+            $table->date('tanggal_keluar')->nullable();
             $table->timestamp('deleted_at')->nullable();
         });
         Schema::create('sekolah_identitas', function (Blueprint $table): void {
@@ -60,6 +63,7 @@ class PdfSemesterFilterTest extends TestCase
         Schema::create('sekolah_tahun_ajaran', function (Blueprint $table): void {
             $table->id();
             $table->string('nama');
+            $table->boolean('sedang_berjalan')->default(false);
         });
         Schema::create('sekolah_kelas', function (Blueprint $table): void {
             $table->id();
@@ -133,9 +137,9 @@ class PdfSemesterFilterTest extends TestCase
             'nomor_induk' => '1234',
         ]);
         DB::table('sekolah_tahun_ajaran')->insert([
-            ['id' => 1, 'nama' => '2023/2024'],
-            ['id' => 2, 'nama' => '2024/2025'],
-            ['id' => 3, 'nama' => '2025/2026'],
+            ['id' => 1, 'nama' => '2023/2024', 'sedang_berjalan' => false],
+            ['id' => 2, 'nama' => '2024/2025', 'sedang_berjalan' => false],
+            ['id' => 3, 'nama' => '2025/2026', 'sedang_berjalan' => true],
         ]);
         DB::table('sekolah_kelas')->insert([
             ['id' => 1, 'nama' => 'X-1', 'tingkat' => 'X'],
@@ -259,6 +263,140 @@ class PdfSemesterFilterTest extends TestCase
             ->assertSee('>96</td>', false)
             ->assertDontSee('>81</td>', false)
             ->assertDontSee('>88</td>', false);
+    }
+
+    public function test_pdf_renders_only_selected_slots_and_defaults_to_all_six_slots(): void
+    {
+        $selectedResponse = $this->withoutMiddleware()->get(route('admin.data-siswa.pdf', [
+            'id' => 1,
+            'bio' => 0,
+            'nilai' => 1,
+            'hadir' => 0,
+            'ekskul' => 0,
+            'naik' => 0,
+            'slots_present' => 1,
+            'slots' => ['X-1', 'XII-2'],
+        ]));
+
+        $selectedResponse->assertOk()
+            ->assertSee('value="X-1" checked', false)
+            ->assertSee('value="XII-2" checked', false)
+            ->assertDontSee('value="XI-1" checked', false)
+            ->assertSee('>81</td>', false)
+            ->assertSee('>96</td>', false)
+            ->assertDontSee('>88</td>', false)
+            ->assertDontSee('>94</td>', false);
+
+        $allSlotsResponse = $this->get(route('admin.data-siswa.pdf', 1));
+        $allSlotsResponse->assertOk();
+        foreach (['X-1', 'X-2', 'XI-1', 'XI-2', 'XII-1', 'XII-2'] as $slot) {
+            $allSlotsResponse->assertSee('value="'.$slot.'" checked', false);
+        }
+    }
+
+    public function test_batch_pdf_accepts_multiple_students_and_whole_class_or_all_students(): void
+    {
+        $activeStudentId = $this->createActiveStudent();
+        $options = [
+            'bio' => 1,
+            'nilai' => 0,
+            'hadir' => 0,
+            'ekskul' => 0,
+            'naik' => 0,
+        ];
+
+        $selectedResponse = $this->withoutMiddleware()->get(route('admin.pdf.batch', $options + [
+            'ids' => '1,'.$activeStudentId,
+        ]));
+        $selectedResponse->assertOk()
+            ->assertSee('Siswa Enam Semester')
+            ->assertSee('Siswa Aktif Cetak');
+
+        $classResponse = $this->get(route('admin.pdf.batch', $options + [
+            'target_kelas' => 'XII-1',
+            'target_ta' => '3',
+        ]));
+        $classResponse->assertOk()
+            ->assertSee('Siswa Enam Semester')
+            ->assertSee('Siswa Aktif Cetak');
+
+        $allResponse = $this->get(route('admin.pdf.batch', $options + [
+            'target_kelas' => '*',
+            'target_ta' => '*',
+        ]));
+        $allResponse->assertOk()
+            ->assertSee('Siswa Enam Semester')
+            ->assertSee('Siswa Aktif Cetak');
+    }
+
+    public function test_teacher_cannot_print_a_student_outside_the_visible_active_scope(): void
+    {
+        $activeStudentId = $this->createActiveStudent();
+        $teacher = Pengguna::query()->create([
+            'peran' => 'guru',
+            'username' => 'guru-pdf-test',
+            'password' => 'test-password',
+            'aktif' => true,
+        ]);
+
+        $this->actingAs($teacher)
+            ->get(route('guru.data-siswa.pdf', 1))
+            ->assertForbidden();
+
+        $this->get(route('guru.data-siswa.pdf-batch', ['ids' => '1']))
+            ->assertForbidden();
+
+        $this->get(route('guru.data-siswa.pdf', $activeStudentId))
+            ->assertOk();
+    }
+
+    public function test_missing_slots_print_empty_tables_unless_they_are_hidden(): void
+    {
+        $activeStudentId = $this->createActiveStudent();
+        $visibleEmptySlots = $this->withoutMiddleware()->get(route('admin.data-siswa.pdf', [
+            'id' => $activeStudentId,
+            'bio' => 0,
+            'nilai' => 1,
+            'hadir' => 1,
+            'ekskul' => 1,
+            'naik' => 0,
+        ]));
+
+        $visibleEmptySlots->assertOk()
+            ->assertSee('Belum ada data')
+            ->assertSee('Semester 1')
+            ->assertSee('Semester 3');
+
+        $hiddenEmptySlots = $this->get(route('admin.data-siswa.pdf', [
+            'id' => $activeStudentId,
+            'bio' => 1,
+            'nilai' => 1,
+            'hadir' => 1,
+            'ekskul' => 1,
+            'naik' => 0,
+            'hide_empty' => 1,
+        ]));
+
+        $hiddenEmptySlots->assertOk()
+            ->assertSee('I. BUKU INDUK REGISTER PESERTA DIDIK')
+            ->assertDontSee('II. LAPORAN HASIL CAPAIAN PEMBELAJARAN');
+    }
+
+    private function createActiveStudent(): int
+    {
+        $studentId = DB::table('siswa_biodata')->insertGetId([
+            'nama_lengkap' => 'Siswa Aktif Cetak',
+            'nisn' => '9876543210',
+            'nomor_induk' => '5678',
+        ]);
+        DB::table('siswa_riwayat_kelas')->insert([
+            'siswa_id' => $studentId,
+            'tahun_ajaran_id' => 3,
+            'kelas_id' => 3,
+            'status' => 'Aktif',
+        ]);
+
+        return $studentId;
     }
 
     public function test_pdf_uses_correct_school_identity_defaults_when_school_settings_are_empty(): void

@@ -104,6 +104,19 @@
             font-size: 12px;
             background: #fff;
         }
+        .pdf-slot-picker {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            width: 100%;
+        }
+        .pdf-slot-list {
+            display: flex;
+            align-items: center;
+            gap: 8px 14px;
+            flex-wrap: wrap;
+        }
 
         .btn-pdf {
             display: inline-flex;
@@ -438,8 +451,20 @@
 
             <span style="flex:1"></span>
 
+            <div class="pdf-slot-picker">
+                <strong>Slot akademik:</strong>
+                <div class="pdf-slot-list">
+                    @foreach(['X-1', 'X-2', 'XI-1', 'XI-2', 'XII-1', 'XII-2'] as $slot)
+                        <label><input type="checkbox" name="slots[]" value="{{ $slot }}" {{ in_array($slot, $selectedSlots ?? ['X-1', 'X-2', 'XI-1', 'XI-2', 'XII-1', 'XII-2'], true) ? 'checked' : '' }} onchange="this.form.submit()"> {{ $slot }}</label>
+                    @endforeach
+                </div>
+                <button type="button" class="btn-pdf outline" onclick="setSlots(true)">Pilih semua</button>
+                <button type="button" class="btn-pdf outline" onclick="setSlots(false)">Kosongkan</button>
+                <label><input type="checkbox" name="hide_empty" value="1" {{ !empty($hideEmptySlots) ? 'checked' : '' }} onchange="this.form.submit()"> Sembunyikan slot kosong</label>
+            </div>
+
             <label>Semester:
-                <select name="sem" onchange="this.form.submit()">
+                <select name="sem" onchange="submitLegacyFilters()">
                     <option value="Semua" {{ ($filterSem ?? 'Semua') === 'Semua' ? 'selected' : '' }}>Semua</option>
                     <option value="1" {{ ($filterSem ?? '') === '1' ? 'selected' : '' }}>Semester 1 · X Ganjil</option>
                     <option value="2" {{ ($filterSem ?? '') === '2' ? 'selected' : '' }}>Semester 2 · X Genap</option>
@@ -472,12 +497,18 @@
 
             <input type="hidden" name="paper" id="form-paper" value="{{ $paper ?? 'F4' }}">
             <input type="hidden" name="filter_applied" value="1">
+            <input type="hidden" name="slots_present" value="1">
             @if(request()->has('kelas'))
                 <input type="hidden" name="kelas" value="{{ request('kelas') }}">
             @endif
             @if(request()->has('ids'))
                 <input type="hidden" name="ids" value="{{ is_array(request('ids')) ? implode(',', request('ids')) : request('ids') }}">
             @endif
+            @foreach(['target_kelas', 'target_ta', 'q', 'st', 'tahun_ajaran'] as $preservedFilter)
+                @if(request()->has($preservedFilter))
+                    <input type="hidden" name="{{ $preservedFilter }}" value="{{ request($preservedFilter) }}">
+                @endif
+            @endforeach
         </form>
     </div>
 </div>
@@ -503,12 +534,29 @@ function applyPreset(v) {
         });
         if (f.sem) f.sem.value = 'Semua';
         if (f.ta) f.ta.value = 'Semua';
+        setSlots(true, false);
     } else {
         keys.forEach(k => {
             if (f[k]) f[k].checked = (k === v);
         });
     }
     f.submit();
+}
+
+function setSlots(selected, submit = true) {
+    document.querySelectorAll('#filter-form input[name="slots[]"]').forEach((slot) => {
+        slot.checked = selected;
+    });
+    if (submit) document.getElementById('filter-form').submit();
+}
+
+function submitLegacyFilters() {
+    const form = document.getElementById('filter-form');
+    form.querySelector('input[name="slots_present"]').disabled = true;
+    form.querySelectorAll('input[name="slots[]"]').forEach((slot) => {
+        slot.disabled = true;
+    });
+    form.submit();
 }
 </script>
 

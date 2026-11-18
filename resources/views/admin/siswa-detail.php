@@ -43,6 +43,8 @@
         'includeGraduationDetails' => true,
         'canManageAcademicRecords' => true,
         'academicMapelOptions' => $academicMapelOptions,
+        'academicYearOptions' => $academicYearOptions,
+        'academicClassOptions' => $academicClassOptions,
     ])
 </div>
 @endsection

@@ -28,9 +28,14 @@
             </div>
         @elseif(in_array($type, ['nilai', 'kehadiran', 'ekskul'], true))
             <div>
-                <label for="kelas">Kelas</label>
+                <label for="kelas">Kelas / tingkat tujuan</label>
                 <select name="kelas" id="kelas">
-                    <option value="*" selected>Semua kelas yang diizinkan</option>
+                    <option value="auto" selected>Deteksi dari Excel</option>
+                    @if($isAdmin)
+                        <option value="X">Kelas X (tingkat)</option>
+                        <option value="XI">Kelas XI (tingkat)</option>
+                        <option value="XII">Kelas XII (tingkat)</option>
+                    @endif
                     @foreach($kelasList as $kelas)
                         <option value="{{ $kelas }}">{{ $kelas }}</option>
                     @endforeach
@@ -40,16 +45,46 @@
                 <label for="semester">Semester</label>
                 <select name="semester" id="semester">
                     <option value="auto" selected>Deteksi dari kolom Excel</option>
-                    <option value="1">Semester 1 / Ganjil (sesuai tingkat kelas)</option>
-                    <option value="2">Semester 2 / Genap (sesuai tingkat kelas)</option>
-                    <option value="local-ganjil">Ganjil (sesuai tingkat kelas)</option>
-                    <option value="local-genap">Genap (sesuai tingkat kelas)</option>
-                    <option value="3">Semester global 3 (XI Ganjil)</option>
-                    <option value="4">Semester global 4 (XI Genap)</option>
-                    <option value="5">Semester global 5 (XII Ganjil)</option>
-                    <option value="6">Semester global 6 (XII Genap)</option>
+                    <option value="1">1 / Ganjil (tingkat terpilih)</option>
+                    <option value="2">2 / Genap (tingkat terpilih)</option>
                 </select>
             </div>
+            <div>
+                <label for="dup">Jika data akademik sudah ada</label>
+                <select name="dup" id="dup">
+                    <option value="skip" selected>Lewati data yang sudah ada</option>
+                    <option value="timpa">Timpa data yang sudah ada</option>
+                </select>
+            </div>
+            @if($isAdmin)
+                <div style="min-width:100%">
+                    <label style="display:flex;gap:8px;align-items:center">
+                        <input type="checkbox" name="create_riwayat" id="create_riwayat" value="1">
+                        Buat riwayat kelas bila belum ada
+                    </label>
+                    <div class="fl" style="margin-top:8px">
+                        <div>
+                            <label for="create_tahun_ajaran_id">Tahun ajaran riwayat baru</label>
+                            <select name="create_tahun_ajaran_id" id="create_tahun_ajaran_id">
+                                <option value="">Pilih tahun ajaran</option>
+                                @foreach($tahunAjaranList as $tahunAjaran)
+                                    <option value="{{ $tahunAjaran->id }}">{{ $tahunAjaran->nama }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div>
+                            <label for="create_kelas_id">Kelas riwayat baru</label>
+                            <select name="create_kelas_id" id="create_kelas_id">
+                                <option value="">Pilih kelas</option>
+                                @foreach($kelasOptions as $kelasOption)
+                                    <option value="{{ $kelasOption->id }}">{{ $kelasOption->nama }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+                    <small class="sub">Riwayat hanya dibuat saat diperlukan, maksimal tiga riwayat per siswa dan satu per tahun ajaran.</small>
+                </div>
+            @endif
         @endif
 
         @if(in_array($type, ['siswa', 'guru'], true))
@@ -82,15 +117,15 @@
     </p>
     @if($type === 'nilai')
         <p class="sub" style="margin:8px 0 0;font-size:12px">
-            Kolom didukung: <code>nisn</code>, <code>kelas</code>, <code>sem</code>, dan kode/nama mapel. Format tabel lebar maupun panjang didukung.
+            Kolom didukung: <code>nisn</code>, <code>nama</code>, <code>kelas</code>, <code>sem</code>, dan kode/nama mapel. Tahun ajaran tujuan mengikuti riwayat kelas siswa.
         </p>
     @elseif($type === 'kehadiran')
         <p class="sub" style="margin:8px 0 0;font-size:12px">
-            Kolom didukung: <code>nisn</code>, <code>nama</code>, <code>kelas</code>, <code>sem</code>, <code>sakit</code>, <code>izin</code>, <code>alpa</code>, dan <code>kokur</code>.
+            Kolom didukung: <code>nisn</code>, <code>nama</code>, <code>kelas</code>, <code>sem</code>, <code>sakit</code>, <code>izin</code>, <code>alpa</code>, dan <code>kokur</code>. Tahun ajaran tujuan mengikuti riwayat kelas siswa.
         </p>
     @elseif($type === 'ekskul')
         <p class="sub" style="margin:8px 0 0;font-size:12px">
-            Kolom didukung: <code>nisn</code>, <code>nama</code>, <code>kelas</code>, <code>sem</code>, <code>ekskul</code>, dan <code>predikat</code>.
+            Kolom didukung: <code>nisn</code>, <code>nama</code>, <code>kelas</code>, <code>sem</code>, <code>ekskul</code>, dan <code>predikat</code>. Tahun ajaran tujuan mengikuti riwayat kelas siswa.
         </p>
     @elseif($type === 'guru')
         <p class="sub" style="margin:8px 0 0;font-size:12px">
@@ -103,7 +138,7 @@
     @endif
     @if($isAdmin && in_array($type, ['nilai', 'kehadiran', 'ekskul'], true))
         <p class="sub" style="margin:8px 0 0;font-size:12px">
-            Nilai semester 1–2 di dalam kelas atau label Ganjil/Genap dikenali untuk kelas X, XI, dan XII.
+            Semester 1/Ganjil dan 2/Genap dipetakan menurut tingkat kelas; kolom semester yang tidak tersedia wajib dipilih sebelum import.
         </p>
     @endif
 </div>

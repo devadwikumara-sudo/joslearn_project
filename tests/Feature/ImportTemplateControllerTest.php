@@ -116,6 +116,6 @@ class ImportTemplateControllerTest extends TestCase
         $this->actingAs($admin)->get(route('admin.import', ['tab' => 'semua']))
             ->assertOk()
             ->assertSee('Import Semua Data')
-            ->assertSee('Kelas siswa default');
+            ->assertSee('Kelas biodata siswa default');
     }
 }

@@ -137,7 +137,8 @@
         <b>{{ $siswaList ? $siswaList->total() : 0 }} siswa</b>
         <div class="student-table-actions">
             <button type="button" class="btn o" onclick="cetakPdfTerpilih()">PDF terpilih</button>
-            <button type="button" class="btn o" onclick="cetakPdfSemua()">PDF semua tampil</button>
+            <button type="button" class="btn o" onclick="cetakPdfSemua()">PDF semua hasil filter</button>
+            <button type="button" class="btn o" onclick="cetakPdfSemuaSiswa()">PDF semua siswa</button>
             <button type="button" class="btn o" onclick="openBulkMovePanel()">Pindah kelas</button>
             <button type="button" id="delete-selected-button" class="btn x" onclick="deleteSelectedStudents()" disabled>Hapus terpilih</button>
             @if($kelasSelected !== '' && $kelasSelected !== '*')
@@ -222,6 +223,8 @@
                                 'includeGraduationDetails' => true,
                                 'canManageAcademicRecords' => true,
                                 'academicMapelOptions' => $academicMapelOptions,
+                                'academicYearOptions' => $academicYearOptions,
+                                'academicClassOptions' => $academicClassOptions,
                             ])
                         </template>
                         <a href="{{ route('admin.data-siswa.pdf', $s->id) }}" class="btn a" style="padding:3px 8px;font-size:12px">⬇ PDF</a>
@@ -463,19 +466,28 @@ function cetakPdfTerpilih() {
         alert('Pilih minimal satu siswa pada kotak centang terlebih dahulu untuk mencetak PDF terpilih.');
         return;
     }
-    const url = '{{ route("admin.pdf.batch") }}?ids=' + encodeURIComponent(ids.join(','));
-    window.open(url, '_blank');
+    openBookPdf({ ids: ids.join(',') });
 }
 
 function cetakPdfSemua() {
-    const allCheckboxes = document.querySelectorAll('.check-item');
-    const ids = Array.from(allCheckboxes).map(function(c) { return c.value; });
-    if (!ids.length) {
-        alert('Tidak ada siswa pada halaman ini untuk dicetak.');
-        return;
-    }
-    const url = '{{ route("admin.pdf.batch") }}?ids=' + encodeURIComponent(ids.join(','));
-    window.open(url, '_blank');
+    openBookPdf({
+        target_kelas: @json($kelasSelected !== '' ? $kelasSelected : '*'),
+        target_ta: @json((string) $tahunAjaranTerpilihId),
+        q: @json($search),
+        st: @json($statusFilter)
+    });
+}
+
+function cetakPdfSemuaSiswa() {
+    openBookPdf({ target_kelas: '*', target_ta: '*' });
+}
+
+function openBookPdf(filters) {
+    const url = new URL(@json(route('admin.pdf.batch')), window.location.origin);
+    Object.entries(filters).forEach(function([key, value]) {
+        if (value !== '' && value !== null) url.searchParams.set(key, value);
+    });
+    window.open(url.toString(), '_blank');
 }
 </script>
 @endpush

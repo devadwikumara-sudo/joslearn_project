@@ -27,8 +27,6 @@ class StudentAcademicHistoryPopupTest extends TestCase
         $histories = collect();
         foreach ([
             ['X-1', 'X', '2023/2024'],
-            ['XI-1', 'XI', '2024/2025'],
-            ['XII-1', 'XII', '2025/2026'],
         ] as [$className, $grade, $year]) {
             $history = new SiswaRiwayatKelas;
             $history->setRelation('kelas', new SekolahKelas(['nama' => $className, 'tingkat' => $grade]));
@@ -63,9 +61,11 @@ class StudentAcademicHistoryPopupTest extends TestCase
             'includeGraduationDetails' => true,
         ])->render();
 
+        $this->assertSame(6, preg_match_all('/data-academic-slot="\\d"/', $html));
         foreach (range(1, 6) as $semester) {
             $this->assertStringContainsString('Semester '.$semester, $html);
         }
+        $this->assertStringContainsString('Belum ada data', $html);
         $this->assertStringContainsString('Matematika: 88', $html);
         $this->assertStringContainsString('Sakit 1, Izin 2, Alpa 0', $html);
         $this->assertStringContainsString('Pramuka: Baik', $html);
@@ -111,6 +111,14 @@ class StudentAcademicHistoryPopupTest extends TestCase
             'siswa' => $siswa,
             'canManageAcademicRecords' => true,
             'academicMapelOptions' => new EloquentCollection([$mapel]),
+            'academicYearOptions' => new EloquentCollection([
+                new SekolahTahunAjaran(['nama' => '2025/2026']),
+            ]),
+            'academicClassOptions' => new EloquentCollection([
+                new SekolahKelas(['nama' => 'X-1', 'tingkat' => 'X']),
+                new SekolahKelas(['nama' => 'XI-1', 'tingkat' => 'XI']),
+                new SekolahKelas(['nama' => 'XII-1', 'tingkat' => 'XII']),
+            ]),
         ])->render();
 
         foreach (['nilai', 'kehadiran', 'ekskul'] as $type) {
@@ -120,5 +128,8 @@ class StudentAcademicHistoryPopupTest extends TestCase
         $this->assertStringContainsString('/data-siswa/3/rekam-akademik/nilai/99', $html);
         $this->assertStringContainsString('/data-siswa/3/rekam-akademik/kehadiran/100', $html);
         $this->assertStringContainsString('/data-siswa/3/rekam-akademik/ekskul/101', $html);
+        $this->assertStringContainsString('data-history-required="true"', $html);
+        $this->assertStringContainsString('name="tahun_ajaran_id"', $html);
+        $this->assertStringContainsString('name="kelas_id"', $html);
     }
 }

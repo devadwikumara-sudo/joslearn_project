@@ -63,6 +63,8 @@ class DataSiswaController extends Controller
             ->paginate(25)
             ->withQueryString();
         $academicMapelOptions = SekolahMapel::query()->orderBy('nama')->get(['id', 'nama', 'kode']);
+        $academicYearOptions = $tahunAjaranList;
+        $academicClassOptions = SekolahKelas::query()->orderBy('nama')->get(['id', 'nama', 'tingkat']);
         $oldInput = $request->hasSession()
             ? $request->session()->get('_old_input', [])
             : [];
@@ -105,6 +107,8 @@ class DataSiswaController extends Controller
             'siswaList',
             'taAktifDefaultId',
             'academicMapelOptions',
+            'academicYearOptions',
+            'academicClassOptions',
             'formOpen',
             'formData',
             'formCloseUrl'
@@ -266,8 +270,10 @@ class DataSiswaController extends Controller
     {
         $siswa = $this->studentWithDetails($id);
         $academicMapelOptions = SekolahMapel::query()->orderBy('nama')->get(['id', 'nama', 'kode']);
+        $academicYearOptions = SekolahTahunAjaran::query()->orderBy('nama')->get(['id', 'nama']);
+        $academicClassOptions = SekolahKelas::query()->orderBy('nama')->get(['id', 'nama', 'tingkat']);
 
-        return view('admin.siswa-detail', compact('siswa', 'academicMapelOptions'));
+        return view('admin.siswa-detail', compact('siswa', 'academicMapelOptions', 'academicYearOptions', 'academicClassOptions'));
     }
 
     private function studentWithDetails(int $id): SiswaBiodata

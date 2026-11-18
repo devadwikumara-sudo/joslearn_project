@@ -116,6 +116,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin.only'])->grou
     Route::delete('/data-guru/{id}', [DataGuruController::class, 'destroy'])->name('data-guru.destroy');
 
     // Import Fleksibel API (Universal Batch Save)
+    Route::post('/import/preview-match', [ImportBatchController::class, 'previewMatch'])->name('import.preview-match');
     Route::post('/import/metadata', [ImportBatchController::class, 'metadata'])->name('import.metadata');
     Route::post('/import/start-batch', [ImportBatchController::class, 'startBatch'])->name('import.start-batch');
     Route::post('/import/save-batch', [ImportBatchController::class, 'saveBatch'])->name('import.save-batch');
@@ -280,12 +281,14 @@ Route::prefix('guru')->name('guru.')->middleware(['auth', 'role.web'])->group(fu
     Route::get('/data-siswa/export', [DataSiswaGuruController::class, 'export'])->name('data-siswa.export');
     Route::get('/data-siswa/pdf-semua', [DataSiswaGuruController::class, 'pdfAll'])->name('data-siswa.pdf-all');
     Route::post('/data-siswa/pdf-terpilih', [DataSiswaGuruController::class, 'pdfSelected'])->name('data-siswa.pdf-selected');
+    Route::get('/data-siswa/pdf-batch', [PdfCetakController::class, 'batch'])->name('data-siswa.pdf-batch');
     Route::get('/data-siswa/{id}/pdf', [PdfCetakController::class, 'single'])->name('data-siswa.pdf');
     Route::get('/data-siswa/{id}/foto', [DataSiswaController::class, 'foto'])->name('data-siswa.foto');
     Route::get('/data-siswa/{id}/berkas/{jenis}', [DataSiswaController::class, 'berkas'])->name('data-siswa.berkas');
     Route::get('/data-siswa/{id}', [DataSiswaGuruController::class, 'show'])->name('data-siswa.show');
 
     // Import Fleksibel API (Universal Batch Save - Guru)
+    Route::post('/import/preview-match', [ImportBatchController::class, 'previewMatch'])->name('import.preview-match');
     Route::post('/import/metadata', [ImportBatchController::class, 'metadata'])->name('import.metadata');
     Route::post('/import/start-batch', [ImportBatchController::class, 'startBatch'])->name('import.start-batch');
     Route::post('/import/save-batch', [ImportBatchController::class, 'saveBatch'])->name('import.save-batch');

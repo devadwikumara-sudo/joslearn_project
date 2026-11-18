@@ -91,6 +91,7 @@ class ImportDataController extends Controller
             $kelasList = SekolahKelas::query()->orderBy('nama')->pluck('nama')
                 ->sortBy(static fn (string $nama): string => $nama, SORT_NATURAL)
                 ->values();
+            $kelasOptions = SekolahKelas::query()->orderBy('nama')->get(['id', 'nama', 'tingkat']);
         } else {
             $kelas = $type === 'nilai'
                 ? $aksesGuru->kelasDiajar($user)
@@ -98,6 +99,7 @@ class ImportDataController extends Controller
             $kelasList = $kelas->pluck('nama')
                 ->sortBy(static fn (string $nama): string => $nama, SORT_NATURAL)
                 ->values();
+            $kelasOptions = $kelas;
         }
 
         $templateRoute = $isAdmin ? 'admin.import.template' : 'guru.import-data.template';
@@ -135,6 +137,7 @@ class ImportDataController extends Controller
             'indexRoute',
             'isAdmin',
             'kelasList',
+            'kelasOptions',
             'riwayatImport',
             'taAktif',
             'tahunAjaranList',

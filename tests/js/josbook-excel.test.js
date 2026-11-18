@@ -59,11 +59,17 @@ async function importWorkbook(workbook, expectedType = 'siswa', dictionaries = {
     const window = {toast() {}};
     const preview = {innerHTML: ''};
     let payload = null;
-    const classField = ['siswa', 'semua'].includes(expectedType) ? {value: expectedType === 'semua' ? '*' : 'X-1'} : null;
+    const classField = ['nilai', 'hadir', 'ekskul', 'semua'].includes(expectedType)
+        ? {value: 'auto', options: []}
+        : {value: 'X-1', options: []};
+    const studentClassField = expectedType === 'semua' ? {value: ''} : null;
     const modeField = ['siswa', 'semua'].includes(expectedType) ? {value: 'semua'} : null;
-    const yearField = expectedType === 'semua' ? {value: '2025/2026'} : null;
-    const semesterField = expectedType === 'semua' ? {value: 'auto'} : null;
-    const duplicateField = expectedType === 'semua' ? {value: 'lengkapi'} : null;
+    const yearField = ['siswa', 'guru'].includes(expectedType) ? {value: '2025/2026'} : null;
+    const semesterField = expectedType === 'semua'
+        ? {value: 'auto'}
+        : (['nilai', 'hadir', 'ekskul'].includes(expectedType) ? {value: '1'} : null);
+    const duplicateField = ['siswa', 'guru', 'semua'].includes(expectedType) ? {value: 'lengkapi'} : null;
+    const academicDuplicateField = ['nilai', 'hadir', 'ekskul', 'semua'].includes(expectedType) ? {value: 'skip'} : null;
     const csrfMeta = {getAttribute: () => 'csrf-test'};
     const endpointMeta = {getAttribute: () => '/test/save-batch'};
     const baseMeta = {getAttribute: () => '/test'};
@@ -73,16 +79,20 @@ async function importWorkbook(workbook, expectedType = 'siswa', dictionaries = {
             if (id === 'tahun_ajaran') return yearField;
             if (id === 'semester') return semesterField;
             if (id === 'duplikat') return duplicateField;
+            if (id === 'dup') return academicDuplicateField;
             if (id === 'mode') return modeField;
+            if (id === 'kelas-siswa') return studentClassField;
             if (id === 'kelas') return classField;
             return null;
         },
         querySelector(selector) {
             if (selector === '[name="kelas"]') return classField;
+            if (selector === '[name="kelas_siswa"]') return studentClassField;
             if (selector === 'select[name="mode"]') return modeField;
             if (selector === 'input[name="tahun_ajaran"]') return yearField;
             if (selector === 'select[name="semester"]') return semesterField;
             if (selector === 'select[name="duplikat"]') return duplicateField;
+            if (selector === 'select[name="dup"]') return academicDuplicateField;
             if (selector === 'meta[name="csrf-token"]') return csrfMeta;
             if (selector === 'meta[name="batch-import-url"]') return endpointMeta;
             if (selector === 'meta[name="app-base-url"]') return baseMeta;
@@ -146,6 +156,29 @@ async function importWorkbook(workbook, expectedType = 'siswa', dictionaries = {
                 message: 'Impor selesai',
                 ...saveResponse
             };
+        } else if (endpoint.endsWith('/preview-match')) {
+            data = {
+                success: true,
+                results: request.rows.map((row, index) => ({
+                    index,
+                    row: row.__excel_row || index + 1,
+                    student: {
+                        id: index + 1,
+                        nama_lengkap: row.nama || 'Siswa Uji',
+                        nisn: row.nisn || null,
+                        nomor_induk: row.nis || null
+                    },
+                    metode: row.nisn ? 'nisn' : (row.nis ? 'nis' : 'nama'),
+                    level: 'ok',
+                    pesan: null,
+                    target: {
+                        kelas: row.kelas || request.kelas,
+                        tahun_ajaran: '2025/2026',
+                        semester: row.sem || request.semester,
+                        riwayat_baru: false
+                    }
+                }))
+            };
         } else {
             data = {success: true};
         }
@@ -190,6 +223,7 @@ async function importWorkbook(workbook, expectedType = 'siswa', dictionaries = {
         window,
         requests,
         modeField,
+        semesterField,
         getPayload: () => payload,
         getState: () => JSON.parse(JSON.stringify(window.JosBookState.imp)),
         runImport: () => window.executeBatchImport(),
@@ -530,6 +564,23 @@ test('automatically maps common alternate headers for grades, attendance, extrac
         assert.equal(state.statuses[0].status, 'ready', fixture.type);
         fixture.assertions(state.rows[0]);
     }
+});
+
+test('holds academic rows when semester is neither detected nor selected', async () => {
+    const imported = await importWorkbook({
+        SheetNames: ['Nilai'],
+        Sheets: {
+            Nilai: [
+                ['NISN', 'Nama', 'Kelas', 'Matematika'],
+                ['0000000123', 'Siswa Uji', 'X-1', 90]
+            ]
+        }
+    }, 'nilai');
+
+    imported.semesterField.value = 'auto';
+    await imported.window.refreshImportPreviewOptions();
+    assert.equal(imported.getState().statuses[0].status, 'error');
+    assert.match(imported.getState().errors[0].msg, /Semester tidak terdeteksi/);
 });
 
 test('previews all detected workbook categories and imports them in dependency order', async () => {

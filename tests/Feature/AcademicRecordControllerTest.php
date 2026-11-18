@@ -6,6 +6,7 @@ use App\Models\Auth\Pengguna;
 use App\Models\Guru\GuruBiodata;
 use App\Models\SiswaBiodata;
 use App\Models\SiswaRiwayatKelas;
+use App\Services\AcademicRecordAccess;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -242,6 +243,53 @@ class AcademicRecordControllerTest extends TestCase
             ->value('keterangan'));
     }
 
+    public function test_admin_can_create_a_missing_grade_history_and_academic_record_together(): void
+    {
+        [$student, , , , $subjects] = $this->createAcademicContext();
+        $admin = $this->createUser('admin', 'create-history-admin');
+        $yearId = DB::table('sekolah_tahun_ajaran')->insertGetId([
+            'nama' => '2024/2025',
+            'sedang_berjalan' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $classId = DB::table('sekolah_kelas')->insertGetId([
+            'nama' => 'XI-1',
+            'tingkat' => 'XI',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->actingAs($admin)->post(route('siswa.akademik.store', [
+            'siswa' => $student->id,
+            'jenis' => 'nilai',
+        ]), [
+            'tingkat' => 'XI',
+            'tahun_ajaran_id' => $yearId,
+            'kelas_id' => $classId,
+            'semester' => 'Ganjil',
+            'mapel_id' => $subjects[0],
+            'nilai_angka' => 88,
+        ])->assertRedirect();
+
+        $historyId = (int) DB::table('siswa_riwayat_kelas')
+            ->where('siswa_id', $student->id)
+            ->where('kelas_id', $classId)
+            ->value('id');
+        $this->assertNotSame(0, $historyId);
+        $this->assertDatabaseHas('siswa_nilai', [
+            'riwayat_kelas_id' => $historyId,
+            'semester' => 'Ganjil',
+            'mapel_id' => $subjects[0],
+            'nilai_angka' => 88,
+        ]);
+        $this->assertDatabaseHas('catatan_aktivitas', [
+            'aksi' => 'tambah_riwayat_kelas',
+            'objek_tipe' => 'siswa_riwayat_kelas',
+            'objek_id' => $historyId,
+        ]);
+    }
+
     public function test_invalid_scores_and_attendance_counts_are_rejected_without_writing_records(): void
     {
         [$student, $history, , , $subjects] = $this->createAcademicContext();
@@ -460,7 +508,28 @@ class AcademicRecordControllerTest extends TestCase
         [$student, $history, , , $subjects] = $this->createAcademicContext();
         $teacher = $this->createUser('guru', 'unassigned-teacher');
 
-        $this->actingAs($teacher)->post(route('siswa.akademik.store', [
+        $permissions = app(AcademicRecordAccess::class)->permissionsFor($teacher, $history);
+        $student->setRelation('riwayatKelasAkademik', collect([$history]));
+        $html = view('partials.siswa-akademik-content', [
+            'siswa' => $student,
+            'academicManagePermissions' => [$history->id => $permissions],
+        ])->render();
+        $this->assertStringNotContainsString('data-academic-open', $html);
+        $newYearId = DB::table('sekolah_tahun_ajaran')->insertGetId([
+            'nama' => '2024/2025',
+            'sedang_berjalan' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $newClassId = DB::table('sekolah_kelas')->insertGetId([
+            'nama' => 'XI-1',
+            'tingkat' => 'XI',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->actingAs($teacher);
+        $this->post(route('siswa.akademik.store', [
             'siswa' => $student->id,
             'jenis' => 'nilai',
         ]), [
@@ -470,7 +539,20 @@ class AcademicRecordControllerTest extends TestCase
             'nilai_angka' => 88,
         ])->assertForbidden();
 
+        $this->post(route('siswa.akademik.store', [
+            'siswa' => $student->id,
+            'jenis' => 'nilai',
+        ]), [
+            'tingkat' => 'XI',
+            'tahun_ajaran_id' => $newYearId,
+            'kelas_id' => $newClassId,
+            'semester' => 'Ganjil',
+            'mapel_id' => $subjects[0],
+            'nilai_angka' => 88,
+        ])->assertForbidden();
+
         $this->assertDatabaseCount('siswa_nilai', 0);
+        $this->assertDatabaseCount('siswa_riwayat_kelas', 1);
         $this->assertDatabaseCount('catatan_aktivitas', 0);
     }
 

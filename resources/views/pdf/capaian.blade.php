@@ -16,15 +16,18 @@
 
     $kktp = $kktp ?? 75;
     $kelasNama = $riwayatKelas?->kelas?->nama ?? $siswa->kelas_aktif ?? '-';
-    $tingkat = explode('-', $kelasNama)[0] ?? 'X';
+    $tingkat = \App\Support\Semester::tingkatDariNamaKelas($kelasNama) ?? 'X';
     $isXII = strtoupper($tingkat) === 'XII';
-    $semesterStart = ['X' => 1, 'XI' => 3, 'XII' => 5][strtoupper($tingkat)] ?? 1;
     $termSemesterNumbers = [
-        'Ganjil' => $semesterStart,
-        'Genap' => $semesterStart + 1,
+        'Ganjil' => \App\Support\Semester::nomor($tingkat, 'Ganjil'),
+        'Genap' => \App\Support\Semester::nomor($tingkat, 'Genap'),
     ];
 
-    $semList = ($filterSem && $filterSem !== 'Semua') ? [$filterSem] : ['Ganjil', 'Genap'];
+    $semList = isset($slotSemesters)
+        ? $slotSemesters
+        : (($filterSem && $filterSem !== 'Semua') ? [$filterSem] : ['Ganjil', 'Genap']);
+    $emptySemesters = $emptySemesters ?? [];
+    $isEmptySlot = count($semList) > 0 && count(array_intersect($semList, $emptySemesters)) === count($semList);
     $numSem = count($semList);
 
     // Kategori Mapel Kurikulum Merdeka per Tingkat
@@ -142,11 +145,11 @@
                                     if (is_numeric($score)) {
                                         $totalNilaiPerSem[$sm] += (float)$score;
                                         $countNilaiPerSem[$sm]++;
-                                    } else {
+                                    } elseif (!in_array($sm, $emptySemesters, true)) {
                                         $adaMissing = true;
                                     }
                                 @endphp
-                                <td>{{ is_numeric($score) ? $score : 'X' }}</td>
+                                <td>{{ in_array($sm, $emptySemesters, true) ? '-' : (is_numeric($score) ? $score : 'X') }}</td>
                             @endforeach
                         </tr>
                     @endforeach
@@ -178,7 +181,7 @@
         @foreach($semList as $sm)
             <div class="kk">
                 <div>No &nbsp; Deskripsi Nilai Kokurikuler (Semester {{ $termSemesterNumbers[$sm] ?? $sm }})</div>
-                <div>{{ $termSemesterNumbers[$sm] ?? $sm }} &nbsp; {{ $kokurMap[$sm] ?? 'Terlaksana dengan baik sesuai dengan Projek Penguatan Profil Pelajar Pancasila (P5).' }}</div>
+                <div>{{ $termSemesterNumbers[$sm] ?? $sm }} &nbsp; {{ in_array($sm, $emptySemesters, true) ? '-' : ($kokurMap[$sm] ?? 'Terlaksana dengan baik sesuai dengan Projek Penguatan Profil Pelajar Pancasila (P5).') }}</div>
             </div>
         @endforeach
     @endif
@@ -211,9 +214,9 @@
                 @empty
                     <tr>
                         <td>1</td>
-                        <td class="l">Pramuka (Wajib)</td>
+                        <td class="l">Belum ada data</td>
                         @foreach($semList as $sm)
-                            <td>B</td>
+                            <td>-</td>
                         @endforeach
                     </tr>
                 @endforelse
@@ -238,21 +241,21 @@
                     <td>1</td>
                     <td class="l">Sakit</td>
                     @foreach($semList as $sm)
-                        <td>{{ (int)($hadirMap[$sm]['sakit'] ?? 0) }} hari</td>
+                        <td>{{ in_array($sm, $emptySemesters, true) ? '-' : (int)($hadirMap[$sm]['sakit'] ?? 0).' hari' }}</td>
                     @endforeach
                 </tr>
                 <tr>
                     <td>2</td>
                     <td class="l">Izin</td>
                     @foreach($semList as $sm)
-                        <td>{{ (int)($hadirMap[$sm]['izin'] ?? 0) }} hari</td>
+                        <td>{{ in_array($sm, $emptySemesters, true) ? '-' : (int)($hadirMap[$sm]['izin'] ?? 0).' hari' }}</td>
                     @endforeach
                 </tr>
                 <tr>
                     <td>3</td>
                     <td class="l">Tanpa Keterangan (Alpha)</td>
                     @foreach($semList as $sm)
-                        <td>{{ (int)($hadirMap[$sm]['alpa'] ?? 0) }} hari</td>
+                        <td>{{ in_array($sm, $emptySemesters, true) ? '-' : (int)($hadirMap[$sm]['alpa'] ?? 0).' hari' }}</td>
                     @endforeach
                 </tr>
             </tbody>
@@ -262,10 +265,10 @@
     @if($optNaik)
         @php
             $keputusan = $riwayatKelas?->keputusan_kenaikan;
-            if (!$keputusan) {
+            if (!$keputusan && !$isEmptySlot) {
                 $keputusan = $isXII ? 'LULUS' : 'NAIK';
             }
-            $pilihanKenaikan = in_array(strtoupper($keputusan), ['LULUS', 'TIDAK LULUS'], true)
+            $pilihanKenaikan = in_array(strtoupper((string) $keputusan), ['LULUS', 'TIDAK LULUS'], true)
                 ? ['LULUS', 'TIDAK LULUS']
                 : ['NAIK', 'TIDAK NAIK'];
             $kelasTujuan = $kelasTujuanNama ?? ($nextKelasMap[$kelasNama] ?? '-');
@@ -286,15 +289,20 @@
         <div class="fr in">
             <span></span>
             <span>Peserta Didik ditetapkan</span>
-            <span>: 
-                @foreach($pilihanKenaikan as $idx => $pk)
-                    @if(strtoupper($keputusan) === $pk)
-                        <b>{{ $pk }}</b>
-                    @else
-                        <s>{{ $pk }}</s>
-                    @endif
-                    @if($idx < count($pilihanKenaikan) - 1) / @endif
-                @endforeach
+            <span>
+                @if($isEmptySlot)
+                    : -
+                @else
+                    :
+                    @foreach($pilihanKenaikan as $idx => $pk)
+                        @if(strtoupper((string) $keputusan) === $pk)
+                            <b>{{ $pk }}</b>
+                        @else
+                            <s>{{ $pk }}</s>
+                        @endif
+                        @if($idx < count($pilihanKenaikan) - 1) / @endif
+                    @endforeach
+                @endif
             </span>
         </div>
         <div class="fr in">

@@ -75,6 +75,13 @@
         return r ? t + '-' + r : t + '-1';
     };
 
+    const targetClass = value => {
+        const text = String(value ?? '').trim().toUpperCase();
+        if (!text || ['*', 'AUTO', 'DETEKSI DARI EXCEL'].includes(text)) return 'auto';
+        if (['X', 'XI', 'XII'].includes(text)) return text;
+        return normK(text);
+    };
+
     const normAcademicYear = v => {
         const match = /(?:^|\D)(20\d{2})\s*[/-]\s*(\d{2}|20\d{2})(?:\D|$)/.exec(String(v ?? '').trim());
         if (!match) return '';
@@ -88,6 +95,22 @@
         const labeledMatch = /(?:tahun\s*(?:ajaran|pelajaran)|academic\s*year|ta)\s*[:=-]?\s*((?:19|20)\d{2}\s*[/-]\s*(?:\d{2}|(?:19|20)\d{2}))/i.exec(metadata);
         const match = labeledMatch || /((?:19|20)\d{2}\s*[/-]\s*(?:\d{2}|(?:19|20)\d{2}))/.exec(metadata);
         return match ? normAcademicYear(match[1]) : '';
+    };
+
+    const classFromSheetName = name => {
+        const match = /(?:^|[^A-Z0-9])(?:kelas\s*)?(XII|XI|X|12|11|10)(?:\s*[-._/]\s*([A-Z0-9]+))?(?=$|[^A-Z0-9])/i.exec(String(name ?? ''));
+        if (!match) return '';
+        const grade = RM[match[1]] || match[1].toUpperCase();
+        return match[2] ? normK(`${grade}-${match[2]}`) : grade;
+    };
+
+    const semesterFromSheetName = name => {
+        const text = String(name ?? '');
+        const globalSemester = /(?:semester|smt|sem)\s*([1-6])\b/i.exec(text);
+        if (globalSemester) return globalSemester[1];
+        if (/\bganjil\b/i.test(text)) return 'Ganjil';
+        if (/\bgenap\b/i.test(text)) return 'Genap';
+        return '';
     };
 
     const normSem = v => {
@@ -909,12 +932,11 @@
             if (!ts.length) ts.push('siswa');
         }
 
-        let kelas = '';
-        if (/^\s*(kelas\s*)?(XII|XI|X|12|11|10)([\s\-._]*[A-Za-z0-9 ]*)?$/i.test(name)) kelas = normK(name);
+        let kelas = classFromSheetName(name);
         if (!kelas) {
             for (let r = 0; r < hr && !kelas; r++) {
                 const m = /kelas\s*[:=]?\s*([A-Za-z0-9.\- ]{1,10})/i.exec((aoa[r] || []).join(' '));
-                if (m && /^(XII|XI|X|12|11|10)/i.test(m[1].trim())) kelas = normK(m[1]);
+                if (m && /^(XII|XI|X|12|11|10)/i.test(m[1].trim())) kelas = targetClass(m[1]);
             }
         }
         const tahunAjaran = yearBeforeHeader(aoa, hr, name);
@@ -1101,9 +1123,23 @@
                 });
                 if (!o0.nisn && !o0.nama) continue;
                 if (!o0.nisn && sw.test(String(o0.nama).trim())) continue;
-                if (!o0.kelas && Z.kelas) o0.kelas = Z.kelas;
+                if (!o0.kelas && Z.kelas) {
+                    if (['X', 'XI', 'XII'].includes(targetClass(Z.kelas))) {
+                        o0.__target_kelas = targetClass(Z.kelas);
+                    } else {
+                        o0.kelas = Z.kelas;
+                    }
+                }
                 if (!o0.tahun_ajaran && Z.tahunAjaran) o0.tahun_ajaran = Z.tahunAjaran;
                 if (o0.nisn) o0.nisn = normN(o0.nisn);
+                if (Z.importClass && Z.importClass !== 'default') o0.__target_kelas = Z.importClass;
+                if (Z.importSemester && Z.importSemester !== 'default') {
+                    o0.__target_semester = Z.importSemester === 'auto' && Z.detectedSemester
+                        ? Z.detectedSemester
+                        : Z.importSemester;
+                } else if (I.sem === 'auto' && Z.detectedSemester) {
+                    o0.__target_semester = Z.detectedSemester;
+                }
 
                 if (t === 'siswa') {
                     const o = {...o0, ...(bk['']||{})};
@@ -1210,15 +1246,22 @@
                 if (r.nisn && !/^\d{10}$/.test(r.nisn)) {
                     addError(idx, id, 'NISN bukan 10 digit: "' + r.nisn + '"');
                 }
-                const rowClass = normK(r.kelas || S.imp.kelas);
-                if (!rowClass) {
+                const rowClass = normK(r.kelas || '');
+                const classSelection = targetClass(S.imp.kelas);
+                const effectiveClass = rowClass || (classSelection === 'auto' ? '' : classSelection);
+                const selectedGrade = ['X', 'XI', 'XII'].includes(classSelection) ? classSelection : '';
+                const actualGrade = /^(XII|XI|X)(?:-|$)/.exec(rowClass)?.[1] || '';
+                if (!effectiveClass) {
                     addError(idx, id, 'Kelas tidak ditentukan');
-                } else if (knownClasses.length && !knownClasses.includes(rowClass)) {
+                } else if (rowClass && knownClasses.length && !knownClasses.includes(rowClass)) {
                     addError(idx, id, `Kelas tidak dikenal: "${rowClass}"`);
-                } else if (S.imp.mode === 'kelas' && S.imp.kelas && rowClass !== S.imp.kelas) {
-                    addError(idx, id, `Kelas pada baris (${rowClass}) berbeda dari kelas yang dipilih (${S.imp.kelas})`);
+                } else if (selectedGrade && actualGrade && selectedGrade !== actualGrade) {
+                    addError(idx, id, `Tingkat kelas pada baris (${actualGrade}) berbeda dari pilihan (${selectedGrade})`);
+                } else if (classSelection !== 'auto' && !selectedGrade && rowClass && rowClass !== classSelection) {
+                    addError(idx, id, `Kelas pada baris (${rowClass}) berbeda dari kelas yang dipilih (${classSelection})`);
                 }
-                const explicitSemester = Number(normSem(r.sem) || (['3', '4', '5', '6'].includes(String(S.imp.sem)) ? S.imp.sem : ''));
+                const selectedSemester = r.__target_semester || S.imp.sem;
+                const explicitSemester = Number(normSem(r.sem) || (['3', '4', '5', '6'].includes(String(selectedSemester)) ? selectedSemester : ''));
                 if (explicitSemester >= 3 && rowClass) {
                     const grade = /^(XII|XI|X)(?:-|$)/.exec(rowClass)?.[1];
                     const expectedGrade = explicitSemester <= 2 ? 'X'
@@ -1226,6 +1269,9 @@
                     if (grade && grade !== expectedGrade) {
                         addError(idx, id, `Semester ${explicitSemester} tidak sesuai dengan tingkat kelas ${grade}`);
                     }
+                }
+                if (!normSem(r.sem) && ['auto', '', 'default'].includes(String(selectedSemester).toLowerCase())) {
+                    addError(idx, id, 'Semester tidak terdeteksi. Pilih semester 1/Ganjil atau 2/Genap.');
                 }
                 if (t === 'nilai') {
                     const values = Object.entries(r).filter(([key, value]) => value !== '' && value != null && valueFields.has(key));
@@ -1281,6 +1327,19 @@
             sem: 'auto',
             dup: 'lengkapi',
             ta: '2024/2025',
+            academicClass: 'auto',
+            createHistory: false,
+            createYearId: '',
+            createClassId: '',
+            matchResults: [],
+            matchPreviewResults: [],
+            matchPreviewPromise: Promise.resolve(),
+            matchPreviewSignature: '',
+            matchPreviewError: '',
+            allMatchPreviewPromise: Promise.resolve(),
+            allMatchPreviewSignature: '',
+            allMatchPreviewError: '',
+            allMatchPreviewResults: {},
             raws: null,
             rows: null,
             detection: null,
@@ -1320,15 +1379,30 @@
         const monthEl = document.querySelector('select[name="bulan"]') || document.getElementById('bulan');
         if (monthEl && monthEl.value) I.sem = Number(monthEl.value) >= 7 ? '1' : '2';
 
-        const dupEl = document.querySelector('select[name="duplikat"]') || document.getElementById('duplikat');
-        if (dupEl && dupEl.value) I.dup = dupEl.value;
-        else I.dup = I.t === 'siswa' ? 'lengkapi' : 'skip';
+        const academicDupEl = document.querySelector('select[name="dup"]') || document.getElementById('dup');
+        const studentDupEl = document.querySelector('select[name="duplikat"]') || document.getElementById('duplikat');
+        if (['nilai', 'hadir', 'ekskul', 'semua'].includes(I.t) && academicDupEl?.value) {
+            I.dup = academicDupEl.value;
+        } else if (studentDupEl?.value) {
+            I.dup = studentDupEl.value;
+        } else {
+            I.dup = I.t === 'siswa' ? 'lengkapi' : 'skip';
+        }
 
         const modeEl = document.querySelector('select[name="mode"]') || document.getElementById('mode');
         if (modeEl && modeEl.value) I.mode = (modeEl.value === 'kelas') ? 'kelas' : 'semua';
 
         const kelasEl = document.querySelector('[name="kelas"]') || document.getElementById('kelas');
-        if (kelasEl) {
+        if (I.t === 'semua' || ['nilai', 'hadir', 'ekskul'].includes(I.t)) {
+            I.academicClass = targetClass(kelasEl?.value || 'auto');
+        }
+
+        if (I.t === 'semua' || (I.t === 'siswa' && I.allWorkbook)) {
+            const studentClassEl = document.querySelector('[name="kelas_siswa"]') || document.getElementById('kelas-siswa');
+            I.kelas = normK(studentClassEl?.value || '') || '';
+        } else if (['nilai', 'hadir', 'ekskul'].includes(I.t)) {
+            I.kelas = I.academicClass;
+        } else if (kelasEl) {
             if (kelasEl.value === '*') {
                 I.mode = 'semua';
                 I.kelas = '';
@@ -1340,6 +1414,10 @@
                 I.kelas = normK(kelasEl.value) || '';
             }
         }
+
+        I.createHistory = Boolean(document.getElementById('create_riwayat')?.checked);
+        I.createYearId = document.getElementById('create_tahun_ajaran_id')?.value || '';
+        I.createClassId = document.getElementById('create_kelas_id')?.value || '';
     }
 
     function syncDetectedAcademicYear(rows) {
@@ -1383,6 +1461,161 @@
         }
 
         return data;
+    }
+
+    const academicTypes = ['nilai', 'hadir', 'ekskul'];
+
+    function matchSignature(type, rows, kelas, semester) {
+        const I = S.imp;
+        return JSON.stringify({
+            type,
+            kelas,
+            semester,
+            createHistory: I.createHistory,
+            createYearId: I.createYearId,
+            createClassId: I.createClassId,
+            rows: (rows || []).map(row => [
+                row.nisn, row.nis, row.nama, row.kelas, row.sem, row.tahun_ajaran,
+                row.__target_kelas, row.__target_semester
+            ])
+        });
+    }
+
+    function applyMatchResults(rows, statuses, results) {
+        const errors = [];
+        const warns = [];
+        (results || []).forEach((result, index) => {
+            const rowIndex = Number.isInteger(result.index) ? result.index : index;
+            const status = statuses[rowIndex];
+            if (!status) return;
+            if (result.level === 'error') {
+                const message = result.pesan || 'Baris tidak dapat dicocokkan atau target riwayat tidak tersedia.';
+                status.status = 'error';
+                status.errors.push(message);
+                errors.push({no: status.row, id: rows[rowIndex]?.nama || rows[rowIndex]?.nisn || `Baris ${status.row}`, msg: message, index: rowIndex});
+            } else if (result.level === 'peringatan') {
+                const message = result.pesan || 'Nama siswa berbeda dari identitas yang ditemukan; periksa kembali.';
+                if (status.status !== 'error') status.status = 'warning';
+                status.warns.push(message);
+                warns.push({no: status.row, id: rows[rowIndex]?.nama || rows[rowIndex]?.nisn || `Baris ${status.row}`, msg: message, index: rowIndex});
+            }
+        });
+        return {errors, warns};
+    }
+
+    function createMatchPayload(type, rows, kelas, semester) {
+        const I = S.imp;
+        const payload = {
+            type: type === 'hadir' ? 'kehadiran' : type,
+            rows,
+            kelas: kelas || 'auto',
+            semester: semester || 'auto',
+            create_riwayat: I.createHistory
+        };
+        if (I.ta) payload.tahun_ajaran = I.ta;
+        if (I.createHistory) {
+            payload.create_tahun_ajaran_id = I.createYearId;
+            payload.create_kelas_id = I.createClassId;
+        }
+        return payload;
+    }
+
+    async function fetchMatchResults(type, rows, kelas, semester) {
+        const results = [];
+        for (let start = 0; start < rows.length; start += 200) {
+            const chunk = rows.slice(start, start + 200);
+            const data = await postImportJson(importEndpoint('preview-match'), createMatchPayload(type, chunk, kelas, semester));
+            results.push(...(data.results || []).map(result => ({
+                ...result,
+                index: start + (Number.isInteger(result.index) ? result.index : 0)
+            })));
+        }
+        return results;
+    }
+
+    function refreshSingleMatchPreview() {
+        const I = S.imp;
+        if (!academicTypes.includes(I.t) || !Array.isArray(I.rows) || I.rows.length === 0) {
+            return Promise.resolve([]);
+        }
+
+        const signature = matchSignature(I.t, I.rows, I.kelas, I.sem);
+        if (I.matchPreviewSignature === signature) return I.matchPreviewPromise;
+
+        I.matchPreviewSignature = signature;
+        I.matchPreviewPending = true;
+        I.matchPreviewError = '';
+        I.matchPreviewResults = [];
+        I.matchPreviewPromise = fetchMatchResults(I.t, I.rows, I.kelas, I.sem)
+            .then(results => {
+                if (I.matchPreviewSignature === signature) I.matchPreviewResults = results;
+                return results;
+            })
+            .catch(error => {
+                if (I.matchPreviewSignature === signature) I.matchPreviewError = error.message;
+                return [];
+            })
+            .finally(() => {
+                if (I.matchPreviewSignature === signature) {
+                    I.matchPreviewPending = false;
+                    renderPreviewUI(false);
+                }
+            });
+
+        return I.matchPreviewPromise;
+    }
+
+    function allMatchSignature() {
+        const I = S.imp;
+        return JSON.stringify({
+            kelas: I.academicClass,
+            semester: I.sem,
+            createHistory: I.createHistory,
+            createYearId: I.createYearId,
+            createClassId: I.createClassId,
+            groups: (I.allGroups || []).filter(group => academicTypes.includes(group.type)).map(group => [
+                group.type,
+                group.rows.map(row => [
+                    row.nisn, row.nis, row.nama, row.kelas, row.sem, row.tahun_ajaran,
+                    row.__target_kelas, row.__target_semester
+                ])
+            ])
+        });
+    }
+
+    function refreshAllMatchPreview() {
+        const I = S.imp;
+        const groups = (I.allGroups || []).filter(group => academicTypes.includes(group.type) && group.rows.length > 0);
+        if (!groups.length) return Promise.resolve({});
+
+        const signature = allMatchSignature();
+        if (I.allMatchPreviewSignature === signature) return I.allMatchPreviewPromise;
+
+        I.allMatchPreviewSignature = signature;
+        I.allMatchPreviewPending = true;
+        I.allMatchPreviewError = '';
+        I.allMatchPreviewResults = {};
+        I.allMatchPreviewPromise = (async () => {
+            for (const group of groups) {
+                I.allMatchPreviewResults[group.type] = await fetchMatchResults(
+                    group.type,
+                    group.rows,
+                    I.academicClass,
+                    I.sem
+                );
+            }
+            return I.allMatchPreviewResults;
+        })().catch(error => {
+            if (I.allMatchPreviewSignature === signature) I.allMatchPreviewError = error.message;
+            return {};
+        }).finally(() => {
+            if (I.allMatchPreviewSignature === signature) {
+                I.allMatchPreviewPending = false;
+                renderAllPreview(false);
+            }
+        });
+
+        return I.allMatchPreviewPromise;
     }
 
     function savedFormatFor(formats, index) {
@@ -1433,10 +1666,13 @@
     }
 
     // ─── Render Panel Pratinjau & Pemetaan Kolom ────────────────────────────────
-    function renderPreviewUI() {
+    function renderPreviewUI(refreshMatches = true) {
         const I = S.imp;
         const container = document.getElementById('josbook-import-preview-area');
         if (!container) return;
+        if (refreshMatches && academicTypes.includes(I.t)) {
+            void refreshSingleMatchPreview();
+        }
 
         const t = I.t;
         const tLabel = {
@@ -1452,9 +1688,26 @@
         const uniqueClasses = [...new Set(rows.map(r => normK(r.kelas || '')).filter(Boolean))];
         const uniqueAcademicYears = [...new Set(rows.map(r => normAcademicYear(r.tahun_ajaran || '')).filter(Boolean))];
         const {errors, warns, statuses} = validateRows(rows, t);
+        const currentMatchSignature = academicTypes.includes(t)
+            ? matchSignature(t, rows, I.kelas, I.sem)
+            : '';
+        if (I.matchPreviewSignature === currentMatchSignature && I.matchPreviewError) {
+            rows.forEach((row, index) => {
+                if (!statuses[index] || statuses[index].status === 'error') return;
+                const message = `Pencocokan di server gagal: ${I.matchPreviewError}`;
+                statuses[index].status = 'error';
+                statuses[index].errors.push(message);
+                errors.push({no: statuses[index].row, id: row.nama || row.nisn || `Baris ${statuses[index].row}`, msg: message, index});
+            });
+        } else if (I.matchPreviewSignature === currentMatchSignature && I.matchPreviewResults.length) {
+            const serverValidation = applyMatchResults(rows, statuses, I.matchPreviewResults);
+            errors.push(...serverValidation.errors);
+            warns.push(...serverValidation.warns);
+        }
         I.errors = errors;
         I.warns = warns;
         I.statuses = statuses;
+        I.matchResults = I.matchPreviewSignature === currentMatchSignature ? I.matchPreviewResults : [];
         I.mappingIssues = mappingIssues(I);
         const readyCount = statuses.filter(row => row.status === 'ready').length;
         const warningCount = statuses.filter(row => row.status === 'warning').length;
@@ -1486,6 +1739,8 @@
                     <h3 style="margin:0">2. Hasil Deteksi Otomatis</h3>
                     <span class="bd ok" style="font-size:12px;padding:4px 10px">Terdeteksi: Data Siswa</span>
                 </div>
+                ${I.allMatchPreviewPending ? '<p class="bd">Memeriksa kecocokan siswa dan target riwayat setiap sheet di server...</p>' : ''}
+                ${I.allMatchPreviewError && I.allMatchPreviewSignature === signature ? `<p class="bd e">Pencocokan server gagal: ${escapeHtml(I.allMatchPreviewError)}</p>` : ''}
                 <div class="bar" style="flex-wrap:wrap;gap:6px">
                     <span class="bd">Sheet “${escapeHtml(detected.sheet)}” · judul baris ${detected.headerRow}</span>
                     <span class="bd">${detected.sheetCount} sheet</span>
@@ -1616,6 +1871,8 @@
         const warningsAccepted = Boolean(I.warningsConfirmed);
         const importDisabled = readyCount + warningCount <= 0
             || I.mappingIssues.length > 0
+            || I.matchPreviewPending
+            || Boolean(I.matchPreviewError && I.matchPreviewSignature === currentMatchSignature)
             || (warningCount > 0 && !warningsAccepted);
         const importLabel = readyCount + warningCount <= 0
             ? 'Tidak ada baris valid untuk diimpor'
@@ -1625,6 +1882,7 @@
                     ? 'Konfirmasi peringatan sebelum mengimpor'
                     : `⬇ Impor ${readyCount + warningCount} Baris ${t === 'siswa' ? 'ke Data Siswa' : (tLabel[t] || t)}`;
 
+        const matchResultsByIndex = new Map((I.matchResults || []).map(result => [result.index, result]));
         let prevHtml = `
             <div class="card" style="margin-top:14px">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
@@ -1636,6 +1894,8 @@
                     </div>
                 </div>
                 ${!totalRows ? `<p class="bd e">Belum ada baris yang dapat dipratinjau. ${escapeHtml(I.mappingIssues[0] || 'Periksa format file atau pemetaan kolom.')}</p>` : ''}
+                ${I.matchPreviewPending ? '<p class="bd">Memeriksa kecocokan siswa dan target riwayat di server...</p>' : ''}
+                ${I.matchPreviewError && I.matchPreviewSignature === currentMatchSignature ? `<p class="bd e">Pencocokan server gagal: ${escapeHtml(I.matchPreviewError)}</p>` : ''}
 
                 <div class="bar" style="flex-wrap:wrap;gap:6px;margin-bottom:12px">
                     ${Object.entries(classBreakdown).map(([k, n]) => `<span class="bd ${k === '(Belum Ada Kelas)' ? 'e' : 'ok'}">${escapeHtml(k)}: <b>${n}</b> baris</span>`).join('')}
@@ -1654,6 +1914,7 @@
                         <tr>
                             <th>#</th>
                             <th>Status</th>
+                            ${academicTypes.includes(t) ? '<th>Siswa cocok</th><th>Metode cocok</th><th>Kelas tujuan</th><th>Tahun ajaran tujuan</th><th>Semester tujuan</th>' : ''}
                             ${previewKeys.map(k => `<th>${escapeHtml(FL[k] || SN[k] || k.toUpperCase())}</th>`).join('')}
                         </tr>
                     </thead>
@@ -1662,6 +1923,11 @@
                             <tr style="background:${statusByRow[i].status === 'error' ? '#fff1f0' : statusByRow[i].status === 'warning' ? '#fffbeb' : '#f0fdf4'}">
                                 <td>${i + 1} <small>(Excel ${statusByRow[i].row})</small></td>
                                 <td><span class="bd ${statusByRow[i].status === 'error' ? 'e' : statusByRow[i].status === 'warning' ? 'w' : 'ok'}">${statusByRow[i].status === 'error' ? 'Error' : statusByRow[i].status === 'warning' ? 'Peringatan' : 'Siap'}</span>${[...statusByRow[i].errors, ...statusByRow[i].warns].map(message => `<div style="font-size:11px;margin-top:3px">${escapeHtml(message)}</div>`).join('')}</td>
+                                ${academicTypes.includes(t) ? (() => {
+                                    const result = matchResultsByIndex.get(i);
+                                    const method = {nisn: 'NISN', nis: 'NIS', nama: 'Nama'}[result?.metode] || '';
+                                    return `<td>${escapeHtml(result?.student?.nama_lengkap || '')}</td><td>${escapeHtml(method)}</td><td>${escapeHtml(result?.target?.kelas || '')}</td><td>${escapeHtml(result?.target?.tahun_ajaran || '')}</td><td>${escapeHtml(result?.target?.semester || '')}</td>`;
+                                })() : ''}
                                 ${previewKeys.map(k => `<td contenteditable="true" data-row="${i}" data-field="${escapeHtml(k)}" onblur="window.editImportCell(this)" style="min-width:80px">${r[k] !== undefined && r[k] !== null && r[k] !== '' ? escapeHtml(r[k]) : ''}</td>`).join('')}
                             </tr>`).join('')}
                     </tbody>
@@ -1677,6 +1943,7 @@
 
         S.imp.warningsConfirmed = false;
         renderPreviewUI();
+        return S.imp.matchPreviewPromise;
     };
 
     // ─── Ubah Pemetaan Kolom Interaktif (C.cmap) ────────────────────────────────
@@ -1695,6 +1962,7 @@
         I.warningsConfirmed = false;
         if (I.rows.some(q => q.kelas)) I.mode = 'semua';
         renderPreviewUI();
+        return I.matchPreviewPromise;
     };
 
     window.changeStudentColumnMap = function(columnIndex, field) {
@@ -1893,7 +2161,7 @@
             if (type === 'siswa') {
                 rows = sheets.flatMap(sheet => sheet.rows || []);
             } else {
-                const temporary = {t: type, raws: sheets, newM: []};
+                const temporary = {t: type, raws: sheets, newM: [], sem: I.sem};
                 rows = buildRows(temporary);
                 newM = temporary.newM;
             }
@@ -1907,7 +2175,10 @@
                 })
                 : mappingIssues({t: type, raws: sheets, newM});
             I.newM = newM;
+            const previousClass = I.kelas;
+            if (academicTypes.includes(type)) I.kelas = I.academicClass;
             const validation = validateRows(rows, type);
+            I.kelas = previousClass;
             return {
                 type,
                 sheets,
@@ -1985,8 +2256,32 @@
             </tr>`;
         }).join('');
 
+        const targetClassOptions = [
+            ['default', 'Gunakan default workbook'],
+            ['auto', 'Deteksi dari Excel'],
+            ['X', 'Kelas X (tingkat)'],
+            ['XI', 'Kelas XI (tingkat)'],
+            ['XII', 'Kelas XII (tingkat)'],
+            ...(Array.from(document.querySelector('[name="kelas"]')?.options || [])
+                .map(option => [option.value, option.textContent])
+                .filter(([value]) => value && !['auto', 'X', 'XI', 'XII'].includes(value)))
+        ];
+        const classTargetSelect = sheet.type === 'siswa' ? '' : `
+            <label>Kelas / tingkat tujuan
+                <select onchange="window.changeAllSheetTarget(${sheetIndex}, 'class', this.value)">
+                    ${targetClassOptions.map(([value, label]) => `<option value="${escapeHtml(value)}" ${(sheet.importClass || 'default') === value ? 'selected' : ''}>${escapeHtml(label)}</option>`).join('')}
+                </select>
+            </label>`;
+        const semesterTargetSelect = sheet.type === 'siswa' ? '' : `
+            <label>Semester tujuan
+                <select onchange="window.changeAllSheetTarget(${sheetIndex}, 'semester', this.value)">
+                    ${[['default', 'Gunakan default workbook'], ['auto', 'Deteksi dari Excel'], ['1', '1 / Ganjil'], ['2', '2 / Genap']]
+                        .map(([value, label]) => `<option value="${value}" ${(sheet.importSemester || 'default') === value ? 'selected' : ''}>${label}</option>`).join('')}
+                </select>
+            </label>`;
+
         return `<div class="card" style="margin-top:10px">
-            <div class="bar" style="justify-content:space-between"><strong>Sheet “${escapeHtml(sheet.name)}”</strong>${typeSelect}</div>
+            <div class="bar" style="justify-content:space-between;flex-wrap:wrap"><strong>Sheet “${escapeHtml(sheet.name)}”</strong>${typeSelect}${classTargetSelect}${semesterTargetSelect}</div>
             <p class="sub">Jenis: ${escapeHtml(ALL_IMPORT_LABELS[sheet.type])} · baris judul ${sheet.hr + 1} · ${sheet.rows?.length ?? 0} baris terbaca</p>
             <details>
                 <summary style="cursor:pointer;font-weight:600">Periksa / ubah pemetaan kolom</summary>
@@ -1998,12 +2293,38 @@
         </div>`;
     }
 
-    function renderAllPreview() {
+    function renderAllPreview(refreshMatches = true) {
         const I = S.imp;
         const container = document.getElementById('josbook-import-preview-area');
         if (!container) return;
 
+        if (refreshMatches) readFormOptions();
         rebuildAllGroups();
+        const signature = allMatchSignature();
+        if (refreshMatches && I.allMatchPreviewSignature !== signature) {
+            void refreshAllMatchPreview();
+        }
+        if (I.allMatchPreviewSignature === signature) {
+            I.allGroups.forEach(group => {
+                if (!academicTypes.includes(group.type)) return;
+                const results = I.allMatchPreviewResults[group.type] || [];
+                const serverValidation = applyMatchResults(group.rows, group.statuses, results);
+                group.errors.push(...serverValidation.errors);
+                group.warns.push(...serverValidation.warns);
+                if (I.allMatchPreviewError) {
+                    group.rows.forEach((row, index) => {
+                        if (!group.statuses[index] || group.statuses[index].status === 'error') return;
+                        const message = `Pencocokan di server gagal: ${I.allMatchPreviewError}`;
+                        group.statuses[index].status = 'error';
+                        group.statuses[index].errors.push(message);
+                        group.errors.push({no: group.statuses[index].row, id: row.nama || row.nisn || `Baris ${group.statuses[index].row}`, msg: message, index});
+                    });
+                }
+            });
+            I.errors = I.allGroups.flatMap(group => group.errors);
+            I.warns = I.allGroups.flatMap(group => group.warns);
+            I.statuses = I.allGroups.flatMap(group => group.statuses);
+        }
         const errorCount = I.allGroups.reduce((count, group) => count + group.errors.length, 0);
         const warningCount = I.allGroups.reduce((count, group) => count + group.warns.length, 0);
         const readyCount = I.allGroups.reduce((count, group) => count + group.statuses.filter(status => status.status === 'ready').length, 0);
@@ -2019,7 +2340,8 @@
             const keys = [...new Set(group.rows.slice(0, 15).flatMap(row => Object.keys(row).filter(key => !key.startsWith('__'))))].slice(0, 8);
             const previewRows = group.rows.slice(0, 15).map((row, index) => {
                 const status = group.statuses[index];
-                return `<tr><td>${index + 1}</td><td>${escapeHtml(status?.status || 'siap')}</td>${keys.map(key => `<td>${escapeHtml(row[key] ?? '')}</td>`).join('')}</tr>`;
+                const match = (I.allMatchPreviewResults[group.type] || []).find(result => result.index === index);
+                return `<tr><td>${index + 1}</td><td>${escapeHtml(status?.status || 'siap')}</td>${academicTypes.includes(group.type) ? `<td>${escapeHtml(match?.student?.nama_lengkap || '')}</td><td>${escapeHtml({nisn: 'NISN', nis: 'NIS', nama: 'Nama'}[match?.metode] || '')}</td><td>${escapeHtml(match?.target?.kelas || '')}</td><td>${escapeHtml(match?.target?.tahun_ajaran || '')}</td><td>${escapeHtml(match?.target?.semester || '')}</td>` : ''}${keys.map(key => `<td>${escapeHtml(row[key] ?? '')}</td>`).join('')}</tr>`;
             }).join('');
             const messages = [
                 ...group.mappingIssues.map(issue => `<li>${escapeHtml(issue)}</li>`),
@@ -2034,7 +2356,7 @@
                 </div>
                 ${messages ? `<details open style="margin-top:8px"><summary>Perlu diperiksa (${group.mappingIssues.length + group.errors.length + group.warns.length})</summary><ul>${messages}</ul></details>` : ''}
                 <div class="tw" style="margin-top:8px;max-height:280px;overflow:auto"><table>
-                    <thead><tr><th>#</th><th>Status</th>${keys.map(key => `<th>${escapeHtml(FL[key] || SN[key] || key)}</th>`).join('')}</tr></thead>
+                    <thead><tr><th>#</th><th>Status</th>${academicTypes.includes(group.type) ? '<th>Siswa cocok</th><th>Metode</th><th>Kelas tujuan</th><th>Tahun ajaran</th><th>Semester tujuan</th>' : ''}${keys.map(key => `<th>${escapeHtml(FL[key] || SN[key] || key)}</th>`).join('')}</tr></thead>
                     <tbody>${previewRows}</tbody>
                 </table></div>
             </div>`;
@@ -2044,7 +2366,10 @@
             ? `<div class="card" style="margin-top:12px;border-left:3px solid #c0392b"><strong>Sheet belum dipetakan</strong><ul>${I.allIssues.map(issue => `<li>${escapeHtml(issue)}</li>`).join('')}</ul></div>`
             : '';
         const warningsAccepted = Boolean(I.warningsConfirmed);
-        const disabled = blocking || I.allGroups.length === 0 || (warningCount > 0 && !warningsAccepted);
+        const disabled = blocking || I.allGroups.length === 0
+            || I.allMatchPreviewPending
+            || Boolean(I.allMatchPreviewError && I.allMatchPreviewSignature === signature)
+            || (warningCount > 0 && !warningsAccepted);
         const missingHtml = missingTypes.length
             ? `<p class="sub">Sheet untuk kategori berikut tidak ditemukan: ${missingTypes.map(type => escapeHtml(ALL_IMPORT_LABELS[type])).join(', ')}.</p>`
             : '';
@@ -2077,6 +2402,7 @@
 
     async function prepareAllWorkbook(workbook, fileName) {
         const I = S.imp;
+        readFormOptions();
         I.t = 'semua';
         I.fileName = fileName || 'import.xlsx';
         I.allWorkbook = workbook;
@@ -2101,6 +2427,9 @@
                 aoa,
                 type,
                 ignored: type === 'guru',
+                importClass: 'default',
+                importSemester: 'default',
+                detectedSemester: semesterFromSheetName(name),
                 headers: preliminary?.heads || [],
                 heads: preliminary?.heads || [],
                 hr: preliminary?.hr || 0
@@ -2126,6 +2455,7 @@
             await loadAllSheetType(sheet, sheet.type, true);
         }
         renderAllPreview();
+        await I.allMatchPreviewPromise;
     }
 
     window.changeAllSheetType = async function(sheetIndex, type) {
@@ -2145,6 +2475,16 @@
                 sheet.ignored = false;
             }
         }
+        I.warningsConfirmed = false;
+        renderAllPreview();
+    };
+
+    window.changeAllSheetTarget = function(sheetIndex, targetType, value) {
+        const I = S.imp;
+        const sheet = I.allSheets?.[sheetIndex];
+        if (!sheet || !ALL_IMPORT_TYPES.includes(sheet.type)) return;
+        if (targetType === 'class') sheet.importClass = value === 'default' ? 'default' : targetClass(value);
+        if (targetType === 'semester') sheet.importSemester = value;
         I.warningsConfirmed = false;
         renderAllPreview();
     };
@@ -2191,11 +2531,13 @@
         readFormOptions();
         S.imp.warningsConfirmed = false;
         renderAllPreview();
+        return S.imp.allMatchPreviewPromise;
     };
 
     window.confirmAllImportWarnings = function(confirmed) {
         S.imp.warningsConfirmed = Boolean(confirmed);
         renderAllPreview();
+        return S.imp.allMatchPreviewPromise;
     };
 
     function allMappingCorrections(type, sheets) {
@@ -2236,7 +2578,9 @@
     window.executeAllBatchImport = async function() {
         const I = S.imp;
         readFormOptions();
-        rebuildAllGroups();
+        renderAllPreview();
+        await I.allMatchPreviewPromise;
+        renderAllPreview(false);
         const errors = I.allGroups.flatMap(group => group.errors);
         const groupIssues = I.allGroups.flatMap(group => group.mappingIssues);
         if (I.allIssues.length || groupIssues.length || errors.length) {
@@ -2338,6 +2682,17 @@
             I.allBatchActive = false;
             I.mappingCorrectionOverride = null;
             I.formatIdOverride = null;
+            I.matchResults = [];
+            I.matchPreviewResults = [];
+            I.matchPreviewPromise = Promise.resolve();
+            I.matchPreviewSignature = '';
+            I.matchPreviewError = '';
+            I.matchPreviewPending = false;
+            I.allMatchPreviewPromise = Promise.resolve();
+            I.allMatchPreviewSignature = '';
+            I.allMatchPreviewError = '';
+            I.allMatchPreviewPending = false;
+            I.allMatchPreviewResults = {};
 
             if (I.t === 'semua') {
                 try {
@@ -2382,6 +2737,7 @@
                 I.mappingIssues = mappingIssues(I);
                 syncDetectedAcademicYear(I.rows);
                 renderPreviewUI();
+                await I.matchPreviewPromise;
                 if (window.toast && result.detection) window.toast(I.rows.length + ' siswa terbaca dari sheet ' + result.detection.sheet);
                 return;
             }
@@ -2449,6 +2805,7 @@
             if (I.mode !== 'kelas' && I.rows.some(q => q.kelas)) I.mode = 'semua';
 
             renderPreviewUI();
+            if (academicTypes.includes(I.t)) await I.matchPreviewPromise;
             if (window.toast) window.toast('Terdeteksi ' + I.rows.length + ' baris dari ' + w.SheetNames.length + ' sheet');
         };
         r.readAsArrayBuffer(f);
@@ -2478,6 +2835,17 @@
         S.imp.allBatchActive = false;
         S.imp.mappingCorrectionOverride = null;
         S.imp.formatIdOverride = null;
+        S.imp.matchResults = [];
+        S.imp.matchPreviewResults = [];
+        S.imp.matchPreviewPromise = Promise.resolve();
+        S.imp.matchPreviewSignature = '';
+        S.imp.matchPreviewError = '';
+        S.imp.matchPreviewPending = false;
+        S.imp.allMatchPreviewPromise = Promise.resolve();
+        S.imp.allMatchPreviewSignature = '';
+        S.imp.allMatchPreviewError = '';
+        S.imp.allMatchPreviewPending = false;
+        S.imp.allMatchPreviewResults = {};
         studentWorkbook = null;
         const c = document.getElementById('josbook-import-preview-area');
         if (c) c.innerHTML = '';
@@ -2488,6 +2856,14 @@
     window.executeBatchImport = async function() {
         const I = S.imp;
         readFormOptions();
+
+        if (academicTypes.includes(I.t)) {
+            await refreshSingleMatchPreview();
+            if (I.matchPreviewError) {
+                alert('Pencocokan di server gagal: ' + I.matchPreviewError);
+                return null;
+            }
+        }
 
         if (I.mappingIssues?.length) {
             alert('Perbaiki pemetaan kolom sebelum mengimpor: ' + I.mappingIssues.join(' '));
@@ -2546,6 +2922,9 @@
             mode: I.mode || 'semua',
             kelas: I.kelas || '',
             dup: I.dup || (I.t === 'siswa' ? 'lengkapi' : 'skip'),
+            create_riwayat: Boolean(I.createHistory),
+            create_tahun_ajaran_id: I.createHistory ? I.createYearId : null,
+            create_kelas_id: I.createHistory ? I.createClassId : null,
             format_id: I.formatIdOverride || I.savedFormats?.find(format => format?.format_id)?.format_id || null,
             mapping_corrections: I.mappingCorrectionOverride || mappingCorrections(I),
             new_classes: [...new Set(rowsToSend.map(r => normK(r.kelas || '')).filter(Boolean))],

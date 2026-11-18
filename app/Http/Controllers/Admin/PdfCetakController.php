@@ -13,20 +13,33 @@ use App\Models\SiswaKehadiran;
 use App\Models\SiswaNilai;
 use App\Models\SiswaRiwayatKelas;
 use App\Support\Semester;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class PdfCetakController extends Controller
 {
+    private const SLOT_OPTIONS = [
+        'X-1' => ['tingkat' => 'X', 'jenis' => 'Ganjil'],
+        'X-2' => ['tingkat' => 'X', 'jenis' => 'Genap'],
+        'XI-1' => ['tingkat' => 'XI', 'jenis' => 'Ganjil'],
+        'XI-2' => ['tingkat' => 'XI', 'jenis' => 'Genap'],
+        'XII-1' => ['tingkat' => 'XII', 'jenis' => 'Ganjil'],
+        'XII-2' => ['tingkat' => 'XII', 'jenis' => 'Genap'],
+    ];
+
     /**
      * Cetak dokumen PDF satu siswa (Register, Nilai, Hadir, Ekskul, Kenaikan).
      */
-    public function single(Request $request, $id): View
+    public function single(Request $request, int|string $id): View
     {
         $siswa = SiswaBiodata::where('id', $id)
             ->orWhere('nisn', $id)
             ->firstOrFail();
+
+        $this->authorizeTeacherStudents($request, [$siswa->id]);
 
         return $this->renderDocumentView($request, [$siswa->id], false);
     }
@@ -36,36 +49,128 @@ class PdfCetakController extends Controller
      */
     public function batch(Request $request): View
     {
-        $ids = $request->input('ids', []);
-        if (is_string($ids)) {
-            $ids = array_filter(explode(',', $ids));
+        $idsInput = $request->input('ids', []);
+        if (is_string($idsInput)) {
+            $idsInput = array_filter(array_map('trim', explode(',', $idsInput)), static fn (string $id): bool => $id !== '');
         }
 
-        $kelas = $request->input('kelas');
-        $ta = $request->input('ta', 'Semua');
+        $request->merge(['ids' => $idsInput]);
+        $selection = $request->validate([
+            'ids' => ['sometimes', 'array'],
+            'ids.*' => ['required', 'integer', 'distinct', 'exists:siswa_biodata,id'],
+            'target_kelas' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'target_ta' => ['sometimes', 'nullable', 'string', 'max:30'],
+            'kelas' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'ta' => ['sometimes', 'nullable', 'string', 'max:30'],
+            'q' => ['sometimes', 'nullable', 'string', 'max:150'],
+            'st' => ['sometimes', 'nullable', 'in:Aktif'],
+        ]);
+        $ids = array_map('intval', $selection['ids'] ?? []);
 
-        // Jika tidak ada list ID tetapi ada parameter kelas, ambil semua siswa di kelas tersebut
-        if (empty($ids) && ! empty($kelas)) {
-            $query = SiswaRiwayatKelas::whereNull('deleted_at');
-
-            if ($kelas !== '*') {
-                $kelasId = SekolahKelas::where('nama', $kelas)->value('id');
-                if ($kelasId) {
-                    $query->where('kelas_id', $kelasId);
-                }
-            }
-
-            if ($ta !== 'Semua') {
-                $taId = SekolahTahunAjaran::where('nama', $ta)->value('id');
-                if ($taId) {
-                    $query->where('tahun_ajaran_id', $taId);
-                }
-            }
-
-            $ids = $query->pluck('siswa_id')->unique()->toArray();
+        $kelas = (string) $request->input('target_kelas', $request->input('kelas', ''));
+        $ta = $request->input('target_ta');
+        if ($ta === null) {
+            $ta = $request->input('ta', 'Semua');
         }
+
+        if ($ids === [] && $kelas !== '') {
+            $ids = $this->studentIdsForTarget($request, $kelas, $ta);
+        }
+
+        $this->authorizeTeacherStudents($request, $ids);
 
         return $this->renderDocumentView($request, $ids, true);
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    private function studentIdsForTarget(Request $request, string $kelas, mixed $tahunAjaran): array
+    {
+        abort_unless(
+            $kelas === '*' || SekolahKelas::query()->where('nama', $kelas)->exists(),
+            422,
+            'Kelas cetak tidak ditemukan.'
+        );
+
+        $allYears = in_array($tahunAjaran, ['*', 'Semua', null, ''], true);
+        if (! $allYears) {
+            $yearExists = is_numeric($tahunAjaran)
+                ? SekolahTahunAjaran::query()->whereKey((int) $tahunAjaran)->exists()
+                : SekolahTahunAjaran::query()->where('nama', (string) $tahunAjaran)->exists();
+            abort_unless($yearExists, 422, 'Tahun ajaran cetak tidak ditemukan.');
+        }
+
+        $status = (string) $request->input('st', '');
+        $hasHistoryFilter = $kelas !== '*' || ! $allYears || $status !== '';
+
+        $yearId = is_numeric($tahunAjaran) && (int) $tahunAjaran > 0
+            ? (int) $tahunAjaran
+            : null;
+        $query = $request->user()?->peran === 'guru'
+            ? SiswaBiodata::aktif($yearId)
+            : SiswaBiodata::query();
+        if ($hasHistoryFilter) {
+            $query->whereHas('riwayatKelas', function (Builder $historyQuery) use ($kelas, $tahunAjaran, $allYears, $status): void {
+                if ($kelas !== '*') {
+                    $historyQuery->whereHas('kelas', fn (Builder $classQuery) => $classQuery->where('nama', $kelas));
+                }
+
+                if (! $allYears) {
+                    $historyQuery->whereHas('tahunAjaran', function (Builder $yearQuery) use ($tahunAjaran): void {
+                        if (is_numeric($tahunAjaran)) {
+                            $yearQuery->whereKey((int) $tahunAjaran);
+                        } else {
+                            $yearQuery->where('nama', (string) $tahunAjaran);
+                        }
+                    });
+                }
+
+                if ($status !== '') {
+                    $historyQuery->where('status', $status);
+                }
+            });
+        }
+
+        $search = trim((string) $request->input('q', ''));
+        if ($search !== '') {
+            $query->where(function (Builder $studentQuery) use ($search): void {
+                $studentQuery->where('nama_lengkap', 'like', "%{$search}%")
+                    ->orWhere('nisn', 'like', "%{$search}%")
+                    ->orWhere('nomor_induk', 'like', "%{$search}%");
+            });
+        }
+
+        return $query->pluck('id')->map(static fn ($id): int => (int) $id)->all();
+    }
+
+    /**
+     * @param  array<int, int>  $studentIds
+     */
+    private function authorizeTeacherStudents(Request $request, array $studentIds): void
+    {
+        if ($request->user()?->peran !== 'guru' || $studentIds === []) {
+            return;
+        }
+
+        $requestedYear = $request->input('tahun_ajaran', $request->input('target_ta'));
+        $yearId = is_numeric($requestedYear) && (int) $requestedYear > 0
+            ? (int) $requestedYear
+            : null;
+        $query = SiswaBiodata::aktif($yearId);
+
+        $kelas = (string) $request->input('target_kelas', $request->input('kelas', ''));
+        if ($kelas !== '' && $kelas !== '*') {
+            $query->whereHas('riwayatKelas', function (Builder $historyQuery) use ($kelas, $yearId): void {
+                $historyQuery->whereHas('kelas', fn (Builder $classQuery) => $classQuery->where('nama', $kelas));
+                if ($yearId !== null) {
+                    $historyQuery->where('tahun_ajaran_id', $yearId);
+                }
+            });
+        }
+
+        $visibleCount = $query->whereIn('id', $studentIds)->distinct()->count('siswa_biodata.id');
+        abort_unless($visibleCount === count(array_unique($studentIds)), 403);
     }
 
     /**
@@ -73,6 +178,29 @@ class PdfCetakController extends Controller
      */
     private function renderDocumentView(Request $request, array $siswaIds, bool $isBatch): View
     {
+        $request->validate([
+            'bio' => ['sometimes', 'boolean'],
+            'nilai' => ['sometimes', 'boolean'],
+            'hadir' => ['sometimes', 'boolean'],
+            'ekskul' => ['sometimes', 'boolean'],
+            'naik' => ['sometimes', 'boolean'],
+            'filter_applied' => ['sometimes', 'boolean'],
+            'sem' => ['sometimes', 'in:Semua,Ganjil,Genap,1,2,3,4,5,6'],
+            'ta' => ['sometimes', 'nullable', 'string', 'max:30'],
+            'kelas_filter' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'kelas' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'tahun_ajaran' => ['sometimes', 'nullable', 'integer', 'exists:sekolah_tahun_ajaran,id'],
+            'target_kelas' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'target_ta' => ['sometimes', 'nullable', 'string', 'max:30'],
+            'q' => ['sometimes', 'nullable', 'string', 'max:150'],
+            'st' => ['sometimes', 'nullable', 'in:Aktif'],
+            'slots_present' => ['sometimes', 'boolean'],
+            'slots' => ['sometimes', 'array'],
+            'slots.*' => ['string', 'in:X-1,X-2,XI-1,XI-2,XII-1,XII-2'],
+            'hide_empty' => ['sometimes', 'boolean'],
+            'paper' => ['sometimes', 'in:F4,A4'],
+        ]);
+
         // 1. Data Identitas Sekolah
         $sekolah = SekolahIdentitas::first();
         if (! $sekolah) {
@@ -110,12 +238,18 @@ class PdfCetakController extends Controller
             $filterSem = 'Semua';
         }
         $filterSemNumber = ctype_digit($filterSem) ? (int) $filterSem : null;
-        $filterSemGrade = $filterSemNumber === null ? null : Semester::tingkatDariNomor($filterSemNumber);
         $reportFilterSem = $filterSemNumber === null ? $filterSem : Semester::jenisDariNomor($filterSemNumber);
         $filterTa = $request->input('ta', 'Semua');
         $filterKelas = (string) $request->input('kelas_filter', 'Semua');
         $filterKelasList = SekolahKelas::orderBy('nama')->pluck('nama')->toArray();
         $paper = $request->input('paper', 'F4');
+        $selectedSlots = $this->selectedSlots($request, $filterSem, $filterKelas);
+        $slotTermsByGrade = [];
+        foreach ($selectedSlots as $slot) {
+            $option = self::SLOT_OPTIONS[$slot];
+            $slotTermsByGrade[$option['tingkat']][] = $option['jenis'];
+        }
+        $hideEmptySlots = $request->boolean('hide_empty');
 
         // 4. Mapping Next Kelas (Untuk Kenaikan Kelas)
         $allKelas = SekolahKelas::pluck('nama')->toArray();
@@ -176,21 +310,19 @@ class PdfCetakController extends Controller
                     return ($r->kelas?->nama ?? '') === $filterKelas;
                 });
             }
-            if ($filterSemGrade !== null) {
-                $riwayatSorted = $riwayatSorted->filter(function ($r) use ($filterSemGrade) {
-                    $className = $r->kelas?->nama ?? '';
-                    $grade = strtoupper((string) ($r->kelas?->tingkat ?? Semester::tingkatDariNamaKelas($className) ?? ''));
-
-                    return $grade === $filterSemGrade;
-                });
-            }
-
             $riwayatDataList = [];
+            $coveredGrades = [];
             foreach ($riwayatSorted as $rk) {
                 $kNama = $rk->kelas?->nama ?? 'X-1';
                 $taNama = $rk->tahunAjaran?->nama ?? '2024/2025';
+                $grade = strtoupper((string) ($rk->kelas?->tingkat ?? Semester::tingkatDariNamaKelas($kNama) ?? ''));
+                $selectedTerms = $slotTermsByGrade[$grade] ?? [];
+                if ($selectedTerms === []) {
+                    continue;
+                }
 
                 $uniqueClasses[$kNama] = true;
+                $coveredGrades[$grade] = true;
 
                 // Nilai Intrakurikuler
                 $nilaiRows = SiswaNilai::where('riwayat_kelas_id', $rk->id)
@@ -245,6 +377,20 @@ class PdfCetakController extends Controller
                     $waliKelasNip = filled($waliKelasNip) ? $waliKelasNip : $waliRel?->guru?->nip;
                 }
 
+                $emptySemesters = $this->emptySemesters(
+                    $selectedTerms,
+                    $nilaiMap,
+                    $hadirRows,
+                    $ekskulRows,
+                    $optNaik && filled($rk->keputusan_kenaikan)
+                );
+                $reportTerms = $hideEmptySlots
+                    ? array_values(array_diff($selectedTerms, $emptySemesters))
+                    : $selectedTerms;
+                if ($reportTerms === []) {
+                    continue;
+                }
+
                 $riwayatDataList[] = [
                     'riwayatKelas' => $rk,
                     'kelasTujuanNama' => $rk->kelasTujuan?->nama,
@@ -255,23 +401,46 @@ class PdfCetakController extends Controller
                     'ekskulList' => array_values($ekskulGrouped),
                     'waliKelasNama' => $waliKelasNama,
                     'waliKelasNip' => $waliKelasNip,
+                    'slotSemesters' => $reportTerms,
+                    'emptySemesters' => $hideEmptySlots ? [] : $emptySemesters,
                 ];
             }
 
-            // Jika siswa belum punya riwayat kelas (hanya biodata baru)
-            if (empty($riwayatDataList)) {
-                $riwayatDataList[] = [
-                    'riwayatKelas' => null,
-                    'kelasTujuanNama' => null,
-                    'taNama' => $filterTa !== 'Semua' ? $filterTa : ($taList[0] ?? '2024/2025'),
-                    'nilaiMap' => ['Ganjil' => [], 'Genap' => []],
-                    'hadirMap' => ['Ganjil' => ['sakit' => 0, 'izin' => 0, 'alpa' => 0], 'Genap' => ['sakit' => 0, 'izin' => 0, 'alpa' => 0]],
-                    'kokurMap' => ['Ganjil' => null, 'Genap' => null],
-                    'ekskulList' => [],
-                    'waliKelasNama' => null,
-                    'waliKelasNip' => null,
-                ];
+            if ($filterTa === 'Semua' && $filterKelas === 'Semua') {
+                foreach (['X', 'XI', 'XII'] as $grade) {
+                    $selectedTerms = $slotTermsByGrade[$grade] ?? [];
+                    if ($selectedTerms === [] || isset($coveredGrades[$grade])) {
+                        continue;
+                    }
+
+                    $emptyHistory = new SiswaRiwayatKelas;
+                    $emptyHistory->setRelation('kelas', new SekolahKelas([
+                        'nama' => $grade,
+                        'tingkat' => $grade,
+                    ]));
+                    $riwayatDataList[] = [
+                        'riwayatKelas' => $emptyHistory,
+                        'kelasTujuanNama' => null,
+                        'taNama' => 'Belum ada data',
+                        'nilaiMap' => ['Ganjil' => [], 'Genap' => []],
+                        'hadirMap' => ['Ganjil' => ['sakit' => 0, 'izin' => 0, 'alpa' => 0], 'Genap' => ['sakit' => 0, 'izin' => 0, 'alpa' => 0]],
+                        'kokurMap' => ['Ganjil' => null, 'Genap' => null],
+                        'ekskulList' => [],
+                        'waliKelasNama' => null,
+                        'waliKelasNip' => null,
+                        'slotSemesters' => $selectedTerms,
+                        'emptySemesters' => $selectedTerms,
+                    ];
+                }
             }
+
+            $riwayatDataList = array_values(array_filter($riwayatDataList, function (array $historyData) use ($hideEmptySlots): bool {
+                if ($hideEmptySlots) {
+                    return count($historyData['emptySemesters']) < count($historyData['slotSemesters']);
+                }
+
+                return true;
+            }));
 
             $siswaItems[] = [
                 'siswa' => $s,
@@ -324,6 +493,8 @@ class PdfCetakController extends Controller
             'filterTa',
             'filterKelas',
             'filterKelasList',
+            'selectedSlots',
+            'hideEmptySlots',
             'paper',
             'tingkatMapel',
             'subTitle',
@@ -332,5 +503,72 @@ class PdfCetakController extends Controller
             'siswaItems',
             'nextKelasMap'
         ));
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function selectedSlots(Request $request, string $filterSem, string $filterKelas): array
+    {
+        if ($request->exists('slots_present')) {
+            $slots = $request->input('slots', []);
+            if (! is_array($slots)) {
+                return [];
+            }
+
+            return array_values(array_intersect(array_keys(self::SLOT_OPTIONS), $slots));
+        }
+
+        if (ctype_digit($filterSem) && $filterSem !== '0') {
+            $semester = Semester::dari((int) $filterSem);
+            $selected = $semester['tingkat'].'-'.($semester['jenis'] === 'Ganjil' ? '1' : '2');
+        } elseif (in_array($filterSem, ['Ganjil', 'Genap'], true)) {
+            $selected = array_keys(array_filter(self::SLOT_OPTIONS, static fn (array $slot): bool => $slot['jenis'] === $filterSem));
+        } else {
+            $selected = array_keys(self::SLOT_OPTIONS);
+        }
+
+        if (is_string($selected)) {
+            $selected = [$selected];
+        }
+
+        if ($filterKelas !== 'Semua') {
+            $grade = Semester::tingkatDariNamaKelas($filterKelas);
+            if ($grade !== null) {
+                $selected = array_values(array_filter($selected, static fn (string $slot): bool => self::SLOT_OPTIONS[$slot]['tingkat'] === $grade));
+            }
+        }
+
+        return $selected;
+    }
+
+    /** @param array<string, array<string, mixed>> $nilaiMap
+     * @param  array<int, string>  $selectedTerms
+     * @return array<int, string>
+     */
+    private function emptySemesters(
+        array $selectedTerms,
+        array $nilaiMap,
+        EloquentCollection $hadirRows,
+        EloquentCollection $ekskulRows,
+        bool $hasPromotionData
+    ): array {
+        $emptySemesters = [];
+        foreach ($selectedTerms as $term) {
+            $hasRecords = ! empty($nilaiMap[$term])
+                || $hadirRows->contains(fn (SiswaKehadiran $row): bool => $this->semesterTerm($row->semester) === $term)
+                || $ekskulRows->contains(fn (SiswaEkskul $row): bool => $this->semesterTerm($row->semester) === $term)
+                || $hasPromotionData;
+            if (! $hasRecords) {
+                $emptySemesters[] = $term;
+            }
+        }
+
+        return $emptySemesters;
+    }
+
+    private function semesterTerm(string|int $semester): string
+    {
+        return $semester === 2 || strtolower((string) $semester) === 'genap' ? 'Genap' : 'Ganjil';
     }
 }

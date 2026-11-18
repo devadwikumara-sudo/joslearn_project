@@ -59,6 +59,8 @@
                     'optHadir'       => $optHadir,
                     'optEkskul'      => $optEkskul,
                     'optNaik'        => $optNaik,
+                    'slotSemesters'  => $rk['slotSemesters'] ?? null,
+                    'emptySemesters' => $rk['emptySemesters'] ?? [],
                 ])
                 @php $adaKonten = true; @endphp
             @endforeach

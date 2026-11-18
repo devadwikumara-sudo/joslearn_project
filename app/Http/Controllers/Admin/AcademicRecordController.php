@@ -5,17 +5,20 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Admin\CatatanAktivitas;
 use App\Models\Auth\Pengguna;
+use App\Models\SekolahKelas;
 use App\Models\SiswaBiodata;
 use App\Models\SiswaEkskul;
 use App\Models\SiswaKehadiran;
 use App\Models\SiswaNilai;
 use App\Models\SiswaRiwayatKelas;
 use App\Services\AcademicRecordAccess;
+use App\Support\Semester;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class AcademicRecordController extends Controller
 {
@@ -28,12 +31,29 @@ class AcademicRecordController extends Controller
     public function store(Request $request, SiswaBiodata $siswa, string $jenis, AcademicRecordAccess $access): RedirectResponse
     {
         $this->assertType($jenis);
-        $data = $this->validatedData($request, $jenis);
-        $history = $this->historyForStudent($siswa, (int) $data['riwayat_kelas_id']);
-        $access->authorize($request->user(), $jenis, $history, $data['mapel_id'] ?? null);
-        $model = $this->newRecord($jenis);
+        $createsHistory = ! $request->filled('riwayat_kelas_id');
+        $historyOptions = null;
+        if ($createsHistory) {
+            abort_unless($request->user()?->peran === 'admin', 403, 'Hanya admin yang dapat membuat riwayat kelas.');
+            $historyOptions = $this->validatedHistoryOptions($request);
+        }
 
-        DB::transaction(function () use ($model, $data, $jenis, $request, $siswa): void {
+        $data = $this->validatedData($request, $jenis, null, $createsHistory);
+        $history = $createsHistory
+            ? null
+            : $this->historyForStudent($siswa, (int) $data['riwayat_kelas_id']);
+        if ($history !== null) {
+            $access->authorize($request->user(), $jenis, $history, $data['mapel_id'] ?? null);
+        }
+
+        DB::transaction(function () use ($data, $jenis, $request, $siswa, $historyOptions): void {
+            if ($historyOptions !== null) {
+                $history = $this->createHistoryForStudent($siswa, $historyOptions);
+                $data['riwayat_kelas_id'] = $history->id;
+                $this->recordHistoryActivity($request->user(), $siswa, $history, $historyOptions['kelas_id']);
+            }
+
+            $model = $this->newRecord($jenis);
             $model->fill($data);
             $model->save();
             $this->recordActivity($request->user(), $jenis, 'tambah', $model, $siswa->id, null, $model->only(self::FIELDS[$jenis]));
@@ -81,12 +101,14 @@ class AcademicRecordController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function validatedData(Request $request, string $jenis, ?int $ignoreId = null): array
+    private function validatedData(Request $request, string $jenis, ?int $ignoreId = null, bool $createsHistory = false): array
     {
         $historyId = $request->input('riwayat_kelas_id');
         $semester = $request->input('semester');
         $rules = [
-            'riwayat_kelas_id' => ['required', 'integer', 'exists:siswa_riwayat_kelas,id'],
+            'riwayat_kelas_id' => $createsHistory
+                ? ['nullable', 'integer']
+                : ['required', 'integer', 'exists:siswa_riwayat_kelas,id'],
             'semester' => ['required', Rule::in(['Ganjil', 'Genap'])],
         ];
 
@@ -133,6 +155,77 @@ class AcademicRecordController extends Controller
         }
 
         return $request->validate($rules);
+    }
+
+    /**
+     * @return array{tingkat: string, tahun_ajaran_id: int, kelas_id: int}
+     */
+    private function validatedHistoryOptions(Request $request): array
+    {
+        return $request->validate([
+            'tingkat' => ['required', Rule::in(['X', 'XI', 'XII'])],
+            'tahun_ajaran_id' => ['required', 'integer', 'exists:sekolah_tahun_ajaran,id'],
+            'kelas_id' => ['required', 'integer', 'exists:sekolah_kelas,id'],
+        ]);
+    }
+
+    /**
+     * @param  array{tingkat: string, tahun_ajaran_id: int, kelas_id: int}  $options
+     */
+    private function createHistoryForStudent(SiswaBiodata $siswa, array $options): SiswaRiwayatKelas
+    {
+        $class = SekolahKelas::query()->findOrFail($options['kelas_id']);
+        $classGrade = $class->tingkat ?? Semester::tingkatDariNamaKelas($class->nama);
+        if ($classGrade !== $options['tingkat']) {
+            throw ValidationException::withMessages([
+                'kelas_id' => 'Kelas harus sesuai dengan tingkat semester yang dipilih.',
+            ]);
+        }
+
+        SiswaBiodata::query()->whereKey($siswa->id)->lockForUpdate()->firstOrFail();
+        $histories = SiswaRiwayatKelas::query()
+            ->where('siswa_id', $siswa->id)
+            ->with('kelas')
+            ->get();
+        if ($histories->contains(fn (SiswaRiwayatKelas $history): bool => ($history->kelas?->tingkat ?? Semester::tingkatDariNamaKelas($history->kelas?->nama ?? '')) === $options['tingkat']
+        )) {
+            throw ValidationException::withMessages([
+                'tingkat' => 'Siswa sudah memiliki riwayat pada tingkat kelas ini.',
+            ]);
+        }
+        if ($histories->count() >= 3) {
+            throw ValidationException::withMessages([
+                'tingkat' => 'Siswa sudah memiliki 3 riwayat kelas; riwayat ke-4 tidak dapat dibuat.',
+            ]);
+        }
+        if ($histories->contains(fn (SiswaRiwayatKelas $history): bool => (int) $history->tahun_ajaran_id === (int) $options['tahun_ajaran_id']
+        )) {
+            throw ValidationException::withMessages([
+                'tahun_ajaran_id' => 'Siswa sudah memiliki riwayat pada tahun ajaran ini.',
+            ]);
+        }
+
+        return SiswaRiwayatKelas::query()->create([
+            'siswa_id' => $siswa->id,
+            'tahun_ajaran_id' => $options['tahun_ajaran_id'],
+            'kelas_id' => $class->id,
+            'status' => 'Aktif',
+        ]);
+    }
+
+    private function recordHistoryActivity(Pengguna $user, SiswaBiodata $siswa, SiswaRiwayatKelas $history, int $classId): void
+    {
+        $className = SekolahKelas::query()->whereKey($classId)->value('nama');
+        CatatanAktivitas::query()->create([
+            'pengguna_id' => $user->id,
+            'peran' => $user->peran,
+            'aksi' => 'tambah_riwayat_kelas',
+            'keterangan' => 'Siswa #'.$siswa->id.'; riwayat #'.$history->id.' ditambahkan untuk kelas '.$className,
+            'objek_tipe' => 'siswa_riwayat_kelas',
+            'objek_id' => $history->id,
+            'alamat_ip' => request()->ip(),
+            'created_at' => now(),
+        ]);
     }
 
     private function assertType(string $jenis): void
