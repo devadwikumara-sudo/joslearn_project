@@ -115,7 +115,7 @@
     <div class="student-page-actions">
         <a href="{{ route('admin.data-siswa.export', ['tahun_ajaran' => $tahunAjaranTerpilihId]) }}" class="btn o">📊 Ekspor Excel</a>
         <a href="{{ route('admin.import.siswa') }}" class="btn o">📥 Import Excel</a>
-        <a href="{{ route('admin.data-siswa', array_merge(request()->query(), ['panel' => 'form', 'mode' => 'create'])) }}" class="btn">+ Tambah siswa</a>
+        <button type="button" class="btn" onclick="openStudentCreateModal()">+ Tambah siswa</button>
         @if($kelasSelected === '' || $kelasSelected === '*')
             <button type="button" class="btn x" disabled title="Pilih satu kelas terlebih dahulu">Hapus semua kelas ini</button>
         @endif
@@ -311,10 +311,11 @@
     @endif
 </div>
 
-@if($formOpen && $formData)
+@if($formData)
     @include('admin._form-pendataan', [
         'formData' => $formData,
         'formCloseUrl' => $formCloseUrl,
+        'formOpen' => $formOpen,
     ])
 @endif
 

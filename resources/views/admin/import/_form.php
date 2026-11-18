@@ -104,12 +104,15 @@
         @endif
     </div>
 
-    <div class="bar" style="margin-top:14px">
-        <input type="file" accept=".xlsx,.xls,.csv" id="excel-file-input" onchange="smartFile(event, '{{ $typeJs }}')">
+    <div class="bar" style="margin-top:16px;flex-wrap:wrap;gap:10px;padding:14px;background:#f8fafc;border-radius:12px;border:1px solid #e2e8f0">
+        <div style="flex:1;min-width:240px">
+            <input type="file" accept=".xlsx,.xls,.csv" id="excel-file-input" onchange="smartFile(event, '{{ $typeJs }}')" style="width:100%;padding:8px">
+        </div>
+        <span class="sp"></span>
         @if($isAdmin && in_array($type, ['nilai', 'kehadiran', 'ekskul'], true))
-            <button type="button" class="btn" onclick="loadDemo{{ $type === 'nilai' ? 'Nilai' : ($type === 'kehadiran' ? 'Hadir' : 'Ekskul') }}()">Pakai data contoh</button>
+            <button type="button" class="btn o" onclick="loadDemo{{ $type === 'nilai' ? 'Nilai' : ($type === 'kehadiran' ? 'Hadir' : 'Ekskul') }}()">🧪 Pakai Data Contoh</button>
         @endif
-        <a href="{{ route($templateRoute, ['jenis' => $type]) }}" class="btn">⬇ Template Excel</a>
+        <a href="{{ route($templateRoute, ['jenis' => $type]) }}" class="btn o">⬇ Unduh Template Excel</a>
     </div>
 
     <p class="sub" style="margin:8px 0 0;font-size:12px">

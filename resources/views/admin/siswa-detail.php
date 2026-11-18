@@ -27,15 +27,15 @@
 @endpush
 
 @section('content')
-<div class="bar">
+<div class="bar" style="margin-bottom:16px">
     <div>
         <h2 style="margin:0">Detail Biodata Siswa</h2>
         <p class="sub" style="margin:4px 0 0">{{ $siswa->nama_lengkap }} · NISN {{ $siswa->nisn }}</p>
     </div>
     <span class="sp"></span>
-    <a href="{{ route('admin.data-siswa') }}" class="btn o">Kembali</a>
-    <a href="{{ route('admin.data-siswa.pdf', $siswa->id) }}" target="_blank" rel="noopener" class="btn" style="background:var(--p);color:#fff">⬇ Cetak PDF</a>
-    <a href="{{ route('admin.data-siswa', ['panel' => 'form', 'mode' => 'edit', 'siswa' => $siswa->id]) }}" class="btn a">Edit biodata</a>
+    <a href="{{ route('admin.data-siswa') }}" class="btn o">← Kembali</a>
+    <a href="{{ route('admin.data-siswa.pdf', $siswa->id) }}" target="_blank" rel="noopener" class="btn o">⬇ Cetak PDF</a>
+    <a href="{{ route('admin.data-siswa', ['panel' => 'form', 'mode' => 'edit', 'siswa' => $siswa->id]) }}" class="btn a">✏ Edit Biodata</a>
 </div>
 
 <div style="margin-top:14px">

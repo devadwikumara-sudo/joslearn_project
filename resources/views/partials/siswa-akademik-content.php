@@ -17,23 +17,24 @@
 
 @pushOnce('styles')
 <style>
-    .academic-record-section{display:grid;gap:12px;padding:16px;border:1px solid #dce5ef;border-radius:14px;background:#fff}
-    .academic-record-section h4{margin:0;color:#12355b;font-size:13px}
+    .academic-record-section{display:grid;gap:14px;padding:20px;border:1.5px solid var(--admin-border);border-radius:16px;background:#fff;box-shadow:var(--admin-shadow-sm)}
+    .academic-record-section h4{margin:0;color:var(--admin-primary);font-size:14px;font-weight:700}
     .academic-record-table-wrap{overflow-x:auto}
-    .academic-record-table{width:100%;border-collapse:collapse;font-size:12px}
-    .academic-record-table th,.academic-record-table td{padding:8px;border-bottom:1px solid #e8edf3;text-align:left;vertical-align:top}
+    .academic-record-table{width:100%;border-collapse:collapse;font-size:12.5px}
+    .academic-record-table th,.academic-record-table td{padding:10px 12px;border-bottom:1px solid #eef2f6;text-align:left;vertical-align:top}
+    .academic-record-table th{background:#f8fafc;font-size:11.5px;font-weight:700;color:var(--admin-text-secondary);text-transform:uppercase;letter-spacing:0.04em}
     .academic-record-actions{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
     .academic-record-actions form{margin:0}
-    .academic-record-empty{margin:0;color:#64748b;font-size:12px}
-    .academic-record-dialog{width:min(560px,calc(100% - 24px));max-height:90vh;padding:0;border:1px solid #dce5ef;border-radius:16px;background:#fff;color:#1b2430}
-    .academic-record-dialog::backdrop{background:#09182b99}
-    .academic-record-dialog form{display:grid;gap:12px;padding:18px}
-    .academic-record-dialog h4{margin:0;color:#12355b}
-    .academic-record-dialog label{display:grid;gap:5px;font-size:12px;font-weight:600}
-    .academic-record-dialog input,.academic-record-dialog select,.academic-record-dialog textarea{width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:8px;font:inherit}
+    .academic-record-empty{margin:0;color:var(--mu);font-size:12px;font-style:italic}
+    .academic-record-dialog{width:min(580px,calc(100% - 24px));max-height:90vh;padding:0;border:1.5px solid var(--admin-border);border-radius:18px;background:#fff;color:var(--admin-text);box-shadow:0 20px 40px -10px rgba(9,24,43,0.4)}
+    .academic-record-dialog::backdrop{background:rgba(9,24,43,0.65);backdrop-filter:blur(6px)}
+    .academic-record-dialog form{display:grid;gap:14px;padding:22px}
+    .academic-record-dialog h4{margin:0;color:var(--admin-text);font-size:16px;font-weight:700}
+    .academic-record-dialog label{display:grid;gap:5px;font-size:12px;font-weight:700;color:var(--admin-text-secondary);text-transform:uppercase;letter-spacing:0.03em}
+    .academic-record-dialog input,.academic-record-dialog select,.academic-record-dialog textarea{width:100%;padding:9px 12px;border:1.5px solid var(--admin-border);border-radius:9px;font:inherit;font-size:13.5px}
     .academic-record-dialog textarea{min-height:90px;resize:vertical}
     .academic-record-dialog [data-academic-fields][hidden]{display:none}
-    .academic-record-dialog .academic-record-dialog-actions{display:flex;justify-content:flex-end;gap:8px}
+    .academic-record-dialog .academic-record-dialog-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:6px}
 </style>
 @endPushOnce
 

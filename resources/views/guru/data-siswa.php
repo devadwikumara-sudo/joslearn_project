@@ -13,50 +13,51 @@
     ];
 @endphp
 
-<div class="bar" style="align-items:flex-start">
-    <div>
-        <h2>Data Siswa</h2>
-        <p class="sub">Pilih kelas atau cari siswa untuk melihat data.</p>
+<div class="student-toolbar">
+    <form method="GET" action="{{ route('guru.data-siswa') }}" class="student-filters">
+        <input type="hidden" name="tahun_ajaran" value="{{ $filters['tahun_ajaran'] }}">
+        <select name="kelas" aria-label="Pilih kelas">
+            <option value="">Semua kelas</option>
+            @foreach($kelasList as $kelas)
+                <option value="{{ $kelas }}" {{ $filters['kelas'] === $kelas ? 'selected' : '' }}>{{ $kelas }}</option>
+            @endforeach
+        </select>
+
+        <input type="text" name="q" placeholder="Cari nama / NISN" value="{{ $filters['q'] }}" style="width:200px">
+
+        <select name="st" aria-label="Pilih status">
+            <option value="">Semua status</option>
+            @foreach(['Aktif'] as $status)
+                <option value="{{ $status }}" {{ $filters['st'] === $status ? 'selected' : '' }}>{{ $status }}</option>
+            @endforeach
+        </select>
+
+        <button type="submit" class="btn">🔍 Cari</button>
+    </form>
+
+    <div class="student-page-actions">
+        <a href="{{ route('guru.data-siswa.export', $queryFilters) }}" class="btn o">📊 Ekspor Excel</a>
     </div>
-    <span class="sp"></span>
-    <a href="{{ route('guru.data-siswa.export', $queryFilters) }}" class="btn">Ekspor Excel</a>
 </div>
 
-<form method="GET" action="{{ route('guru.data-siswa') }}" class="bar">
-    <input type="hidden" name="tahun_ajaran" value="{{ $filters['tahun_ajaran'] }}">
-    <select name="kelas" aria-label="Pilih kelas">
-        <option value="">Semua kelas</option>
-        @foreach($kelasList as $kelas)
-            <option value="{{ $kelas }}" {{ $filters['kelas'] === $kelas ? 'selected' : '' }}>{{ $kelas }}</option>
-        @endforeach
-    </select>
-
-    <input type="text" name="q" placeholder="Cari nama / NISN" value="{{ $filters['q'] }}" style="width:200px">
-
-    <select name="st" aria-label="Pilih status">
-        <option value="">Semua status</option>
-        @foreach(['Aktif'] as $status)
-            <option value="{{ $status }}" {{ $filters['st'] === $status ? 'selected' : '' }}>{{ $status }}</option>
-        @endforeach
-    </select>
-
-    <button type="submit" class="btn o">Cari</button>
-</form>
-
-<div class="card">
+<div class="card" style="margin-top:14px">
     <div class="bar">
-        <b>{{ $siswa->total() }} siswa</b>
-        <span class="sp"></span>
-        <button type="submit" form="pdf-siswa-terpilih" class="btn o" id="pdf-selected-button" disabled>PDF terpilih</button>
-        <a href="{{ route('guru.data-siswa.pdf-all', $queryFilters) }}" class="btn o">PDF semua tampil</a>
-        <button type="button" class="btn o" id="book-pdf-selected-button" disabled onclick="cetakBukuIndukTerpilih()">Buku induk terpilih</button>
-        <a href="{{ route('guru.data-siswa.pdf-batch', [
-            'target_kelas' => $filters['kelas'] !== '' ? $filters['kelas'] : '*',
-            'target_ta' => (string) $filters['tahun_ajaran'],
-            'q' => $filters['q'],
-            'st' => $filters['st'],
-        ]) }}" class="btn o">Buku induk hasil filter</a>
-        <a href="{{ route('guru.data-siswa.pdf-batch', ['target_kelas' => '*', 'target_ta' => (string) $filters['tahun_ajaran']]) }}" class="btn o">Buku induk semua siswa</a>
+        <span class="student-counter-badge">
+            <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+            <b>{{ $siswa->total() }}</b> Siswa
+        </span>
+        <div class="student-table-actions">
+            <button type="submit" form="pdf-siswa-terpilih" class="btn o" id="pdf-selected-button" disabled>📄 PDF terpilih</button>
+            <a href="{{ route('guru.data-siswa.pdf-all', $queryFilters) }}" class="btn o">📑 PDF semua tampil</a>
+            <button type="button" class="btn o" id="book-pdf-selected-button" disabled onclick="cetakBukuIndukTerpilih()">📚 Buku induk terpilih</button>
+            <a href="{{ route('guru.data-siswa.pdf-batch', [
+                'target_kelas' => $filters['kelas'] !== '' ? $filters['kelas'] : '*',
+                'target_ta' => (string) $filters['tahun_ajaran'],
+                'q' => $filters['q'],
+                'st' => $filters['st'],
+            ]) }}" class="btn o">📖 Buku induk filter</a>
+            <a href="{{ route('guru.data-siswa.pdf-batch', ['target_kelas' => '*', 'target_ta' => (string) $filters['tahun_ajaran']]) }}" class="btn o">📚 Semua siswa</a>
+        </div>
     </div>
 
     <form id="pdf-siswa-terpilih" method="POST" action="{{ route('guru.data-siswa.pdf-selected') }}">
@@ -104,8 +105,8 @@
                             <td>{{ $murid->nama_ayah ?? $murid->nama_ibu ?? '-' }}</td>
                             <td><span class="bd {{ $badgeClass }}">{{ $statusNama }}</span></td>
                             <td style="white-space:nowrap">
-                                <a href="{{ route('guru.data-siswa.show', $murid->id) }}" class="btn o" style="padding:3px 8px;font-size:12px">Lihat</a>
-                                <a href="{{ route('guru.data-siswa.pdf', array_merge(['id' => $murid->id], $studentFilters)) }}" class="btn" style="padding:3px 8px;font-size:12px">PDF</a>
+                                <a href="{{ route('guru.data-siswa.show', $murid->id) }}" class="btn o" style="padding:4px 9px;font-size:12px">👁 Lihat</a>
+                                <a href="{{ route('guru.data-siswa.pdf', array_merge(['id' => $murid->id], $studentFilters)) }}" class="btn a" style="padding:4px 9px;font-size:12px">⬇ PDF</a>
                             </td>
                         </tr>
                     @empty

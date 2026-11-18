@@ -74,24 +74,21 @@ class DataSiswaController extends Controller
         $formMode = is_string($formMode) && in_array($formMode, ['create', 'edit'], true)
             ? $formMode
             : 'create';
-        $formData = null;
-        if ($formOpen) {
-            $formStudent = null;
-            if ($formMode === 'edit') {
-                $formStudentId = $request->query('siswa', $oldInput['_form_siswa'] ?? null);
-                abort_unless(is_numeric($formStudentId) && (int) $formStudentId > 0, 404);
-                $formStudent = SiswaBiodata::aktif()
-                    ->with([
-                        'berkas',
-                        'riwayatKelas' => static function ($query): void {
-                            $query->with(['kelas', 'tahunAjaran'])->orderByDesc('tahun_ajaran_id');
-                        },
-                    ])
-                    ->findOrFail((int) $formStudentId);
-            }
-
-            $formData = app(FormPendataanController::class)->formOptions($formStudent);
+        $formStudent = null;
+        if ($formOpen && $formMode === 'edit') {
+            $formStudentId = $request->query('siswa', $oldInput['_form_siswa'] ?? null);
+            abort_unless(is_numeric($formStudentId) && (int) $formStudentId > 0, 404);
+            $formStudent = SiswaBiodata::aktif()
+                ->with([
+                    'berkas',
+                    'riwayatKelas' => static function ($query): void {
+                        $query->with(['kelas', 'tahunAjaran'])->orderByDesc('tahun_ajaran_id');
+                    },
+                ])
+                ->findOrFail((int) $formStudentId);
         }
+
+        $formData = app(FormPendataanController::class)->formOptions($formStudent);
         $formCloseQuery = $request->query();
         unset($formCloseQuery['panel'], $formCloseQuery['mode'], $formCloseQuery['siswa']);
         $formCloseUrl = route('admin.data-siswa', $formCloseQuery);
