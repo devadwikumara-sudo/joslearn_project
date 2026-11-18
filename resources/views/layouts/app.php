@@ -11,7 +11,8 @@
     <title>@yield('title', 'JosBook — Portal Akademik')</title>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ asset('css/josbook.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/josbook.css') }}?v={{ file_exists(public_path('css/josbook.css')) ? filemtime(public_path('css/josbook.css')) : time() }}">
+    <link rel="stylesheet" href="{{ asset('css/josbook-admin-modern.css') }}?v={{ file_exists(public_path('css/josbook-admin-modern.css')) ? filemtime(public_path('css/josbook-admin-modern.css')) : time() }}">
     <style>a.btn,a.btn:hover{text-decoration:none}</style>
     @stack('styles')
 </head>
@@ -27,9 +28,12 @@
                 <div class="josbook-sidebar-logo">
                     <img src="{{ asset('images/josbook-logo.png') }}" alt="Logo JosBook" width="48" height="48">
                 </div>
-                <div>
-                    <h1 class="text-xl font-bold tracking-tight leading-tight">JosBook</h1>
-                    <p class="text-[10px] tracking-wider text-blue-200 uppercase font-medium">Portal Akademik</p>
+                <div class="josbook-sidebar-brand-text">
+                    <div class="josbook-sidebar-brand-title">
+                        <h1 class="text-xl font-bold tracking-tight leading-tight">JosBook</h1>
+                        <span class="josbook-sidebar-badge">v2.0</span>
+                    </div>
+                    <p class="text-[10px] tracking-wider uppercase font-medium">Portal Akademik</p>
                 </div>
             </div>
 
@@ -44,6 +48,8 @@
             @if(Auth::check() && Auth::user()->peran === 'admin')
             {{-- ── MENU ADMIN ── --}}
             <nav class="josbook-sidebar-nav" aria-label="Menu admin">
+                <div class="sidebar-section-title">Menu Utama</div>
+
                 <a href="{{ route('admin.dashboard') }}" class="{{ request()->routeIs('admin.dashboard') ? 'on' : '' }}" data-menu="dashboard">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
                     <span>Dashboard</span>
@@ -58,6 +64,8 @@
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                     <span>Import Data</span>
                 </a>
+
+                <div class="sidebar-section-title">Akademik & Siswa</div>
 
                 <a href="{{ route('admin.kenaikan-mutasi', ['tab' => 'kenaikan']) }}" class="{{ request()->routeIs('admin.kenaikan-mutasi*', 'admin.kenaikan-kelas*', 'admin.mutasi-siswa*') ? 'on' : '' }}" data-menu="kenaikan-mutasi">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
@@ -74,6 +82,8 @@
                     <span>Guru &amp; Master</span>
                 </a>
 
+                <div class="sidebar-section-title">Laporan & Pengaturan</div>
+
                 <a href="{{ route('admin.laporan') }}" class="{{ request()->routeIs('admin.laporan*', 'admin.cek-kualitas-data*') ? 'on' : '' }}" data-menu="laporan">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                     <span>Laporan</span>
@@ -87,6 +97,8 @@
             @else
             {{-- ── MENU GURU ── --}}
             <nav class="josbook-sidebar-nav" aria-label="Menu guru">
+                <div class="sidebar-section-title">Menu Utama</div>
+
                 <a href="{{ route('guru.beranda') }}" class="{{ request()->routeIs('guru.beranda') ? 'on' : '' }}" data-menu="beranda">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
                     <span>Beranda</span>
@@ -96,6 +108,8 @@
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0112 20.055a11.952 11.952 0 01-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path></svg>
                     <span>Data Siswa</span>
                 </a>
+
+                <div class="sidebar-section-title">Akademik & Kelas</div>
 
                 @if($guruMenuMapel && ! $guruMenuWali)
                     <a href="{{ route('guru.input-nilai-mapel') }}" class="{{ request()->routeIs('guru.input-nilai-mapel*') ? 'on' : '' }}" data-menu="input-nilai">
@@ -117,6 +131,9 @@
                         <span>Kenaikan Kelas</span>
                     </a>
                 @endif
+
+                <div class="sidebar-section-title">Pengaturan</div>
+
                 <a href="{{ route('guru.setting') }}" class="{{ request()->routeIs('guru.setting*', 'guru.log-aktivitas*') ? 'on' : '' }}" data-menu="setting">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924-1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 001.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                     <span>Setting</span>
@@ -167,14 +184,35 @@
 
     {{-- Main content --}}
     <main class="mn">
+        {{-- Top Utility Bar --}}
+        <div class="admin-topbar">
+            <div class="admin-topbar-left">
+                <div class="admin-topbar-status">
+                    <span class="admin-topbar-pulse"></span>
+                    <span class="admin-topbar-status-text">Sistem JosBook Online</span>
+                </div>
+            </div>
+            <div class="admin-topbar-right">
+                <div class="admin-topbar-date">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                    <span>{{ now()->translatedFormat('l, d F Y') }}</span>
+                </div>
+                @if(Auth::check())
+                    <span class="admin-topbar-pill {{ Auth::user()->peran === 'admin' ? 'admin' : 'guru' }}">
+                        {{ Auth::user()->peran === 'admin' ? '🛡️ Administrator' : '🎓 Pendidik' }}
+                    </span>
+                @endif
+            </div>
+        </div>
+
         @if(session('success'))
-            <div class="note" style="background:#e1f4ea;border-color:#a3d9b8;color:#1f5c3a;margin-bottom:14px">✅ {{ session('success') }}</div>
+            <div class="note ok">✅ {{ session('success') }}</div>
         @endif
         @if(session('error'))
-            <div class="note" style="background:#fbe5e1;border-color:#efc6bf;color:#8b2a1e;margin-bottom:14px">❌ {{ session('error') }}</div>
+            <div class="note err">❌ {{ session('error') }}</div>
         @endif
         @if(session('info'))
-            <div class="note" style="margin-bottom:14px">ℹ️ {{ session('info') }}</div>
+            <div class="note">ℹ️ {{ session('info') }}</div>
         @endif
 
         @yield('content')

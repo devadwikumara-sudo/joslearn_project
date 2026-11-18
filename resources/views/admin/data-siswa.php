@@ -113,8 +113,8 @@
     </details>
 
     <div class="student-page-actions">
-        <a href="{{ route('admin.data-siswa.export', ['tahun_ajaran' => $tahunAjaranTerpilihId]) }}" class="btn o">Ekspor Excel</a>
-        <a href="{{ route('admin.import.siswa') }}" class="btn o">Import Excel</a>
+        <a href="{{ route('admin.data-siswa.export', ['tahun_ajaran' => $tahunAjaranTerpilihId]) }}" class="btn o">📊 Ekspor Excel</a>
+        <a href="{{ route('admin.import.siswa') }}" class="btn o">📥 Import Excel</a>
         <a href="{{ route('admin.data-siswa', array_merge(request()->query(), ['panel' => 'form', 'mode' => 'create'])) }}" class="btn">+ Tambah siswa</a>
         @if($kelasSelected === '' || $kelasSelected === '*')
             <button type="button" class="btn x" disabled title="Pilih satu kelas terlebih dahulu">Hapus semua kelas ini</button>
@@ -134,13 +134,16 @@
 
 <div class="card" style="margin-top:14px">
     <div class="bar">
-        <b>{{ $siswaList ? $siswaList->total() : 0 }} siswa</b>
+        <span class="student-counter-badge">
+            <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+            <b>{{ $siswaList ? $siswaList->total() : 0 }}</b> Siswa
+        </span>
         <div class="student-table-actions">
-            <button type="button" class="btn o" onclick="cetakPdfTerpilih()">PDF terpilih</button>
-            <button type="button" class="btn o" onclick="cetakPdfSemua()">PDF semua hasil filter</button>
-            <button type="button" class="btn o" onclick="cetakPdfSemuaSiswa()">PDF semua siswa</button>
-            <button type="button" class="btn o" onclick="openBulkMovePanel()">Pindah kelas</button>
-            <button type="button" id="delete-selected-button" class="btn x" onclick="deleteSelectedStudents()" disabled>Hapus terpilih</button>
+            <button type="button" class="btn o" onclick="cetakPdfTerpilih()">📄 PDF terpilih</button>
+            <button type="button" class="btn o" onclick="cetakPdfSemua()">📑 PDF hasil filter</button>
+            <button type="button" class="btn o" onclick="cetakPdfSemuaSiswa()">📚 PDF semua siswa</button>
+            <button type="button" class="btn o" onclick="openBulkMovePanel()">⇄ Pindah kelas</button>
+            <button type="button" id="delete-selected-button" class="btn x" onclick="deleteSelectedStudents()" disabled>🗑 Hapus terpilih</button>
             @if($kelasSelected !== '' && $kelasSelected !== '*')
                 <form method="POST" action="{{ route('admin.data-siswa.bulk-delete') }}" style="margin:0" onsubmit="return confirm('Semua siswa kelas {{ $kelasSelected }} pada {{ $tahunAjaranTerpilihId === '*' ? 'semua tahun ajaran' : 'tahun ajaran yang dipilih' }} akan dipindahkan ke Tempat Sampah. Seluruh riwayat pada profil siswa ikut terhapus. Lanjutkan?')">
                     @csrf
@@ -213,10 +216,10 @@
                             data-pdf-url="{{ route('admin.data-siswa.pdf', $s->id) }}"
                             data-edit-url="{{ $formEditUrl }}"
                             class="btn o"
-                            style="padding:3px 8px;font-size:12px"
+                            style="padding:4px 9px;font-size:12px"
                             aria-haspopup="dialog"
                             onclick="openStudentDetail(this)"
-                        >Lihat</button>
+                        >👁 Lihat</button>
                         <template class="student-detail-template">
                             @include('admin.siswa-detail-content', [
                                 'siswa' => $s,
@@ -227,13 +230,13 @@
                                 'academicClassOptions' => $academicClassOptions,
                             ])
                         </template>
-                        <a href="{{ route('admin.data-siswa.pdf', $s->id) }}" class="btn a" style="padding:3px 8px;font-size:12px">⬇ PDF</a>
-                        <a href="{{ $formEditUrl }}" class="btn o" style="padding:3px 8px;font-size:12px">Ubah</a>
-                        <button type="button" class="btn o" style="padding:3px 8px;font-size:12px" title="Pindah kelas" aria-label="Pindah kelas {{ $s->nama_lengkap }}" onclick="openBulkMovePanel([{{ $s->id }}])">⇄</button>
+                        <a href="{{ route('admin.data-siswa.pdf', $s->id) }}" class="btn a" style="padding:4px 9px;font-size:12px">⬇ PDF</a>
+                        <a href="{{ $formEditUrl }}" class="btn o" style="padding:4px 9px;font-size:12px">✏ Ubah</a>
+                        <button type="button" class="btn o" style="padding:4px 9px;font-size:12px" title="Pindah kelas" aria-label="Pindah kelas {{ $s->nama_lengkap }}" onclick="openBulkMovePanel([{{ $s->id }}])">⇄</button>
                         <form action="{{ route('admin.data-siswa.destroy', $s->id) }}" method="POST" style="display:inline" onsubmit="return confirm('Pindahkan data {{ $s->nama_lengkap }} ke tempat sampah?')">
                             @csrf
                             @method('DELETE')
-                            <button type="submit" class="btn x" style="padding:3px 8px;font-size:12px">🗑</button>
+                            <button type="submit" class="btn x" style="padding:4px 8px;font-size:12px" title="Pindahkan ke tempat sampah">🗑</button>
                         </form>
                     </td>
                 </tr>

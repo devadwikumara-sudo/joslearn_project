@@ -81,14 +81,50 @@
 @endif
 
 <div class="g g4 alumni-stats">
-    <div class="card st"><span>Alumni lulus</span><b>{{ $trackingStats['total'] }}</b></div>
-    <div class="card st"><span>Sudah dilacak</span><b>{{ $trackingStats['dilacak'] }}</b></div>
-    <div class="card st"><span>Kuliah</span><b>{{ $trackingStats['kuliah'] }}</b></div>
-    <div class="card st"><span>Bekerja</span><b>{{ $trackingStats['bekerja'] }}</b></div>
+    <div class="card st">
+        <div class="st-head">
+            <span>Alumni lulus</span>
+            <div class="st-icon st-icon-blue">
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0112 20.055a11.952 11.952 0 01-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path></svg>
+            </div>
+        </div>
+        <b>{{ number_format($trackingStats['total'] ?? 0) }}</b>
+        <small class="st-foot text-blue">● Terdata lulus</small>
+    </div>
+    <div class="card st">
+        <div class="st-head">
+            <span>Sudah dilacak</span>
+            <div class="st-icon st-icon-indigo">
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </div>
+        </div>
+        <b>{{ number_format($trackingStats['dilacak'] ?? 0) }}</b>
+        <small class="st-foot text-indigo">● Status aktivitas terdata</small>
+    </div>
+    <div class="card st">
+        <div class="st-head">
+            <span>Kuliah</span>
+            <div class="st-icon st-icon-purple">
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+            </div>
+        </div>
+        <b>{{ number_format($trackingStats['kuliah'] ?? 0) }}</b>
+        <small class="st-foot text-purple">● Perguruan tinggi</small>
+    </div>
+    <div class="card st">
+        <div class="st-head">
+            <span>Bekerja</span>
+            <div class="st-icon st-icon-emerald">
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+            </div>
+        </div>
+        <b>{{ number_format($trackingStats['bekerja'] ?? 0) }}</b>
+        <small class="st-foot text-emerald">● Dunia usaha &amp; industri</small>
+    </div>
 </div>
 
 <form method="GET" action="{{ route('admin.alumni') }}">
-    <div class="bar">
+    <div class="bar" style="background:#fff;padding:14px 18px;border-radius:14px;border:1px solid var(--admin-border);box-shadow:0 2px 8px rgba(15,23,42,0.04);margin-bottom:16px">
         <select name="aj" onchange="this.form.submit()">
             @foreach($types as $value => $label)
             <option value="{{ $value }}" {{ $aj === $value ? 'selected' : '' }}>{{ $label }}</option>
@@ -100,10 +136,10 @@
             <option value="{{ $y }}" {{ (string)$ay === (string)$y ? 'selected' : '' }}>{{ $y }}</option>
             @endforeach
         </select>
-        <input type="text" name="aq" placeholder="Cari nama / induk / NISN" value="{{ $aq }}">
-        <button type="submit" class="btn">Cari</button>
+        <input type="text" name="aq" placeholder="Cari nama / induk / NISN" value="{{ $aq }}" style="width:200px">
+        <button type="submit" class="btn">🔍 Cari</button>
         <span class="sp"></span>
-        <a href="{{ route('admin.alumni.export', ['aj' => $aj, 'ay' => $ay, 'aq' => $aq]) }}" class="btn">⬇ Ekspor Excel (Kontrol Induk + biodata)</a>
+        <a href="{{ route('admin.alumni.export', ['aj' => $aj, 'ay' => $ay, 'aq' => $aq]) }}" class="btn o">📊 Ekspor Excel (Kontrol Induk + Biodata)</a>
     </div>
 </form>
 
