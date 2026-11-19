@@ -342,6 +342,8 @@ class FormPendataanController extends Controller
             : 'Alumni (Lulus)';
         $year = $request->input('return_ay');
         $year = is_string($year) && preg_match('/^\d{4}$/', $year) === 1 ? $year : '';
+        $kelas = $request->input('return_kelas');
+        $kelas = is_string($kelas) ? trim($kelas) : '';
         $search = $request->input('return_aq');
         $search = is_string($search) ? trim($search) : '';
         $page = $request->integer('return_page') ?: null;
@@ -351,6 +353,7 @@ class FormPendataanController extends Controller
             'tab' => $tab,
             'aj' => $type,
             'ay' => $year,
+            'kelas' => $kelas,
             'aq' => $search,
             'page' => $page,
             'siswa' => $siswa->id,

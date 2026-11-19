@@ -505,6 +505,7 @@
             <input type="hidden" name="return_tab" value="{{ $alumniReturn['tab'] ?? 'kontrol-induk' }}">
             <input type="hidden" name="return_aj" value="{{ $alumniReturn['aj'] ?? '' }}">
             <input type="hidden" name="return_ay" value="{{ $alumniReturn['ay'] ?? '' }}">
+            <input type="hidden" name="return_kelas" value="{{ $alumniReturn['kelas'] ?? '' }}">
             <input type="hidden" name="return_aq" value="{{ $alumniReturn['aq'] ?? '' }}">
             <input type="hidden" name="return_page" value="{{ $alumniReturn['page'] ?? '' }}">
         @endif

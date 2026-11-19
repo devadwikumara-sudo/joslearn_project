@@ -8,6 +8,7 @@
                 <tr>
                     <th>Kelas</th>
                     <th>Tahun Ajaran</th>
+                    <th>Status</th>
                     <th>Jumlah Siswa</th>
                     <th>Aksi</th>
                 </tr>
@@ -17,14 +18,21 @@
                     <tr>
                         <td><strong>{{ $row->kelas }}</strong></td>
                         <td>{{ $taAktif ?: 'Belum diatur' }}</td>
+                        <td>{{ $row->status ?: 'Aktif' }}</td>
                         <td><b>{{ $row->baris }}</b> baris</td>
                         <td>
-                            <a href="{{ route('admin.data-siswa', ['kelas' => $row->kelas]) }}" class="btn o" style="padding:3px 8px;font-size:12px">Lihat di Data Siswa</a>
+                            @if($row->status === 'Lulus')
+                                <a href="{{ route('admin.alumni', ['aj' => 'Alumni (Lulus)', 'kelas' => $row->kelas]) }}" class="btn o" style="padding:3px 8px;font-size:12px">Lihat di Alumni</a>
+                            @elseif(in_array($row->status, ['Pindah keluar', 'Keluar'], true))
+                                <a href="{{ route('admin.alumni', ['aj' => 'Pindah / Keluar', 'kelas' => $row->kelas]) }}" class="btn o" style="padding:3px 8px;font-size:12px">Lihat di Alumni</a>
+                            @else
+                                <a href="{{ route('admin.data-siswa', ['kelas' => $row->kelas]) }}" class="btn o" style="padding:3px 8px;font-size:12px">Lihat di Data Siswa</a>
+                            @endif
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="4" style="text-align:center;padding:24px;color:var(--mu)">
+                        <td colspan="5" style="text-align:center;padding:24px;color:var(--mu)">
                             Belum ada data siswa terdaftar pada tahun ajaran ini.
                         </td>
                     </tr>

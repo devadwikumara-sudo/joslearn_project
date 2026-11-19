@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Admin\CatatanAktivitas;
+use App\Models\SekolahKelas;
 use App\Models\SekolahTahunAjaran;
 use App\Models\SiswaBiodata;
 use Illuminate\Database\Eloquent\Builder;
@@ -29,8 +30,10 @@ class AlumniController extends Controller
         $aj = $this->selectedType($request);
         $ay = $this->queryString($request, 'ay');
         $aq = trim($this->queryString($request, 'aq'));
+        $kelas = trim($this->queryString($request, 'kelas'));
         $panelTab = $request->query('tab') === 'pelacakan' ? 'pelacakan' : 'kontrol-induk';
         $selectedStudentId = $request->integer('siswa') ?: null;
+        $kelasList = SekolahKelas::query()->orderBy('nama')->pluck('nama');
 
         $tahunList = SiswaBiodata::query()
             ->graduated()
@@ -55,7 +58,7 @@ class AlumniController extends Controller
             $ys = [(string) date('Y'), (string) (date('Y') - 1), (string) (date('Y') - 2)];
         }
 
-        $query = $this->filteredAlumniQuery($aj, $ay, $aq);
+        $query = $this->filteredAlumniQuery($aj, $ay, $aq, $kelas);
         $totalFiltered = (clone $query)->count();
         $alumni = $query->with([
             'riwayatKelas' => static function ($query): void {
@@ -119,6 +122,7 @@ class AlumniController extends Controller
             'aj' => $aj,
             'ay' => $ay,
             'aq' => $aq,
+            'kelas' => $kelas,
             'page' => $request->query('page'),
             'siswa' => $selectedStudentId,
         ], static fn ($value): bool => $value !== null && $value !== '');
@@ -137,6 +141,8 @@ class AlumniController extends Controller
             'aj' => $aj,
             'ay' => $ay,
             'aq' => $aq,
+            'kelas' => $kelas,
+            'kelasList' => $kelasList,
             'ys' => $ys,
             'types' => self::TYPES,
             'totalFiltered' => $totalFiltered,
@@ -173,6 +179,7 @@ class AlumniController extends Controller
             'aj' => $this->selectedType($request),
             'ay' => $this->queryString($request, 'ay'),
             'aq' => trim($this->queryString($request, 'aq')),
+            'kelas' => trim($this->queryString($request, 'kelas')),
             'page' => $request->integer('page') ?: null,
         ];
         $formCloseUrl = route('admin.alumni', array_filter([
@@ -180,6 +187,7 @@ class AlumniController extends Controller
             'aj' => $formData['alumniReturn']['aj'],
             'ay' => $formData['alumniReturn']['ay'],
             'aq' => $formData['alumniReturn']['aq'],
+            'kelas' => $formData['alumniReturn']['kelas'],
             'page' => $formData['alumniReturn']['page'],
             'siswa' => $siswa->id,
         ], static fn ($value): bool => $value !== null && $value !== ''));
@@ -237,6 +245,7 @@ class AlumniController extends Controller
             'aj' => $this->selectedType($request),
             'ay' => $request->input('ay'),
             'aq' => $request->input('aq'),
+            'kelas' => $request->input('kelas'),
             'page' => $request->integer('page') ?: null,
             'siswa' => $id,
         ], static fn ($value): bool => $value !== null && $value !== ''))
@@ -295,6 +304,7 @@ class AlumniController extends Controller
             'aj' => $this->selectedType($request),
             'ay' => $request->input('ay'),
             'aq' => $request->input('aq'),
+            'kelas' => $request->input('kelas'),
             'page' => $request->integer('page') ?: null,
         ], static fn ($value): bool => $value !== null && $value !== ''))
             ->with('success', "Kelulusan {$siswa->nama_lengkap} berhasil dibatalkan.");
@@ -305,7 +315,8 @@ class AlumniController extends Controller
         $rows = $this->filteredAlumniQuery(
             $this->selectedType($request),
             $this->queryString($request, 'ay'),
-            trim($this->queryString($request, 'aq'))
+            trim($this->queryString($request, 'aq')),
+            trim($this->queryString($request, 'kelas'))
         )
             ->with(['riwayatKelas', 'pelacakan'])
             ->orderBy('nomor_induk')
@@ -369,7 +380,7 @@ class AlumniController extends Controller
         return response()->stream($callback, 200, $headers);
     }
 
-    private function filteredAlumniQuery(string $type, string $year, string $search): Builder
+    private function filteredAlumniQuery(string $type, string $year, string $search, string $kelas): Builder
     {
         $query = $type === self::TYPE_EXIT
             ? SiswaBiodata::query()
@@ -389,6 +400,12 @@ class AlumniController extends Controller
                 $query->where('nama_lengkap', 'like', "%{$search}%")
                     ->orWhere('nomor_induk', 'like', "%{$search}%")
                     ->orWhere('nisn', 'like', "%{$search}%");
+            });
+        }
+
+        if ($kelas !== '') {
+            $query->whereHas('riwayatKelas.kelas', function (Builder $classQuery) use ($kelas): void {
+                $classQuery->where('nama', $kelas);
             });
         }
 

@@ -2572,6 +2572,41 @@ class ImportStudentMatchingTest extends TestCase
         ]);
     }
 
+    public function test_student_import_results_route_graduates_to_alumni_and_active_students_to_data_siswa(): void
+    {
+        $this->import('siswa', [
+            [
+                'nisn' => '0000000104',
+                'nama' => 'Siswa Lulus',
+                'kelas' => 'XII-1',
+                'status' => 'Lulus',
+                'tahun_lulus' => '2026',
+            ],
+            [
+                'nisn' => '0000000105',
+                'nama' => 'Siswa Aktif Tanpa Status',
+                'kelas' => 'XII-1',
+            ],
+        ], 'Ganjil', '2025/2026')->assertOk();
+
+        $alumniUrl = route('admin.alumni', [
+            'aj' => 'Alumni (Lulus)',
+            'kelas' => 'XII-1',
+        ]);
+        $activeStudentsUrl = route('admin.data-siswa', ['kelas' => 'XII-1']);
+
+        $this->actingAs($this->admin)
+            ->withoutMiddleware()
+            ->get(route('admin.import', ['tab' => 'siswa', 'tahun_ajaran_id' => 1]))
+            ->assertOk()
+            ->assertSee('Lulus')
+            ->assertSee('Aktif')
+            ->assertSee('href="'.e($alumniUrl).'"', false)
+            ->assertSee('href="'.e($activeStudentsUrl).'"', false)
+            ->assertSee('Lihat di Alumni')
+            ->assertSee('Lihat di Data Siswa');
+    }
+
     public function test_student_import_routes_alumni_to_alumni_and_belum_lulus_to_active_students(): void
     {
         $response = $this->import('siswa', [
@@ -2631,6 +2666,30 @@ class ImportStudentMatchingTest extends TestCase
         $this->assertSame(3, $dataSiswa->getData()['siswaList']->total());
         $this->assertSame(2, $alumni->getData()['alumni']->total());
         $this->assertSame([], array_values(array_intersect($activeIds, $alumniIds)));
+    }
+
+    public function test_alumni_can_be_filtered_by_a_class_in_their_academic_history(): void
+    {
+        DB::table('siswa_biodata')->whereIn('id', [1, 2])->update(['tahun_lulus' => '2025']);
+        DB::table('siswa_riwayat_kelas')->whereIn('siswa_id', [1, 2])->update(['status' => 'Lulus']);
+        DB::table('siswa_riwayat_kelas')->where('siswa_id', 2)->update(['kelas_id' => 2]);
+
+        $response = $this->actingAs($this->admin)
+            ->get(route('admin.alumni', ['kelas' => 'X-1']));
+
+        $response->assertOk()
+            ->assertViewHas('alumni', function ($alumni): bool {
+                return $alumni->total() === 1
+                    && $alumni->getCollection()->pluck('id')->all() === [1];
+            })
+            ->assertSee('name="kelas"', false)
+            ->assertSee('value="X-1" selected', false)
+            ->assertSee('href="'.e(route('admin.alumni.export', [
+                'aj' => 'Alumni (Lulus)',
+                'ay' => '',
+                'kelas' => 'X-1',
+                'aq' => '',
+            ])).'"', false);
     }
 
     public function test_graduated_import_without_class_or_academic_year_is_listed_as_alumni(): void
@@ -2755,6 +2814,7 @@ class ImportStudentMatchingTest extends TestCase
         $filters = [
             'aj' => 'Alumni (Lulus)',
             'ay' => '2025',
+            'kelas' => 'X-1',
             'aq' => 'Nama',
             'page' => 1,
         ];
@@ -2768,7 +2828,8 @@ class ImportStudentMatchingTest extends TestCase
             ->get(route('admin.alumni.biodata.edit', array_merge($filters, ['id' => 1])))
             ->assertOk()
             ->assertSee('Edit Biodata Alumni')
-            ->assertSee('name="alumni_edit" value="1"', false);
+            ->assertSee('name="alumni_edit" value="1"', false)
+            ->assertSee('name="return_kelas" value="X-1"', false);
 
         $this->put(route('admin.data-siswa.update', 1), [
             'alumni_edit' => '1',
@@ -2777,12 +2838,14 @@ class ImportStudentMatchingTest extends TestCase
             'return_tab' => 'kontrol-induk',
             'return_aj' => 'Alumni (Lulus)',
             'return_ay' => '2025',
+            'return_kelas' => 'X-1',
             'return_aq' => 'Nama',
             'return_page' => '1',
         ])->assertRedirect(route('admin.alumni', [
             'tab' => 'kontrol-induk',
             'aj' => 'Alumni (Lulus)',
             'ay' => '2025',
+            'kelas' => 'X-1',
             'aq' => 'Nama',
             'page' => 1,
             'siswa' => 1,

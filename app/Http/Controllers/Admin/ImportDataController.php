@@ -121,9 +121,11 @@ class ImportDataController extends Controller
                 ->where('riwayat.tahun_ajaran_id', $tahunAjaranTerpilihId)
                 ->whereNull('riwayat.deleted_at')
                 ->select('kelas.nama as kelas')
+                ->addSelect('riwayat.status')
                 ->selectRaw('COUNT(*) as baris')
-                ->groupBy('kelas.id', 'kelas.nama')
+                ->groupBy('kelas.id', 'kelas.nama', 'riwayat.status')
                 ->orderBy('kelas.nama')
+                ->orderBy('riwayat.status')
                 ->get();
         } elseif ($isAdmin && $type === 'guru') {
             $totalGuru = GuruBiodata::query()->count();

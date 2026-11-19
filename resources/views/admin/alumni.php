@@ -136,10 +136,16 @@
             <option value="{{ $y }}" {{ (string)$ay === (string)$y ? 'selected' : '' }}>{{ $y }}</option>
             @endforeach
         </select>
+        <select name="kelas" onchange="this.form.submit()">
+            <option value="">Semua kelas</option>
+            @foreach($kelasList as $kelasOption)
+            <option value="{{ $kelasOption }}" {{ $kelas === $kelasOption ? 'selected' : '' }}>{{ $kelasOption }}</option>
+            @endforeach
+        </select>
         <input type="text" name="aq" placeholder="Cari nama / induk / NISN" value="{{ $aq }}" style="width:200px">
         <button type="submit" class="btn">🔍 Cari</button>
         <span class="sp"></span>
-        <a href="{{ route('admin.alumni.export', ['aj' => $aj, 'ay' => $ay, 'aq' => $aq]) }}" class="btn o">📊 Ekspor Excel (Kontrol Induk + Biodata)</a>
+        <a href="{{ route('admin.alumni.export', ['aj' => $aj, 'ay' => $ay, 'kelas' => $kelas, 'aq' => $aq]) }}" class="btn o">📊 Ekspor Excel (Kontrol Induk + Biodata)</a>
     </div>
 </form>
 
@@ -439,6 +445,7 @@
                             @csrf
                             <input type="hidden" name="aj" value="{{ $aj }}">
                             <input type="hidden" name="ay" value="{{ $ay }}">
+                            <input type="hidden" name="kelas" value="{{ $kelas }}">
                             <input type="hidden" name="aq" value="{{ $aq }}">
                             <input type="hidden" name="page" value="{{ $alumni->currentPage() }}">
                             <button type="submit" class="btn o">Batalkan kelulusan</button>
@@ -510,6 +517,7 @@
         @method('PUT')
         <input type="hidden" name="aj" value="{{ $aj }}">
         <input type="hidden" name="ay" value="{{ $ay }}">
+        <input type="hidden" name="kelas" value="{{ $kelas }}">
         <input type="hidden" name="aq" value="{{ $aq }}">
         <input type="hidden" name="tab" value="{{ $panelTab }}">
         <input type="hidden" name="page" value="{{ $alumni->currentPage() }}">
