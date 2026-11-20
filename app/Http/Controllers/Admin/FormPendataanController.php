@@ -289,20 +289,61 @@ class FormPendataanController extends Controller
 
     private function updateAlumniBiodata(Request $request, int $id): RedirectResponse
     {
-        $siswa = SiswaBiodata::alumni()->findOrFail($id);
+        $siswa = SiswaBiodata::alumni()->with('pelacakan')->findOrFail($id);
+        $latestTracking = $siswa->pelacakan->last();
         $rules = $this->validationRules($siswa->id);
         unset($rules['kelas'], $rules['tahun_ajaran'], $rules['status']);
         $data = $request->validate($rules);
+        $hasTrackingInput = $latestTracking !== null
+            || collect($request->only([
+                'tracking_jenis',
+                'tracking_nama_tempat',
+                'tracking_tahun',
+                'tracking_keterangan',
+            ]))->contains(static fn (mixed $value): bool => filled($value));
+        $trackingRequired = $hasTrackingInput ? 'required' : 'nullable';
+        $trackingData = $request->validate([
+            'tracking_jenis' => [$trackingRequired, 'string', Rule::in(['Kuliah', 'Bekerja', 'Wirausaha', 'Mencari kerja', 'Lainnya'])],
+            'tracking_nama_tempat' => [$trackingRequired, 'string', 'max:150'],
+            'tracking_tahun' => [$trackingRequired, 'digits:4'],
+            'tracking_keterangan' => ['nullable', 'string', 'max:255'],
+        ]);
+        unset($data['kegiatan_setelah_lulus']);
         unset($data['foto_file'], $data['berkas']);
         $this->normalizeDocumentFlags($request, $data);
         $fotoPath = null;
         $uploadedAttachmentPaths = [];
         $replacedAttachmentPaths = [];
+        $trackingChanged = false;
 
         try {
-            DB::transaction(function () use ($request, $data, $siswa, &$fotoPath, &$uploadedAttachmentPaths, &$replacedAttachmentPaths): void {
+            DB::transaction(function () use ($request, $data, $trackingData, $hasTrackingInput, $siswa, &$fotoPath, &$uploadedAttachmentPaths, &$replacedAttachmentPaths, &$trackingChanged): void {
                 $this->storePhoto($request, $data, $fotoPath);
                 $siswa->update($data);
+                if ($hasTrackingInput) {
+                    $trackingAttributes = [
+                        'jenis' => $trackingData['tracking_jenis'],
+                        'nama_tempat' => $trackingData['tracking_nama_tempat'],
+                        'tahun' => $trackingData['tracking_tahun'],
+                        'keterangan' => $trackingData['tracking_keterangan'] ?? null,
+                    ];
+                    $latestTracking = $siswa->pelacakan()->latest('id')->first();
+
+                    if ($latestTracking) {
+                        $latestTracking->fill($trackingAttributes);
+                        if ($latestTracking->isDirty()) {
+                            $latestTracking->save();
+                            $trackingChanged = true;
+                        }
+                    } else {
+                        $siswa->pelacakan()->create($trackingAttributes);
+                        $trackingChanged = true;
+                    }
+
+                    $siswa->update([
+                        'kegiatan_setelah_lulus' => "{$trackingAttributes['jenis']} · {$trackingAttributes['nama_tempat']}",
+                    ]);
+                }
                 $this->storeAttachments($request, $siswa, $uploadedAttachmentPaths, $replacedAttachmentPaths);
 
                 CatatanAktivitas::create([
@@ -314,6 +355,18 @@ class FormPendataanController extends Controller
                     'objek_id' => $siswa->id,
                     'alamat_ip' => $request->ip(),
                 ]);
+
+                if ($trackingChanged) {
+                    CatatanAktivitas::create([
+                        'pengguna_id' => auth()->id(),
+                        'peran' => auth()->user()->peran ?? 'admin',
+                        'aksi' => 'lacak_alumni',
+                        'keterangan' => "Memperbarui pelacakan alumni: {$siswa->nama_lengkap} ({$trackingAttributes['jenis']} di {$trackingAttributes['nama_tempat']})",
+                        'objek_tipe' => 'siswa',
+                        'objek_id' => $siswa->id,
+                        'alamat_ip' => $request->ip(),
+                    ]);
+                }
             });
         } catch (\Throwable $exception) {
             if ($fotoPath !== null) {
@@ -356,7 +409,6 @@ class FormPendataanController extends Controller
             'kelas' => $kelas,
             'aq' => $search,
             'page' => $page,
-            'siswa' => $siswa->id,
         ], static fn ($value): bool => $value !== null && $value !== ''))
             ->with('success', "Biodata lengkap {$siswa->nama_lengkap} berhasil diperbarui.");
     }
@@ -367,8 +419,10 @@ class FormPendataanController extends Controller
     private function validationRules(?int $siswaId = null): array
     {
         $nisnUnique = Rule::unique('siswa_biodata', 'nisn')->whereNull('deleted_at');
+        $nomorIndukUnique = Rule::unique('siswa_biodata', 'nomor_induk')->whereNull('deleted_at');
         if ($siswaId !== null) {
             $nisnUnique->ignore($siswaId);
+            $nomorIndukUnique->ignore($siswaId);
         }
 
         $rules = [
@@ -405,6 +459,8 @@ class FormPendataanController extends Controller
         foreach (self::STRING_LIMITS as $column => $maxLength) {
             $rules[$column] = ['nullable', 'string', 'max:'.$maxLength];
         }
+
+        $rules['nomor_induk'] = ['nullable', 'string', 'max:64', $nomorIndukUnique];
 
         return $rules;
     }

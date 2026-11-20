@@ -189,7 +189,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin.only'])->grou
     // Alumni & Kontrol (alumni dan kontrol.png)
     Route::get('/alumni', [AlumniController::class, 'index'])->name('alumni');
     Route::get('/alumni/export', [AlumniController::class, 'export'])->name('alumni.export');
+    Route::delete('/alumni/bulk-delete', [AlumniController::class, 'bulkDestroy'])->name('alumni.bulk-delete');
     Route::get('/alumni/{id}/biodata', [AlumniController::class, 'editBiodata'])->name('alumni.biodata.edit');
+    Route::get('/alumni/{id}/edit-data', [AlumniController::class, 'editData'])->name('alumni.edit-data');
     Route::get('/alumni/{id}', [AlumniController::class, 'show'])->name('alumni.show');
     Route::put('/alumni/{id}', [AlumniController::class, 'update'])->name('alumni.update');
     Route::post('/alumni/{id}/batalkan-kelulusan', [AlumniController::class, 'cancelGraduation'])->name('alumni.cancel-graduation');

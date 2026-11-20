@@ -12,11 +12,6 @@
     .alumni-modal-head p{margin:3px 0 0;color:var(--mu);font-size:12px}
     .alumni-modal-close{margin-left:auto;width:36px;height:36px;border:1px solid var(--ln);border-radius:50%;background:#fff;color:var(--p);font-size:20px;cursor:pointer}
     .alumni-modal-body{overflow:auto;padding:20px}
-    .alumni-identity{display:flex;align-items:center;gap:16px;padding:20px;border-radius:16px;background:linear-gradient(125deg,#12355b,#1d4f85);color:#fff}
-    .alumni-avatar{display:grid;place-items:center;width:58px;height:58px;flex:none;border-radius:16px;background:#ffffff20;color:#fff;font-size:23px;font-weight:800}
-    .alumni-identity h4{margin:0 0 5px;font-size:20px}
-    .alumni-identity p{margin:0;color:#d9e7f7;font-size:12px}
-    .alumni-identity .bd{margin-left:auto;background:#fff;color:var(--p)}
     .alumni-detail-section{margin-top:14px;padding:18px;border:1px solid var(--ln);border-radius:15px;background:#fff}
     .alumni-detail-section h4{margin:0 0 14px;color:var(--p);font-size:13px}
     .alumni-detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 22px}
@@ -24,10 +19,18 @@
     .alumni-detail-item span{display:block;margin-bottom:4px;color:var(--mu);font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
     .alumni-detail-item b{display:block;overflow-wrap:anywhere;color:#1b2430;font-size:12px}
     .alumni-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-    .alumni-form-grid input{width:100%}
-    .alumni-name-link{padding:0;border:0;background:none;color:var(--p);font:inherit;font-weight:700;text-align:left;cursor:pointer}
-    .alumni-modal-foot{display:flex;justify-content:flex-end;gap:8px;padding:14px 20px;border-top:1px solid var(--ln);background:#fff}
+    .alumni-form-grid label{display:block;margin:0 0 5px;color:var(--mu);font-size:11px;font-weight:700}
+    .alumni-form-grid input,.alumni-form-grid select{width:100%}
+    .alumni-form-grid input[type=checkbox]{width:auto;margin-right:6px}
+    .alumni-form-flag{display:flex!important;align-items:center;gap:6px;margin-top:8px!important}
+    .alumni-form-heading{grid-column:1/-1;margin:8px 0 0;padding-bottom:7px;border-bottom:1px solid var(--ln);color:var(--p);font-size:12px;font-weight:800}
+    .alumni-form-summary{grid-column:1/-1}
+    .alumni-form-summary small{display:block;margin-top:5px;color:var(--mu);font-size:10px}
+    .alumni-name-link{color:var(--p);font:inherit;font-weight:700;text-align:left;text-decoration:none}
+    .alumni-name-link:hover{text-decoration:underline}
     .alumni-pdf-frame{width:100%;height:min(76vh,920px);border:0;background:#e8edf4}
+    .btn.alumni-tracking-action.pending{border:1px solid #f59e0b;background:#f59e0b;color:#fff}
+    .btn.alumni-tracking-action.tracked{border:1px solid var(--ln);background:#fff;color:var(--p)}
     .student-profile{display:grid;gap:12px}
     .student-profile-identity{display:flex;align-items:center;gap:14px;padding:16px;border-radius:14px;background:linear-gradient(125deg,#12355b,#1d4f85);color:#fff}
     .student-profile-photo,.student-profile-avatar{display:grid;place-items:center;width:58px;height:58px;flex:none;border:2px solid #ffffff44;border-radius:16px;object-fit:cover}
@@ -58,6 +61,10 @@
     .alumni-side-tabs{display:flex;gap:8px;padding:12px 18px;border-bottom:1px solid var(--ln);background:#fff}
     .alumni-side-tabs a{padding:8px 12px;border:1px solid var(--ln);border-radius:8px;color:var(--p);font-size:12px;font-weight:700;text-decoration:none}
     .alumni-side-tabs a.on{background:var(--p);border-color:var(--p);color:#fff}
+    .alumni-side-tabs button{padding:8px 12px;border:1px solid var(--ln);border-radius:8px;background:#fff;color:var(--p);font-size:12px;font-weight:700;cursor:pointer}
+    .alumni-side-tabs button.on{background:var(--p);border-color:var(--p);color:#fff}
+    #alumni-edit-tabs{flex:none;overflow-x:auto;white-space:nowrap}
+    #alumni-edit-tabs button{flex:none}
     .alumni-side-body{flex:1;min-height:0;overflow-y:auto;padding:16px}
     .alumni-tracking-row{display:flex;align-items:flex-start;gap:10px;padding:12px 0;border-bottom:1px solid #e8edf3}
     .alumni-tracking-row form{margin-left:auto}
@@ -65,13 +72,13 @@
     .alumni-side-form label{display:block;margin:8px 0 4px;color:var(--mu);font-size:11px;font-weight:700}
     .alumni-side-form input,.alumni-side-form select{width:100%}
     .alumni-side-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
-    @media(max-width:600px){.alumni-modal{padding:8px}.alumni-modal-box{max-height:96vh;border-radius:14px}.alumni-modal-head{padding:14px}.alumni-modal-body{padding:12px}.alumni-side-panel{width:calc(100vw - 16px);height:96dvh;max-height:calc(100dvh - 16px);border-radius:14px}.alumni-detail-grid,.alumni-form-grid,.student-profile-grid{grid-template-columns:1fr}.alumni-identity{align-items:flex-start;padding:15px}.alumni-identity h4{font-size:16px}.alumni-identity .bd{margin-left:auto}.student-profile-identity{align-items:flex-start;padding:13px}.student-profile-identity h4{font-size:15px}}
+    @media(max-width:600px){.alumni-modal{padding:8px}.alumni-modal-box{max-height:96vh;border-radius:14px}.alumni-modal-head{padding:14px}.alumni-modal-body{padding:12px}.alumni-side-panel{width:calc(100vw - 16px);height:96dvh;max-height:calc(100dvh - 16px);border-radius:14px}.alumni-detail-grid,.alumni-form-grid,.student-profile-grid{grid-template-columns:1fr}.student-profile-identity{align-items:flex-start;padding:13px}.student-profile-identity h4{font-size:15px}}
 </style>
 @endpush
 
 @section('content')
 <h2>Alumni</h2>
-<p class="sub">Data lulus dan pindah/keluar, kontrol induk, serta pelacakan alumni · {{ $totalFiltered }} data · klik baris untuk membuka detail alumni</p>
+<p class="sub">Data lulus dan pindah/keluar, kontrol induk, serta pelacakan alumni · {{ $totalFiltered }} data · klik baris atau tombol Lihat/Edit untuk membuka panel alumni</p>
 
 @if(session('success'))
 <div class="note ok">{{ session('success') }}</div>
@@ -149,11 +156,52 @@
     </div>
 </form>
 
+<div class="bar" style="flex-wrap:wrap;gap:8px;margin-bottom:14px">
+    <form method="POST" action="{{ route('admin.alumni.bulk-delete') }}" style="margin:0" onsubmit="return confirm('Semua alumni yang cocok dengan filter saat ini akan dipindahkan ke Tempat Sampah. Lanjutkan?')">
+        @csrf
+        @method('DELETE')
+        <input type="hidden" name="mode" value="all">
+        <input type="hidden" name="aj" value="{{ $aj }}">
+        <input type="hidden" name="ay" value="{{ $ay }}">
+        <input type="hidden" name="kelas" value="{{ $kelas }}">
+        <input type="hidden" name="aq" value="{{ $aq }}">
+        <input type="hidden" name="konfirmasi" value="hapus">
+        <button type="submit" class="btn x" {{ $totalFiltered === 0 ? 'disabled' : '' }}>🗑 Hapus semua hasil filter ({{ $totalFiltered }})</button>
+    </form>
+    <form id="alumni-delete-selected-form" method="POST" action="{{ route('admin.alumni.bulk-delete') }}" style="display:none" onsubmit="return confirm('Alumni yang dipilih akan dipindahkan ke Tempat Sampah. Lanjutkan?')">
+        @csrf
+        @method('DELETE')
+        <input type="hidden" name="mode" value="selected">
+        <input type="hidden" name="aj" value="{{ $aj }}">
+        <input type="hidden" name="ay" value="{{ $ay }}">
+        <input type="hidden" name="kelas" value="{{ $kelas }}">
+        <input type="hidden" name="aq" value="{{ $aq }}">
+        <input type="hidden" name="konfirmasi" value="hapus">
+    </form>
+    <button type="submit" form="alumni-delete-selected-form" id="alumni-delete-selected-button" class="btn x" disabled>🗑 Hapus terpilih</button>
+    @if($kelas !== '')
+        <form method="POST" action="{{ route('admin.alumni.bulk-delete') }}" style="margin:0" onsubmit="return confirm('Semua alumni yang cocok di kelas terpilih akan dipindahkan ke Tempat Sampah. Lanjutkan?')">
+            @csrf
+            @method('DELETE')
+            <input type="hidden" name="mode" value="class">
+            <input type="hidden" name="aj" value="{{ $aj }}">
+            <input type="hidden" name="ay" value="{{ $ay }}">
+            <input type="hidden" name="kelas" value="{{ $kelas }}">
+            <input type="hidden" name="aq" value="{{ $aq }}">
+            <input type="hidden" name="konfirmasi" value="hapus">
+            <button type="submit" class="btn x" {{ $totalFiltered === 0 ? 'disabled' : '' }}>🗑 Hapus per kelas {{ $kelas }} ({{ $totalFiltered }})</button>
+        </form>
+    @else
+        <button type="button" class="btn x" disabled title="Pilih kelas pada filter terlebih dahulu">🗑 Hapus per kelas</button>
+    @endif
+</div>
+
 <div class="card wide">
     <div class="tw">
         <table>
             <thead>
                 <tr>
+                    <th><input type="checkbox" id="alumni-select-all" aria-label="Pilih semua alumni di halaman"></th>
                     <th>No</th>
                     <th>Induk</th>
                     <th>Nama Peserta Didik</th>
@@ -182,7 +230,6 @@
             <tbody>
                 @forelse($alumni as $idx => $s)
                 @php
-                    $latestRiwayat = $s->riwayatKelas->first();
                     $isGraduated = $s->isGraduated();
                     $status = $s->status_alumni;
                     $statusClass = $status === 'Lulus' ? 'ok' : (in_array($status, ['Pindah keluar', 'Keluar', 'Pindah']) ? 'w' : '');
@@ -193,46 +240,17 @@
                         'id' => $s->id,
                         'nama_lengkap' => $s->nama_lengkap,
                         'nisn' => $s->nisn,
-                        'nomor_induk' => $s->nomor_induk,
-                        'status' => $status,
-                        'kelas_terakhir' => $s->kelas_keluar ?: ($latestRiwayat?->kelas?->nama ?? '-'),
-                        'jenis_registrasi' => $s->jenis_registrasi,
-                        'tanggal_diterima' => $s->tanggal_diterima,
-                        'kelas_diterima' => $s->kelas_diterima,
-                        'rombel_diterima' => $s->rombel_diterima,
-                        'sekolah_asal' => $s->sekolah_asal,
-                        'alasan_keluar' => $s->alasan_keluar,
-                        'tanggal_keluar' => $s->tanggal_keluar,
-                        'kelas_keluar' => $s->kelas_keluar,
-                        'sekolah_tujuan' => $s->sekolah_tujuan,
-                        'nomor_peserta_psaj' => $s->nomor_peserta_psaj,
-                        'nomor_skl' => $s->nomor_skl,
-                        'nomor_ijazah_sma' => $s->nomor_ijazah_sma,
-                        'tanggal_ijazah_sma' => $s->tanggal_ijazah_sma,
-                        'nomor_transkrip' => $s->nomor_transkrip,
-                        'tahun_lulus' => $s->tahun_lulus,
-                        'kegiatan_setelah_lulus' => $s->kegiatan_setelah_lulus,
-                        'nomor_hp' => $s->nomor_hp,
-                        'alamat_jalan' => $s->alamat_jalan,
-                        'status_kontrol_induk' => $s->status_kontrol_induk,
-                        'status_pelacakan' => $s->status_pelacakan,
-                        'edit_url' => route('admin.alumni.update', $s->id),
-                        'full_edit_url' => route('admin.alumni.biodata.edit', array_merge($panelQuery, ['id' => $s->id])),
+                        'edit_data_url' => route('admin.alumni.edit-data', $s->id),
                         'pdf_url' => route('admin.data-siswa.pdf', $s->id),
-                        'tracking_url' => route('admin.alumni', array_merge($panelQuery, [
-                            'tab' => 'pelacakan',
-                            'siswa' => $s->id,
-                        ])),
                     ];
                     $studentJson = json_encode($studentDetails, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
                 @endphp
                 <tr class="alumni-row" data-panel-url="{{ $panelUrl }}" tabindex="0" role="link" aria-label="Buka panel {{ $s->nama_lengkap }}">
+                    <td><input type="checkbox" class="alumni-select-row" form="alumni-delete-selected-form" name="siswa_ids[]" value="{{ $s->id }}" aria-label="Pilih {{ $s->nama_lengkap }}" onclick="event.stopPropagation()"></td>
                     <td>{{ $alumni->firstItem() + $idx }}</td>
                     <td>{{ $s->nomor_induk ?: '-' }}</td>
                     <td>
-                        <button type="button" class="alumni-name-link" data-alumni="{{ $studentJson }}" onclick="openAlumniDetail(this)">
-                            {{ $s->nama_lengkap }}
-                        </button>
+                        <a class="alumni-name-link" href="{{ $panelUrl }}">{{ $s->nama_lengkap }}</a>
                     </td>
                     <td>{{ $s->nisn }}</td>
                     <td>{{ $s->jenis_registrasi ?: '-' }}</td>
@@ -266,29 +284,22 @@
                     </td>
                     <td><span class="bd {{ $s->pelacakan_count ? 'ok' : 'w' }}">{{ $s->status_pelacakan }}</span></td>
                     <td style="white-space:nowrap">
-                        <button type="button" class="btn" data-alumni="{{ $studentJson }}" onclick="event.stopPropagation();openAlumniDetail(this)">Lihat</button>
-                        <button type="button" class="btn a" data-alumni="{{ $studentJson }}" onclick="event.stopPropagation();openAlumniEdit(this)">✏ Edit</button>
+                        <a href="{{ $panelUrl }}" class="btn" onclick="event.stopPropagation()">Lihat</a>
+                        <button id="alumni-edit-{{ $s->id }}" type="button" class="btn a" data-alumni="{{ $studentJson }}" onclick="event.stopPropagation();openAlumniEdit(this)">✏ Edit</button>
                         <button type="button" class="btn o" data-alumni="{{ $studentJson }}" onclick="event.stopPropagation();openAlumniPdf(this)">⬇ PDF</button>
-                        @if($isGraduated && empty($s->kegiatan_setelah_lulus))
-                            <a href="{{ $studentDetails['tracking_url'] }}" class="btn o" title="Catat kelanjutan alumni">Lacak</a>
+                        @if($isGraduated)
+                            <button type="button" class="btn alumni-tracking-action {{ $s->pelacakan_count ? 'tracked' : 'pending' }}" data-alumni="{{ $studentJson }}" onclick="event.stopPropagation();openAlumniEdit(this, 'tracking')" title="{{ $s->pelacakan_count ? 'Ubah pelacakan terakhir' : 'Catat kelanjutan alumni' }}">{{ $s->pelacakan_count ? 'Sudah dilacak' : 'Lacak' }}</button>
                         @endif
                         <form method="POST" action="{{ route('admin.data-siswa.destroy', $s->id) }}" style="display:inline" onsubmit="return confirm('Pindahkan data ke tempat sampah?')">
                             @csrf
                             @method('DELETE')
                             <button type="submit" class="btn x">🗑</button>
                         </form>
-                        <template class="alumni-profile-template">
-                            @include('admin.siswa-detail-content', [
-                                'siswa' => $s,
-                                'includeGraduationDetails' => false,
-                                'canManageAcademicRecords' => false,
-                            ])
-                        </template>
                     </td>
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="23" style="text-align:center;padding:24px;color:var(--mu)">
+                    <td colspan="24" style="text-align:center;padding:24px;color:var(--mu)">
                         Tidak ada data siswa yang cocok dengan filter.
                     </td>
                 </tr>
@@ -349,39 +360,12 @@
                                 <b>{{ $tracking->jenis }} · {{ $tracking->nama_tempat ?: '-' }}</b>
                                 <div style="color:var(--mu);font-size:11px">{{ $tracking->tahun ?: '-' }} · {{ $tracking->keterangan ?: 'Tanpa catatan' }}</div>
                             </div>
-                            <form method="POST" action="{{ route('admin.pelacakan-alumni.destroy', $tracking->id) }}" onsubmit="return confirm('Hapus riwayat pelacakan ini?')">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" class="btn x" aria-label="Hapus riwayat pelacakan">Hapus</button>
-                            </form>
                         </div>
                     @empty
                         <p class="student-profile-empty">Belum ada riwayat pelacakan.</p>
                     @endforelse
                 </section>
 
-                <form class="alumni-side-form" method="POST" action="{{ route('admin.pelacakan-alumni.store') }}">
-                    @csrf
-                    <input type="hidden" name="siswa_id" value="{{ $selectedAlumni->id }}">
-                    <h4 style="margin:0;color:var(--p)">Catat kegiatan lanjutan</h4>
-                    <label for="tracking-kind">Kegiatan</label>
-                    <select id="tracking-kind" name="jenis" required>
-                        <option value="Kuliah">Kuliah</option>
-                        <option value="Bekerja">Bekerja</option>
-                        <option value="Wirausaha">Wirausaha</option>
-                        <option value="Mencari kerja">Mencari kerja</option>
-                        <option value="Lainnya">Lainnya</option>
-                    </select>
-                    <label for="tracking-place">Kampus / instansi / perusahaan</label>
-                    <input id="tracking-place" name="nama_tempat" maxlength="150" required>
-                    <label for="tracking-year">Tahun</label>
-                    <input id="tracking-year" type="number" name="tahun" value="{{ date('Y') }}" min="1900" max="2099" required>
-                    <label for="tracking-note">Catatan</label>
-                    <input id="tracking-note" name="keterangan" maxlength="255">
-                    <div class="alumni-side-actions">
-                        <button type="submit" class="btn a">Simpan pelacakan</button>
-                    </div>
-                </form>
             @else
                 <section class="alumni-detail-section">
                     <h4>Kontak dan status</h4>
@@ -412,32 +396,17 @@
                         <div class="alumni-detail-item"><span>Kegiatan lanjutan</span><b>{{ $selectedAlumni->kegiatan_setelah_lulus ?: 'Belum diketahui' }}</b></div>
                     </div>
                     <div class="alumni-side-actions">
-                        <button type="button" class="btn a" data-alumni="{{ json_encode([
-                            'id' => $selectedAlumni->id,
-                            'nama_lengkap' => $selectedAlumni->nama_lengkap,
-                            'nisn' => $selectedAlumni->nisn,
-                            'jenis_registrasi' => $selectedAlumni->jenis_registrasi,
-                            'tanggal_diterima' => $selectedAlumni->tanggal_diterima,
-                            'kelas_diterima' => $selectedAlumni->kelas_diterima,
-                            'rombel_diterima' => $selectedAlumni->rombel_diterima,
-                            'sekolah_asal' => $selectedAlumni->sekolah_asal,
-                            'alasan_keluar' => $selectedAlumni->alasan_keluar,
-                            'tanggal_keluar' => $selectedAlumni->tanggal_keluar,
-                            'kelas_keluar' => $selectedAlumni->kelas_keluar,
-                            'sekolah_tujuan' => $selectedAlumni->sekolah_tujuan,
-                            'tahun_lulus' => $selectedAlumni->tahun_lulus,
-                            'nomor_peserta_psaj' => $selectedAlumni->nomor_peserta_psaj,
-                            'nomor_skl' => $selectedAlumni->nomor_skl,
-                            'nomor_ijazah_sma' => $selectedAlumni->nomor_ijazah_sma,
-                            'tanggal_ijazah_sma' => $selectedAlumni->tanggal_ijazah_sma,
-                            'nomor_transkrip' => $selectedAlumni->nomor_transkrip,
-                            'kegiatan_setelah_lulus' => $selectedAlumni->kegiatan_setelah_lulus,
-                            'edit_url' => route('admin.alumni.update', $selectedAlumni->id),
-                            'full_edit_url' => route('admin.alumni.biodata.edit', array_merge($panelQuery, ['id' => $selectedAlumni->id])),
-                        ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) }}" onclick="openAlumniEdit(this)">Edit Kontrol Induk</button>
-                        <a class="btn o" href="{{ route('admin.alumni.biodata.edit', array_merge($panelQuery, ['id' => $selectedAlumni->id])) }}">Edit biodata lengkap</a>
+                        <button type="button" class="btn a" onclick="document.getElementById('alumni-edit-{{ $selectedAlumni->id }}').click()">✏ Edit Kontrol Induk</button>
                         <a class="btn o" href="{{ route('admin.data-siswa.pdf', $selectedAlumni->id) }}" target="_blank" rel="noopener">Cetak PDF</a>
                     </div>
+                </section>
+                <section class="alumni-detail-section">
+                    <h4>Biodata Lengkap dan Riwayat Kelas</h4>
+                    @include('admin.siswa-detail-content', [
+                        'siswa' => $selectedAlumni,
+                        'includeGraduationDetails' => false,
+                        'canManageAcademicRecords' => false,
+                    ])
                 </section>
                 @if($selectedAlumni->isGraduated())
                     @if($canCancelGraduation)
@@ -460,67 +429,18 @@
     </aside>
 @endif
 
-<div id="alumni-detail-modal" class="alumni-modal" role="dialog" aria-modal="true" aria-labelledby="alumni-detail-title" onclick="closeAlumniModal(event, this)">
-    <div class="alumni-modal-box">
-        <div class="alumni-modal-head">
-            <div>
-                <h3 id="alumni-detail-title">Biodata dan Kontrol Induk</h3>
-                <p>Ringkasan data peserta didik</p>
-            </div>
-            <button type="button" class="alumni-modal-close" aria-label="Tutup" onclick="closeAlumniModal(null, document.getElementById('alumni-detail-modal'))">&times;</button>
-        </div>
-        <div class="alumni-modal-body">
-            <div class="alumni-identity">
-                <div class="alumni-avatar" data-detail="inisial">S</div>
-                <div>
-                    <h4 data-detail="nama_lengkap">Nama siswa</h4>
-                    <p>NISN <span data-detail="nisn"></span> · Induk <span data-detail="nomor_induk"></span></p>
-                </div>
-                <span class="bd" data-detail="status"></span>
-            </div>
-            <section class="alumni-detail-section">
-                <h4>Registrasi dan asal peserta didik</h4>
-                <div class="alumni-detail-grid">
-                    <div class="alumni-detail-item"><span>Jenis registrasi</span><b data-detail="jenis_registrasi"></b></div>
-                    <div class="alumni-detail-item"><span>Tanggal diterima</span><b data-detail="tanggal_diterima"></b></div>
-                    <div class="alumni-detail-item"><span>Kelas masuk</span><b data-detail="kelas_masuk"></b></div>
-                    <div class="alumni-detail-item"><span>Sekolah asal</span><b data-detail="sekolah_asal"></b></div>
-                </div>
-            </section>
-            <section class="alumni-detail-section">
-                <h4>Kelulusan dan kontrol induk</h4>
-                <div class="alumni-detail-grid">
-                    <div class="alumni-detail-item"><span>Alasan keluar</span><b data-detail="alasan_keluar"></b></div>
-                    <div class="alumni-detail-item"><span>Tanggal keluar</span><b data-detail="tanggal_keluar"></b></div>
-                    <div class="alumni-detail-item"><span>Kelas keluar</span><b data-detail="kelas_keluar"></b></div>
-                    <div class="alumni-detail-item"><span>Sekolah tujuan</span><b data-detail="sekolah_tujuan"></b></div>
-                    <div class="alumni-detail-item"><span>Tahun lulus</span><b data-detail="tahun_lulus"></b></div>
-                    <div class="alumni-detail-item"><span>Nomor peserta PSAJ</span><b data-detail="nomor_peserta_psaj"></b></div>
-                    <div class="alumni-detail-item"><span>Nomor SKL</span><b data-detail="nomor_skl"></b></div>
-                    <div class="alumni-detail-item"><span>Nomor ijazah nasional</span><b data-detail="nomor_ijazah_sma"></b></div>
-                    <div class="alumni-detail-item"><span>Tanggal pengesahan ijazah</span><b data-detail="tanggal_ijazah_sma"></b></div>
-                    <div class="alumni-detail-item"><span>Nomor transkrip nilai</span><b data-detail="nomor_transkrip"></b></div>
-                    <div class="alumni-detail-item"><span>Melanjutkan studi / bekerja</span><b data-detail="kegiatan_setelah_lulus"></b></div>
-                </div>
-            </section>
-            <section class="alumni-detail-section">
-                <h4>Biodata Lengkap dan Riwayat Kelas</h4>
-                <div data-profile-content aria-live="polite">Memuat biodata lengkap...</div>
-            </section>
-        </div>
-    </div>
-</div>
-
 <div id="alumni-edit-modal" class="alumni-modal" role="dialog" aria-modal="true" aria-labelledby="alumni-edit-title" onclick="closeAlumniModal(event, this)">
-    <form id="alumni-edit-form" class="alumni-modal-box" method="POST">
+    <form id="alumni-edit-form" class="alumni-modal-box" method="POST" enctype="multipart/form-data">
         @csrf
         @method('PUT')
-        <input type="hidden" name="aj" value="{{ $aj }}">
-        <input type="hidden" name="ay" value="{{ $ay }}">
-        <input type="hidden" name="kelas" value="{{ $kelas }}">
-        <input type="hidden" name="aq" value="{{ $aq }}">
-        <input type="hidden" name="tab" value="{{ $panelTab }}">
-        <input type="hidden" name="page" value="{{ $alumni->currentPage() }}">
+        <input type="hidden" name="alumni_edit" value="1">
+        <input type="hidden" name="alumni_edit_id" value="">
+        <input type="hidden" name="return_aj" value="{{ $aj }}">
+        <input type="hidden" name="return_ay" value="{{ $ay }}">
+        <input type="hidden" name="return_kelas" value="{{ $kelas }}">
+        <input type="hidden" name="return_aq" value="{{ $aq }}">
+        <input type="hidden" name="return_tab" value="{{ $panelTab }}">
+        <input type="hidden" name="return_page" value="{{ $alumni->currentPage() }}">
         <div class="alumni-modal-head">
             <div>
                 <h3 id="alumni-edit-title">Edit Kontrol Induk</h3>
@@ -528,33 +448,23 @@
             </div>
             <button type="button" class="alumni-modal-close" aria-label="Tutup" onclick="closeAlumniModal(null, document.getElementById('alumni-edit-modal'))">&times;</button>
         </div>
-        <div class="alumni-modal-body">
-            <div class="alumni-form-grid">
-                <div><label>Jenis registrasi</label><input name="jenis_registrasi" data-edit-field="jenis_registrasi"></div>
-                <div><label>Tanggal diterima</label><input type="date" name="tanggal_diterima" data-edit-field="tanggal_diterima"></div>
-                <div><label>Kelas diterima</label><input name="kelas_diterima" data-edit-field="kelas_diterima"></div>
-                <div><label>Rombel diterima</label><input name="rombel_diterima" data-edit-field="rombel_diterima"></div>
-                <div><label>Sekolah asal</label><input name="sekolah_asal" data-edit-field="sekolah_asal"></div>
-                <div><label>Alasan keluar</label><input name="alasan_keluar" data-edit-field="alasan_keluar"></div>
-                <div><label>Tanggal keluar</label><input type="date" name="tanggal_keluar" data-edit-field="tanggal_keluar"></div>
-                <div><label>Kelas keluar</label><input name="kelas_keluar" data-edit-field="kelas_keluar"></div>
-                <div><label>Sekolah tujuan</label><input name="sekolah_tujuan" data-edit-field="sekolah_tujuan"></div>
-                <div><label>Tahun lulus</label><input name="tahun_lulus" maxlength="4" inputmode="numeric" data-edit-field="tahun_lulus"></div>
-                <div><label>Nomor peserta PSAJ</label><input name="nomor_peserta_psaj" data-edit-field="nomor_peserta_psaj"></div>
-                <div><label>Nomor SKL</label><input name="nomor_skl" data-edit-field="nomor_skl"></div>
-                <div><label>Nomor ijazah nasional</label><input name="nomor_ijazah_sma" data-edit-field="nomor_ijazah_sma"></div>
-                <div><label>Tanggal pengesahan ijazah</label><input type="date" name="tanggal_ijazah_sma" data-edit-field="tanggal_ijazah_sma"></div>
-                <div><label>Nomor transkrip nilai</label><input name="nomor_transkrip" data-edit-field="nomor_transkrip"></div>
-                <div><label>Melanjutkan studi / bekerja</label><input name="kegiatan_setelah_lulus" data-edit-field="kegiatan_setelah_lulus"></div>
-            </div>
-        </div>
+        @if($errors->any())
+            <div class="note err" role="alert" style="margin:12px 20px 0">{{ $errors->first() }}</div>
+        @endif
+        <div id="alumni-edit-loading" class="note" role="status" hidden style="margin:12px 20px 0">Memuat biodata lengkap...</div>
+        <div id="alumni-edit-load-error" class="note err" role="alert" hidden style="margin:12px 20px 0"></div>
+        @include('admin._alumni-edit-fields')
         <div class="alumni-modal-foot">
-            <a id="alumni-full-edit-link" class="btn o">Biodata lengkap</a>
             <button type="button" class="btn o" onclick="closeAlumniModal(null, document.getElementById('alumni-edit-modal'))">Batal</button>
             <button type="submit" class="btn a">Simpan perubahan</button>
         </div>
     </form>
 </div>
+
+<form id="alumni-tracking-delete-form" method="POST" style="display:none">
+    @csrf
+    @method('DELETE')
+</form>
 
 <div id="alumni-pdf-modal" class="alumni-modal" role="dialog" aria-modal="true" aria-labelledby="alumni-pdf-title" onclick="closeAlumniModal(event, this)">
     <div class="alumni-modal-box">
@@ -585,41 +495,176 @@ function showAlumniModal(modal) {
     document.body.style.overflow = 'hidden';
 }
 
-function openAlumniDetail(button) {
-    const data = alumniData(button);
-    if (!data) return;
-    const modal = document.getElementById('alumni-detail-modal');
-    const display = (value) => value === null || value === undefined || value === '' ? '-' : String(value);
-    const formatDate = (value) => {
-        const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value ?? ''));
-        return match ? `${match[3]}/${match[2]}/${match[1]}` : display(value);
-    };
-    modal.querySelectorAll('[data-detail]').forEach((element) => {
-        const key = element.dataset.detail;
-        let value = data[key];
-        if (key === 'inisial') value = String(data.nama_lengkap || 'S').trim().slice(0, 1).toUpperCase();
-        if (key === 'kelas_masuk') value = [data.kelas_diterima, data.rombel_diterima].filter(Boolean).join('-');
-        if (['tanggal_diterima', 'tanggal_keluar', 'tanggal_ijazah_sma'].includes(key)) value = formatDate(value);
-        element.textContent = display(value);
-    });
-    const profileContent = modal.querySelector('[data-profile-content]');
-    const profileTemplate = button.closest('tr').querySelector('.alumni-profile-template');
-    profileContent.replaceChildren(profileTemplate.content.cloneNode(true));
-    showAlumniModal(modal);
-}
+async function openAlumniEdit(button, initialTab = 'control', oldValues = null) {
+    const rowData = alumniData(button);
+    if (!rowData) return;
 
-function openAlumniEdit(button) {
-    const data = alumniData(button);
-    if (!data) return;
+    const panel = document.getElementById('alumni-side-panel');
+    const backdrop = document.querySelector('.alumni-side-backdrop');
+    if (panel && backdrop) {
+        const destination = new URL(backdrop.href, window.location.href);
+        panel.remove();
+        backdrop.remove();
+        window.history.replaceState(
+            window.history.state,
+            '',
+            destination.pathname + destination.search + destination.hash
+        );
+    }
+
     const modal = document.getElementById('alumni-edit-modal');
     const form = document.getElementById('alumni-edit-form');
-    form.action = data.edit_url;
-    document.getElementById('alumni-full-edit-link').href = data.full_edit_url;
-    modal.querySelector('[data-edit-name]').textContent = `${data.nama_lengkap} · NISN ${data.nisn || '-'}`;
-    modal.querySelectorAll('[data-edit-field]').forEach((input) => {
-        input.value = data[input.dataset.editField] ?? '';
-    });
+    const loading = document.getElementById('alumni-edit-loading');
+    const loadError = document.getElementById('alumni-edit-load-error');
+    const submitButton = form.querySelector('[type="submit"]');
+    const requestId = Number(form.dataset.requestId || 0) + 1;
+    let dataLoaded = false;
+    form.dataset.requestId = String(requestId);
+    form.action = rowData.edit_data_url;
+    form.querySelector('[name="alumni_edit_id"]').value = rowData.id;
+    modal.querySelector('[data-edit-name]').textContent = `${rowData.nama_lengkap} · NISN ${rowData.nisn || '-'}`;
+    loading.hidden = false;
+    loadError.hidden = true;
+    submitButton.disabled = true;
     showAlumniModal(modal);
+
+    try {
+        const response = await fetch(rowData.edit_data_url, {
+            headers: { Accept: 'application/json' },
+            credentials: 'same-origin',
+        });
+        if (!response.ok) {
+            throw new Error(`Permintaan data alumni gagal (${response.status}).`);
+        }
+
+        const data = await response.json();
+        if (form.dataset.requestId !== String(requestId)) return;
+        form.action = data.edit_url;
+        modal.querySelectorAll('[data-edit-field]').forEach((input) => {
+            input.value = data[input.dataset.editField] ?? '';
+        });
+        form.querySelectorAll('input[name],select[name],textarea[name]').forEach((input) => {
+            if (input.type === 'file' || input.type === 'hidden') return;
+            const value = data[input.name];
+            if (input.type === 'checkbox') {
+                input.checked = value === true || value === 1 || value === '1' || value === 'on';
+            } else {
+                input.value = value ?? '';
+            }
+        });
+        if (oldValues) {
+            form.querySelectorAll('input[name],select[name],textarea[name]').forEach((input) => {
+                if (input.type === 'file' || input.type === 'hidden') return;
+                if (input.type === 'checkbox') {
+                    input.checked = oldValues[input.name] === true || oldValues[input.name] === 1 || oldValues[input.name] === '1' || oldValues[input.name] === 'on';
+                } else if (Object.prototype.hasOwnProperty.call(oldValues, input.name)) {
+                    input.value = oldValues[input.name] ?? '';
+                }
+            });
+        }
+        renderAlumniPhoto(data.foto_url);
+        renderAlumniAttachments(data.attachments || []);
+        renderAlumniTrackingHistory(data.tracking_history || []);
+        switchAlumniEditTab(initialTab);
+        loading.hidden = true;
+        dataLoaded = true;
+    } catch (error) {
+        if (form.dataset.requestId !== String(requestId)) return;
+        console.error('Gagal memuat data alumni untuk diedit.', error);
+        loading.hidden = true;
+        loadError.textContent = 'Data lengkap alumni gagal dimuat. Muat ulang halaman atau coba lagi.';
+        loadError.hidden = false;
+    } finally {
+        if (form.dataset.requestId === String(requestId)) {
+            submitButton.disabled = !dataLoaded;
+        }
+    }
+}
+
+function renderAlumniPhoto(url) {
+    const preview = document.getElementById('alumni-edit-photo-preview');
+    const filePanel = document.getElementById('alumni-edit-photo-file');
+    preview.hidden = !url;
+    preview.style.display = url ? 'block' : 'none';
+    preview.src = url || '';
+    filePanel.replaceChildren();
+
+    if (url) {
+        const link = document.createElement('a');
+        link.href = url;
+        link.target = '_blank';
+        link.rel = 'noopener';
+        link.textContent = 'Lihat pas foto yang tersimpan';
+        filePanel.append(link);
+    } else {
+        const emptyMessage = document.createElement('p');
+        emptyMessage.className = 'student-profile-empty';
+        emptyMessage.textContent = 'Belum ada pas foto.';
+        filePanel.append(emptyMessage);
+    }
+}
+
+function renderAlumniAttachments(attachments) {
+    document.querySelectorAll('[data-existing-attachment]').forEach((container) => {
+        const attachment = attachments.find((item) => item.jenis === container.dataset.existingAttachment);
+        container.replaceChildren();
+        const message = document.createElement('p');
+        message.className = 'student-profile-empty';
+
+        if (attachment) {
+            const link = document.createElement('a');
+            link.href = attachment.url;
+            link.target = '_blank';
+            link.rel = 'noopener';
+            link.textContent = `Tersimpan: ${attachment.nama_file}`;
+            message.append(link);
+        } else {
+            message.textContent = 'Belum ada dokumen yang diunggah.';
+        }
+        container.append(message);
+    });
+}
+
+function renderAlumniTrackingHistory(history) {
+    const container = document.getElementById('alumni-edit-tracking-history');
+    container.replaceChildren();
+
+    if (history.length === 0) {
+        const emptyMessage = document.createElement('p');
+        emptyMessage.className = 'student-profile-empty';
+        emptyMessage.textContent = 'Belum ada riwayat pelacakan.';
+        container.append(emptyMessage);
+        return;
+    }
+
+    history.forEach((tracking) => {
+        const row = document.createElement('div');
+        row.className = 'alumni-tracking-row';
+        const description = document.createElement('div');
+        description.textContent = `${tracking.jenis} · ${tracking.nama_tempat || '-'} (${tracking.tahun || '-'})${tracking.keterangan ? ` · ${tracking.keterangan}` : ''}`;
+        const deleteButton = document.createElement('button');
+        deleteButton.type = 'button';
+        deleteButton.className = 'btn x';
+        deleteButton.dataset.trackingDeleteUrl = tracking.delete_url;
+        deleteButton.textContent = 'Hapus';
+        row.append(description, deleteButton);
+        container.append(row);
+    });
+}
+
+function switchAlumniEditTab(tab) {
+    document.querySelectorAll('[data-edit-tab]').forEach((button) => {
+        const isActive = button.dataset.editTab === tab;
+        button.classList.toggle('on', isActive);
+        button.setAttribute('aria-selected', String(isActive));
+    });
+    document.querySelectorAll('[data-edit-panel]').forEach((panel) => {
+        panel.hidden = panel.dataset.editPanel !== tab;
+    });
+    const modalBody = document.querySelector('#alumni-edit-modal .alumni-modal-body');
+    if (modalBody) {
+        modalBody.scrollTop = 0;
+    }
 }
 
 function openAlumniPdf(button) {
@@ -672,11 +717,54 @@ document.querySelectorAll('.alumni-row').forEach((row) => {
     });
 });
 
+document.querySelectorAll('[data-edit-tab]').forEach((button) => {
+    button.addEventListener('click', () => switchAlumniEditTab(button.dataset.editTab));
+});
+
+const alumniSelectAll = document.getElementById('alumni-select-all');
+const alumniSelectRows = document.querySelectorAll('.alumni-select-row');
+const alumniDeleteSelectedButton = document.getElementById('alumni-delete-selected-button');
+
+function updateAlumniDeleteSelection() {
+    const selectedCount = document.querySelectorAll('.alumni-select-row:checked').length;
+    alumniDeleteSelectedButton.disabled = selectedCount === 0;
+    alumniSelectAll.checked = alumniSelectRows.length > 0 && selectedCount === alumniSelectRows.length;
+    alumniSelectAll.indeterminate = selectedCount > 0 && selectedCount < alumniSelectRows.length;
+}
+
+alumniSelectAll.addEventListener('change', () => {
+    alumniSelectRows.forEach((checkbox) => {
+        checkbox.checked = alumniSelectAll.checked;
+    });
+    updateAlumniDeleteSelection();
+});
+
+alumniSelectRows.forEach((checkbox) => {
+    checkbox.addEventListener('change', updateAlumniDeleteSelection);
+});
+
+document.getElementById('alumni-edit-tracking-history').addEventListener('click', (event) => {
+    const button = event.target.closest('[data-tracking-delete-url]');
+    if (!button || !window.confirm('Hapus riwayat pelacakan ini?')) return;
+
+    const form = document.getElementById('alumni-tracking-delete-form');
+    form.action = button.dataset.trackingDeleteUrl;
+    form.submit();
+});
+
 document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') {
         document.querySelectorAll('.alumni-modal.on').forEach((modal) => closeAlumniModal(null, modal));
     }
 });
+
+const oldAlumniEditValues = @json(old());
+if (oldAlumniEditValues.alumni_edit === '1' && oldAlumniEditValues.alumni_edit_id) {
+    const editButton = document.getElementById(`alumni-edit-${oldAlumniEditValues.alumni_edit_id}`);
+    if (editButton) {
+        openAlumniEdit(editButton, 'control', oldAlumniEditValues);
+    }
+}
 </script>
 @endpush
 @endsection

@@ -4,6 +4,7 @@
     $tahunAjaranList = $formData['tahunAjaranList'];
     $tahunAjaranTerpilih = $formData['tahunAjaranTerpilih'];
     $alumniEdit = (bool) ($formData['alumniEdit'] ?? false);
+    $alumniTracking = $formData['alumniTracking'] ?? null;
     $alumniReturn = $formData['alumniReturn'] ?? [];
     $tahunAjaranForm = old('tahun_ajaran', $tahunAjaranTerpilih);
     $riwayatTerpilih = $edit?->riwayatKelas->firstWhere('tahunAjaran.nama', $tahunAjaranForm);
@@ -1190,11 +1191,40 @@
                         </div>
                     </div>
 
-                    <div class="sf-group">
-                        <label class="sf-label">Melanjutkan Studi / Tempat Bekerja</label>
-                        <input type="text" name="kegiatan_setelah_lulus" class="sf-input" value="{{ old('kegiatan_setelah_lulus', $edit->kegiatan_setelah_lulus ?? '') }}" placeholder="mis. Universitas Indonesia (Teknik Informatika) / Bekerja di PT...">
-                        <span class="sf-hint">Informasi penelusuran tamatan / tracer alumni</span>
-                    </div>
+                    @if($alumniEdit)
+                        <div class="sf-group sf-col-span-full">
+                            <label class="sf-label">Kegiatan Setelah Lulus (ringkasan otomatis)</label>
+                            <input type="text" class="sf-input" value="{{ $edit->kegiatan_setelah_lulus ?: '' }}" readonly>
+                            <span class="sf-hint">Ringkasan diperbarui dari data Pelacakan terakhir.</span>
+                        </div>
+                        <div class="sf-group">
+                            <label class="sf-label" for="alumni-tracking-kind">Kegiatan</label>
+                            <select id="alumni-tracking-kind" name="tracking_jenis" class="sf-select" @if($alumniTracking) required @endif>
+                                <option value="">Pilih kegiatan</option>
+                                @foreach(['Kuliah', 'Bekerja', 'Wirausaha', 'Mencari kerja', 'Lainnya'] as $trackingType)
+                                    <option value="{{ $trackingType }}" @selected(old('tracking_jenis', $alumniTracking?->jenis) === $trackingType)>{{ $trackingType }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="sf-group">
+                            <label class="sf-label" for="alumni-tracking-place">Kampus / instansi / perusahaan</label>
+                            <input id="alumni-tracking-place" type="text" name="tracking_nama_tempat" class="sf-input" maxlength="150" value="{{ old('tracking_nama_tempat', $alumniTracking?->nama_tempat ?? '') }}" @if($alumniTracking) required @endif>
+                        </div>
+                        <div class="sf-group">
+                            <label class="sf-label" for="alumni-tracking-year">Tahun</label>
+                            <input id="alumni-tracking-year" type="number" name="tracking_tahun" class="sf-input" min="1900" max="2099" maxlength="4" value="{{ old('tracking_tahun', $alumniTracking?->tahun ?? '') }}" @if($alumniTracking) required @endif>
+                        </div>
+                        <div class="sf-group">
+                            <label class="sf-label" for="alumni-tracking-note">Catatan</label>
+                            <input id="alumni-tracking-note" type="text" name="tracking_keterangan" class="sf-input" maxlength="255" value="{{ old('tracking_keterangan', $alumniTracking?->keterangan ?? '') }}">
+                        </div>
+                    @else
+                        <div class="sf-group">
+                            <label class="sf-label">Melanjutkan Studi / Tempat Bekerja</label>
+                            <input type="text" name="kegiatan_setelah_lulus" class="sf-input" value="{{ old('kegiatan_setelah_lulus', $edit->kegiatan_setelah_lulus ?? '') }}" placeholder="mis. Universitas Indonesia (Teknik Informatika) / Bekerja di PT...">
+                            <span class="sf-hint">Informasi penelusuran tamatan / tracer alumni</span>
+                        </div>
+                    @endif
                 </div>
             </div>
 

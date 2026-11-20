@@ -2784,14 +2784,13 @@ class ImportStudentMatchingTest extends TestCase
         $graduates->assertOk()
             ->assertViewHas('alumni', fn ($alumni): bool => $alumni->total() === 1)
             ->assertSee('Nama Sama')
+            ->assertSee('Edit Kontrol Induk')
             ->assertSee('Status Kontrol Induk')
             ->assertSee('Status Pelacakan')
             ->assertSee('Sudah dilacak')
             ->assertSee('id="alumni-side-panel"', false)
             ->assertSee('onclick="return closeAlumniSidePanel(event)"', false)
-            ->assertSee('>Cari</button>', false)
-            ->assertSee('id="alumni-full-edit-link" class="btn o"', false)
-            ->assertDontSee('id="alumni-full-edit-link" class="btn o" target="_blank"', false)
+            ->assertSee('🔍 Cari</button>', false)
             ->assertSee('Kegiatan Setelah Lulus')
             ->assertSee('Riwayat Pelacakan')
             ->assertSee('Jurusan Informatika')
@@ -2810,6 +2809,18 @@ class ImportStudentMatchingTest extends TestCase
     {
         DB::table('siswa_biodata')->where('id', 1)->update(['tahun_lulus' => '2025']);
         DB::table('siswa_riwayat_kelas')->where('siswa_id', 1)->update(['status' => 'Lulus']);
+        DB::table('siswa_biodata')->where('id', 1)->update([
+            'kegiatan_setelah_lulus' => 'Kuliah · Kampus Contoh',
+        ]);
+        $trackingId = DB::table('siswa_pelacakan_alumni')->insertGetId([
+            'siswa_id' => 1,
+            'jenis' => 'Kuliah',
+            'nama_tempat' => 'Kampus Contoh',
+            'tahun' => '2025',
+            'keterangan' => 'Teknik Informatika',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
         $historyBefore = DB::table('siswa_riwayat_kelas')->where('siswa_id', 1)->first();
         $filters = [
             'aj' => 'Alumni (Lulus)',
@@ -2819,22 +2830,108 @@ class ImportStudentMatchingTest extends TestCase
             'page' => 1,
         ];
 
+        $panelUrl = route('admin.alumni', [
+            'tab' => 'kontrol-induk',
+            'aj' => 'Alumni (Lulus)',
+            'ay' => '2025',
+            'aq' => 'Nama',
+            'kelas' => 'X-1',
+            'page' => 1,
+            'siswa' => 1,
+        ]);
         $this->actingAs($this->admin)
             ->get(route('admin.alumni', array_merge($filters, ['siswa' => 1])))
             ->assertOk()
-            ->assertSee('Edit biodata lengkap');
+            ->assertSee('href="'.e($panelUrl).'" class="btn"', false)
+            ->assertSee('onclick="event.stopPropagation();openAlumniEdit(this)"', false)
+            ->assertSee('name="nomor_induk"', false)
+            ->assertSee('name="nama_lengkap"', false)
+            ->assertSee('name="nisn"', false)
+            ->assertSee('name="nik"', false)
+            ->assertSee('name="alamat_jalan"', false)
+            ->assertSee('name="golongan_darah"', false)
+            ->assertSee('name="nama_ayah"', false)
+            ->assertSee('name="nama_ibu"', false)
+            ->assertSee('name="nama_wali"', false)
+            ->assertSee('name="foto_file"', false)
+            ->assertSee('name="berkas[kk]"', false)
+            ->assertSee('name="catatan"', false)
+            ->assertSee('name="alumni_edit" value="1"', false)
+            ->assertSee('name="nomor_peserta_psaj"', false)
+            ->assertSee('name="nomor_transkrip"', false)
+            ->assertSee('data-edit-field="status_alumni"', false)
+            ->assertSee('data-edit-field="status_kontrol_induk"', false)
+            ->assertSee('data-edit-field="status_pelacakan"', false)
+            ->assertSee('name="tracking_jenis"', false)
+            ->assertDontSee('alumni-detail-modal', false);
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.alumni.edit-data', 1))
+            ->assertOk()
+            ->assertJsonPath('id', 1)
+            ->assertJsonPath('nama_lengkap', 'Nama Sama')
+            ->assertJsonStructure([
+                'nik',
+                'alamat_jalan',
+                'golongan_darah',
+                'nama_ayah',
+                'nama_ibu',
+                'nama_wali',
+                'catatan',
+                'kk_ada',
+                'attachments',
+                'tracking_history',
+            ]);
 
         $this->actingAs($this->admin)
             ->get(route('admin.alumni.biodata.edit', array_merge($filters, ['id' => 1])))
             ->assertOk()
             ->assertSee('Edit Biodata Alumni')
             ->assertSee('name="alumni_edit" value="1"', false)
-            ->assertSee('name="return_kelas" value="X-1"', false);
+            ->assertSee('name="return_kelas" value="X-1"', false)
+            ->assertSee('name="tracking_jenis"', false)
+            ->assertSee('value="Kampus Contoh"', false)
+            ->assertSee('value="2025"', false)
+            ->assertSee('Kegiatan Setelah Lulus (ringkasan otomatis)');
+
+        $this->from(route('admin.alumni.biodata.edit', array_merge($filters, ['id' => 1])))
+            ->put(route('admin.data-siswa.update', 1), [
+                'alumni_edit' => '1',
+                'nama_lengkap' => 'Nama Alumni Diperbarui',
+                'nisn' => '0000000001',
+                'nik' => '1234567890123456',
+                'alamat_jalan' => 'Jalan Uji 1',
+                'golongan_darah' => 'O',
+                'nama_ayah' => 'Ayah Uji',
+                'nama_ibu' => 'Ibu Uji',
+                'nama_wali' => 'Wali Uji',
+                'catatan' => 'Catatan alumni uji',
+                'tracking_jenis' => 'Bekerja',
+            ])
+            ->assertSessionHasErrors(['tracking_nama_tempat', 'tracking_tahun']);
+
+        $this->assertDatabaseHas('siswa_pelacakan_alumni', [
+            'id' => $trackingId,
+            'jenis' => 'Kuliah',
+            'nama_tempat' => 'Kampus Contoh',
+        ]);
 
         $this->put(route('admin.data-siswa.update', 1), [
             'alumni_edit' => '1',
             'nama_lengkap' => 'Nama Alumni Diperbarui',
             'nisn' => '0000000001',
+            'nik' => '1234567890123456',
+            'alamat_jalan' => 'Jalan Uji 1',
+            'golongan_darah' => 'O',
+            'nama_ayah' => 'Ayah Uji',
+            'nama_ibu' => 'Ibu Uji',
+            'nama_wali' => 'Wali Uji',
+            'catatan' => 'Catatan alumni uji',
+            'kk_ada' => '1',
+            'tracking_jenis' => 'Bekerja',
+            'tracking_nama_tempat' => 'Perusahaan Contoh',
+            'tracking_tahun' => '2026',
+            'tracking_keterangan' => 'Staf',
             'return_tab' => 'kontrol-induk',
             'return_aj' => 'Alumni (Lulus)',
             'return_ay' => '2025',
@@ -2848,13 +2945,25 @@ class ImportStudentMatchingTest extends TestCase
             'kelas' => 'X-1',
             'aq' => 'Nama',
             'page' => 1,
-            'siswa' => 1,
         ]));
+
+        $this->get(route('admin.alumni', $filters))
+            ->assertOk()
+            ->assertDontSee('id="alumni-side-panel"', false)
+            ->assertSee('Biodata lengkap Nama Alumni Diperbarui berhasil diperbarui.');
 
         $this->assertDatabaseHas('siswa_biodata', [
             'id' => 1,
             'nama_lengkap' => 'Nama Alumni Diperbarui',
             'tahun_lulus' => '2025',
+            'nik' => '1234567890123456',
+            'alamat_jalan' => 'Jalan Uji 1',
+            'golongan_darah' => 'O',
+            'nama_ayah' => 'Ayah Uji',
+            'nama_ibu' => 'Ibu Uji',
+            'nama_wali' => 'Wali Uji',
+            'catatan' => 'Catatan alumni uji',
+            'kk_ada' => 1,
         ]);
         $this->assertDatabaseHas('siswa_riwayat_kelas', [
             'id' => $historyBefore->id,
@@ -2865,6 +2974,279 @@ class ImportStudentMatchingTest extends TestCase
         ]);
         $this->assertDatabaseHas('catatan_aktivitas', [
             'aksi' => 'edit_biodata_alumni',
+            'objek_id' => 1,
+        ]);
+        $this->assertDatabaseCount('siswa_pelacakan_alumni', 1);
+        $this->assertDatabaseHas('siswa_pelacakan_alumni', [
+            'id' => $trackingId,
+            'jenis' => 'Bekerja',
+            'nama_tempat' => 'Perusahaan Contoh',
+            'tahun' => '2026',
+            'keterangan' => 'Staf',
+        ]);
+        $this->assertDatabaseHas('siswa_biodata', [
+            'id' => 1,
+            'kegiatan_setelah_lulus' => 'Bekerja · Perusahaan Contoh',
+        ]);
+        $this->assertDatabaseHas('catatan_aktivitas', [
+            'aksi' => 'lacak_alumni',
+            'objek_id' => 1,
+        ]);
+    }
+
+    public function test_alumni_list_uses_one_detail_panel_and_keeps_tracking_action_visible(): void
+    {
+        DB::table('siswa_biodata')->whereIn('id', [1, 2])->update(['tahun_lulus' => '2025']);
+        DB::table('siswa_riwayat_kelas')->whereIn('siswa_id', [1, 2])->update(['status' => 'Lulus']);
+        DB::table('siswa_pelacakan_alumni')->insert([
+            'siswa_id' => 1,
+            'jenis' => 'Kuliah',
+            'nama_tempat' => 'Kampus Contoh',
+            'tahun' => '2025',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->actingAs($this->admin)
+            ->get(route('admin.alumni'));
+
+        $response->assertOk()
+            ->assertSee('onclick="event.stopPropagation();openAlumniEdit(this)"', false)
+            ->assertSee('id="alumni-edit-modal"', false)
+            ->assertSee('>Edit Kontrol Induk</h3>', false)
+            ->assertSee('id="alumni-select-all"', false)
+            ->assertSee('name="siswa_ids[]"', false)
+            ->assertSee('Hapus semua hasil filter')
+            ->assertSee('Hapus terpilih')
+            ->assertSee('Hapus per kelas')
+            ->assertSee('data-edit-tab="control"', false)
+            ->assertSee('data-edit-tab="tracking"', false)
+            ->assertSee('class="btn alumni-tracking-action tracked"', false)
+            ->assertSee('class="btn alumni-tracking-action pending"', false)
+            ->assertSee('openAlumniEdit(this, \'tracking\')', false)
+            ->assertSee('>Sudah dilacak</button>', false)
+            ->assertSee('>Lacak</button>', false)
+            ->assertDontSee('alumni-detail-modal', false);
+    }
+
+    public function test_alumni_bulk_delete_trashes_all_matching_filter_results_and_logs_activity(): void
+    {
+        $this->makeGraduatedAlumni(1, '2025', 1);
+        $this->makeGraduatedAlumni(2, '2024', 1);
+
+        $response = $this->actingAs($this->admin)->delete(route('admin.alumni.bulk-delete'), [
+            'mode' => 'all',
+            'aj' => 'Alumni (Lulus)',
+            'ay' => '2025',
+            'kelas' => '',
+            'aq' => '',
+            'konfirmasi' => 'hapus',
+        ]);
+
+        $response->assertRedirect(route('admin.alumni', [
+            'aj' => 'Alumni (Lulus)',
+            'ay' => '2025',
+        ]))->assertSessionHas('success', '1 data alumni berhasil dipindahkan ke Tempat Sampah.');
+        $this->assertSoftDeleted('siswa_biodata', ['id' => 1]);
+        $this->assertNotSoftDeleted('siswa_biodata', ['id' => 2]);
+        $this->assertDatabaseHas('catatan_aktivitas', [
+            'pengguna_id' => $this->admin->id,
+            'aksi' => 'hapus_alumni_massal',
+            'objek_tipe' => 'alumni',
+        ]);
+    }
+
+    public function test_alumni_bulk_delete_only_trashes_selected_ids_that_match_the_filter(): void
+    {
+        $this->makeGraduatedAlumni(1, '2025', 1);
+        $this->makeGraduatedAlumni(2, '2025', 2);
+
+        $response = $this->actingAs($this->admin)->delete(route('admin.alumni.bulk-delete'), [
+            'mode' => 'selected',
+            'aj' => 'Alumni (Lulus)',
+            'ay' => '2025',
+            'kelas' => 'X-1',
+            'aq' => '',
+            'siswa_ids' => [1, 2],
+            'konfirmasi' => 'hapus',
+        ]);
+
+        $response->assertRedirect(route('admin.alumni', [
+            'aj' => 'Alumni (Lulus)',
+            'ay' => '2025',
+            'kelas' => 'X-1',
+        ]))->assertSessionHas('success', '1 data alumni berhasil dipindahkan ke Tempat Sampah.');
+        $this->assertSoftDeleted('siswa_biodata', ['id' => 1]);
+        $this->assertNotSoftDeleted('siswa_biodata', ['id' => 2]);
+    }
+
+    public function test_alumni_bulk_delete_by_class_only_trashes_alumni_in_the_selected_class(): void
+    {
+        $this->makeGraduatedAlumni(1, '2025', 1);
+        $this->makeGraduatedAlumni(2, '2025', 2);
+
+        $response = $this->actingAs($this->admin)->delete(route('admin.alumni.bulk-delete'), [
+            'mode' => 'class',
+            'aj' => 'Alumni (Lulus)',
+            'ay' => '2025',
+            'kelas' => 'X-1',
+            'aq' => '',
+            'konfirmasi' => 'hapus',
+        ]);
+
+        $response->assertRedirect(route('admin.alumni', [
+            'aj' => 'Alumni (Lulus)',
+            'ay' => '2025',
+            'kelas' => 'X-1',
+        ]))->assertSessionHas('success', '1 data alumni berhasil dipindahkan ke Tempat Sampah.');
+        $this->assertSoftDeleted('siswa_biodata', ['id' => 1]);
+        $this->assertNotSoftDeleted('siswa_biodata', ['id' => 2]);
+    }
+
+    public function test_alumni_bulk_delete_requires_confirmation_and_does_not_change_records(): void
+    {
+        $this->makeGraduatedAlumni(1, '2025', 1);
+
+        $response = $this->actingAs($this->admin)->delete(route('admin.alumni.bulk-delete'), [
+            'mode' => 'all',
+            'aj' => 'Alumni (Lulus)',
+        ]);
+
+        $response->assertSessionHasErrors(['konfirmasi']);
+        $this->assertNotSoftDeleted('siswa_biodata', ['id' => 1]);
+    }
+
+    public function test_teacher_cannot_use_alumni_bulk_delete_endpoint(): void
+    {
+        $this->makeGraduatedAlumni(1, '2025', 1);
+        $teacher = Pengguna::create([
+            'peran' => 'guru',
+            'username' => 'alumni-delete-teacher',
+            'email' => 'alumni-delete-teacher@example.test',
+            'password' => 'unused',
+            'aktif' => true,
+        ]);
+
+        $this->actingAs($teacher)->delete(route('admin.alumni.bulk-delete'), [
+            'mode' => 'all',
+            'aj' => 'Alumni (Lulus)',
+            'konfirmasi' => 'hapus',
+        ])->assertForbidden();
+
+        $this->assertNotSoftDeleted('siswa_biodata', ['id' => 1]);
+    }
+
+    public function test_alumni_control_edit_modal_updates_latest_tracking_without_opening_detail_panel(): void
+    {
+        DB::table('siswa_biodata')->where('id', 1)->update([
+            'tahun_lulus' => '2025',
+            'alasan_keluar' => 'Lulus',
+        ]);
+        DB::table('siswa_riwayat_kelas')->where('siswa_id', 1)->update(['status' => 'Lulus']);
+        $trackingId = DB::table('siswa_pelacakan_alumni')->insertGetId([
+            'siswa_id' => 1,
+            'jenis' => 'Kuliah',
+            'nama_tempat' => 'Kampus Contoh',
+            'tahun' => '2025',
+            'keterangan' => 'Teknik Informatika',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.alumni'))
+            ->assertOk()
+            ->assertSee('name="tracking_jenis"', false)
+            ->assertSee('name="nomor_induk"', false)
+            ->assertSee('name="nama_lengkap"', false)
+            ->assertSee('name="nisn"', false)
+            ->assertSee('Kampus Contoh')
+            ->assertSee('data-edit-tab="tracking"', false)
+            ->assertDontSee('id="alumni-side-panel"', false);
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.alumni.edit-data', 1))
+            ->assertOk()
+            ->assertJsonPath('tracking_keterangan', 'Teknik Informatika')
+            ->assertJsonPath('tracking_history.0.keterangan', 'Teknik Informatika');
+
+        $duplicateNisn = DB::table('siswa_biodata')
+            ->where('id', '!=', 1)
+            ->value('nisn');
+
+        $this->put(route('admin.alumni.update', 1), [
+            'nama_lengkap' => 'Nama Alumni',
+            'nisn' => $duplicateNisn,
+            'tracking_jenis' => 'Kuliah',
+            'tracking_nama_tempat' => 'Kampus Contoh',
+            'tracking_tahun' => '2025',
+            'tracking_keterangan' => 'Teknik Informatika',
+        ])->assertSessionHasErrors('nisn');
+
+        $this->put(route('admin.alumni.update', 1), [
+            'nomor_induk' => 'INDUK-ALUMNI-2025',
+            'nama_lengkap' => 'Nama Alumni Diperbarui',
+            'nisn' => '0000000001',
+            'jenis_registrasi' => 'Siswa Baru',
+            'tanggal_diterima' => '2023-07-17',
+            'kelas_diterima' => 'X',
+            'rombel_diterima' => '1',
+            'sekolah_asal' => 'SMPN Uji',
+            'alasan_keluar' => 'Lulus',
+            'tanggal_keluar' => '2025-05-04',
+            'kelas_keluar' => 'XII-1',
+            'sekolah_tujuan' => '',
+            'tahun_lulus' => '2025',
+            'nomor_peserta_psaj' => 'PSAJ-2025',
+            'nomor_skl' => 'SKL-2025',
+            'nomor_ijazah_sma' => 'IJZ-2025',
+            'tanggal_ijazah_sma' => '2025-07-04',
+            'nomor_transkrip' => 'TR-2025',
+            'tracking_jenis' => 'Bekerja',
+            'tracking_nama_tempat' => 'Perusahaan Contoh',
+            'tracking_tahun' => '2026',
+            'tracking_keterangan' => 'Staf',
+            'aj' => 'Alumni (Lulus)',
+        ])->assertRedirect(route('admin.alumni', [
+            'tab' => 'kontrol-induk',
+            'aj' => 'Alumni (Lulus)',
+        ]));
+
+        $this->assertDatabaseCount('siswa_pelacakan_alumni', 1);
+        $this->assertDatabaseHas('siswa_pelacakan_alumni', [
+            'id' => $trackingId,
+            'jenis' => 'Bekerja',
+            'nama_tempat' => 'Perusahaan Contoh',
+            'tahun' => '2026',
+            'keterangan' => 'Staf',
+        ]);
+        $this->assertDatabaseHas('siswa_biodata', [
+            'id' => 1,
+            'nomor_induk' => 'INDUK-ALUMNI-2025',
+            'nama_lengkap' => 'Nama Alumni Diperbarui',
+            'nisn' => '0000000001',
+            'jenis_registrasi' => 'Siswa Baru',
+            'tanggal_diterima' => '2023-07-17',
+            'kelas_diterima' => 'X',
+            'rombel_diterima' => '1',
+            'sekolah_asal' => 'SMPN Uji',
+            'alasan_keluar' => 'Lulus',
+            'tanggal_keluar' => '2025-05-04',
+            'kelas_keluar' => 'XII-1',
+            'tahun_lulus' => '2025',
+            'nomor_peserta_psaj' => 'PSAJ-2025',
+            'nomor_skl' => 'SKL-2025',
+            'nomor_ijazah_sma' => 'IJZ-2025',
+            'tanggal_ijazah_sma' => '2025-07-04',
+            'nomor_transkrip' => 'TR-2025',
+            'kegiatan_setelah_lulus' => 'Bekerja · Perusahaan Contoh',
+        ]);
+        $this->assertDatabaseHas('catatan_aktivitas', [
+            'aksi' => 'edit_kontrol_induk',
+            'objek_id' => 1,
+        ]);
+        $this->assertDatabaseHas('catatan_aktivitas', [
+            'aksi' => 'lacak_alumni',
             'objek_id' => 1,
         ]);
     }
@@ -3135,6 +3517,18 @@ class ImportStudentMatchingTest extends TestCase
             'semester' => 'Ganjil',
             'mapel_id' => 1,
             'nilai_angka' => 88,
+        ]);
+    }
+
+    private function makeGraduatedAlumni(int $studentId, string $graduationYear, int $classId): void
+    {
+        DB::table('siswa_biodata')->where('id', $studentId)->update([
+            'tahun_lulus' => $graduationYear,
+            'alasan_keluar' => 'Lulus',
+        ]);
+        DB::table('siswa_riwayat_kelas')->where('siswa_id', $studentId)->update([
+            'kelas_id' => $classId,
+            'status' => 'Lulus',
         ]);
     }
 

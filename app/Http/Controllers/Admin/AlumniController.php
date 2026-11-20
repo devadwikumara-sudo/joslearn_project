@@ -8,9 +8,11 @@ use App\Models\SekolahKelas;
 use App\Models\SekolahTahunAjaran;
 use App\Models\SiswaBiodata;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -166,6 +168,7 @@ class AlumniController extends Controller
         $siswa = SiswaBiodata::alumni()
             ->with([
                 'berkas',
+                'pelacakan',
                 'riwayatKelas' => static function ($query): void {
                     $query->with(['kelas', 'tahunAjaran'])->orderByDesc('tahun_ajaran_id');
                 },
@@ -174,6 +177,7 @@ class AlumniController extends Controller
 
         $formData = $formPendataan->formOptions($siswa);
         $formData['alumniEdit'] = true;
+        $formData['alumniTracking'] = $siswa->pelacakan->last();
         $formData['alumniReturn'] = [
             'tab' => $this->selectedPanelTab($request->query('tab')),
             'aj' => $this->selectedType($request),
@@ -189,15 +193,79 @@ class AlumniController extends Controller
             'aq' => $formData['alumniReturn']['aq'],
             'kelas' => $formData['alumniReturn']['kelas'],
             'page' => $formData['alumniReturn']['page'],
-            'siswa' => $siswa->id,
         ], static fn ($value): bool => $value !== null && $value !== ''));
 
         return view('admin.alumni-edit', compact('formData', 'formCloseUrl'));
     }
 
+    public function editData(int $id): JsonResponse
+    {
+        $siswa = SiswaBiodata::alumni()
+            ->with(['berkas', 'pelacakan', 'riwayatKelas'])
+            ->findOrFail($id);
+        $latestHistory = $siswa->riwayatKelas->sortByDesc('id')->first();
+        $latestTracking = $siswa->pelacakan->last();
+        $isGraduated = $siswa->isGraduated();
+        $payload = $siswa->only([
+            'nama_lengkap', 'nama_panggilan', 'nisn', 'nomor_induk', 'jenis_kelamin', 'nik',
+            'tempat_lahir', 'tanggal_lahir', 'agama', 'kewarganegaraan', 'anak_ke', 'jumlah_saudara',
+            'status_yatim', 'bahasa_sehari_hari', 'alamat_jalan', 'alamat_rt_rw', 'alamat_desa',
+            'alamat_kecamatan', 'alamat_kabupaten', 'alamat_provinsi', 'alamat_kode_pos', 'nomor_hp',
+            'tempat_tinggal', 'jarak_ke_sekolah_km', 'golongan_darah', 'tinggi_badan_cm',
+            'berat_badan_kg', 'penyakit', 'kelainan_fisik', 'sekolah_asal', 'tanggal_ijazah_smp',
+            'nomor_ijazah_smp', 'lama_belajar_tahun', 'jenis_registrasi', 'tanggal_diterima',
+            'pindahan_dari_sekolah', 'alasan_pindah', 'kelas_diterima', 'rombel_diterima',
+            'nama_ayah', 'agama_ayah', 'kewarganegaraan_ayah', 'pendidikan_ayah', 'pekerjaan_ayah',
+            'penghasilan_ayah', 'nomor_hp_ayah', 'keadaan_ayah', 'nama_ibu', 'agama_ibu',
+            'kewarganegaraan_ibu', 'pendidikan_ibu', 'pekerjaan_ibu', 'penghasilan_ibu',
+            'nomor_hp_ibu', 'keadaan_ibu', 'ortu_alamat_jalan', 'ortu_alamat_rt_rw',
+            'ortu_alamat_desa', 'ortu_alamat_kecamatan', 'ortu_alamat_kabupaten',
+            'ortu_alamat_provinsi', 'ortu_alamat_kode_pos', 'nama_wali', 'agama_wali',
+            'kewarganegaraan_wali', 'pendidikan_wali', 'pekerjaan_wali', 'penghasilan_wali',
+            'nomor_hp_wali', 'wali_alamat_jalan', 'wali_alamat_rt_rw', 'wali_alamat_desa',
+            'wali_alamat_kecamatan', 'wali_alamat_kabupaten', 'wali_alamat_provinsi',
+            'wali_alamat_kode_pos', 'kelas_keluar', 'alasan_keluar', 'tanggal_keluar',
+            'sekolah_tujuan', 'nomor_peserta_psaj', 'nomor_skl', 'nomor_ijazah_sma',
+            'tanggal_ijazah_sma', 'nomor_transkrip', 'tahun_lulus', 'kegiatan_setelah_lulus',
+            'catatan', 'kk_ada', 'akta_ada', 'ijazah_smp_ada', 'surat_pindah_ada',
+        ]);
+        $payload['id'] = $siswa->id;
+        $payload['status_alumni'] = $isGraduated
+            ? 'Lulus'
+            : ($siswa->alasan_keluar ?: (in_array($latestHistory?->status, ['Pindah keluar', 'Keluar'], true) ? $latestHistory->status : 'Keluar'));
+        $payload['status_kontrol_induk'] = $this->controlIndukCompleteness($siswa, $isGraduated).'%';
+        $payload['status_pelacakan'] = $latestTracking
+            ? trim($latestTracking->jenis.' · '.$latestTracking->nama_tempat.' ('.$latestTracking->tahun.')')
+            : 'Belum dilacak';
+        $payload['edit_url'] = route('admin.data-siswa.update', $siswa->id);
+        $payload['foto_url'] = $siswa->foto ? route('admin.data-siswa.foto', $siswa->id) : null;
+        $payload['attachments'] = $siswa->berkas->map(static fn ($attachment): array => [
+            'jenis' => $attachment->jenis,
+            'nama_file' => $attachment->nama_file,
+            'url' => route('admin.data-siswa.berkas', [$siswa->id, $attachment->jenis]),
+        ])->values();
+        $payload['tracking_jenis'] = $latestTracking?->jenis;
+        $payload['tracking_nama_tempat'] = $latestTracking?->nama_tempat;
+        $payload['tracking_tahun'] = $latestTracking?->tahun;
+        $payload['tracking_keterangan'] = $latestTracking?->keterangan;
+        $payload['tracking_history'] = $siswa->pelacakan->map(static fn ($tracking): array => [
+            'jenis' => $tracking->jenis,
+            'nama_tempat' => $tracking->nama_tempat,
+            'tahun' => $tracking->tahun,
+            'keterangan' => $tracking->keterangan,
+            'delete_url' => route('admin.pelacakan-alumni.destroy', $tracking->id),
+        ])->values();
+
+        return response()->json($payload);
+    }
+
     public function update(Request $request, int $id): RedirectResponse
     {
+        $siswa = SiswaBiodata::alumni()->with('pelacakan')->findOrFail($id);
         $validated = $request->validate([
+            'nomor_induk' => ['nullable', 'string', 'max:64', Rule::unique('siswa_biodata', 'nomor_induk')->whereNull('deleted_at')->ignore($siswa->id)],
+            'nama_lengkap' => ['required', 'string', 'max:150'],
+            'nisn' => ['required', 'digits:10', Rule::unique('siswa_biodata', 'nisn')->whereNull('deleted_at')->ignore($siswa->id)],
             'jenis_registrasi' => ['nullable', 'string', 'max:64'],
             'tanggal_diterima' => ['nullable', 'date_format:Y-m-d'],
             'kelas_diterima' => ['nullable', 'string', 'max:10'],
@@ -213,12 +281,25 @@ class AlumniController extends Controller
             'tanggal_ijazah_sma' => ['nullable', 'date_format:Y-m-d'],
             'nomor_transkrip' => ['nullable', 'string', 'max:64'],
             'tahun_lulus' => ['nullable', 'digits:4'],
-            'kegiatan_setelah_lulus' => ['nullable', 'string', 'max:255'],
+        ]);
+        $latestTracking = $siswa->pelacakan->last();
+        $trackingFields = [
+            'tracking_jenis',
+            'tracking_nama_tempat',
+            'tracking_tahun',
+            'tracking_keterangan',
+        ];
+        $trackingIsRequired = $latestTracking !== null
+            || collect($request->only($trackingFields))->contains(static fn (mixed $value): bool => filled($value));
+        $trackingRequired = $trackingIsRequired ? 'required' : 'nullable';
+        $tracking = $request->validate([
+            'tracking_jenis' => [$trackingRequired, 'string', Rule::in(['Kuliah', 'Bekerja', 'Wirausaha', 'Mencari kerja', 'Lainnya'])],
+            'tracking_nama_tempat' => [$trackingRequired, 'string', 'max:150'],
+            'tracking_tahun' => [$trackingRequired, 'digits:4'],
+            'tracking_keterangan' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $siswa = SiswaBiodata::findOrFail($id);
-
-        DB::transaction(function () use ($request, $siswa, $validated): void {
+        DB::transaction(function () use ($request, $siswa, $validated, $tracking, $trackingIsRequired, $latestTracking): void {
             $siswa->fill($validated)->save();
 
             if ($siswa->isGraduated()) {
@@ -227,6 +308,30 @@ class AlumniController extends Controller
                     ->latest('id')
                     ->first()
                     ?->update(['status' => 'Lulus']);
+            }
+
+            $trackingChanged = false;
+            if ($trackingIsRequired) {
+                $trackingAttributes = [
+                    'jenis' => $tracking['tracking_jenis'],
+                    'nama_tempat' => $tracking['tracking_nama_tempat'],
+                    'tahun' => $tracking['tracking_tahun'],
+                    'keterangan' => $tracking['tracking_keterangan'] ?? null,
+                ];
+                if ($latestTracking) {
+                    $latestTracking->fill($trackingAttributes);
+                    if ($latestTracking->isDirty()) {
+                        $latestTracking->save();
+                        $trackingChanged = true;
+                    }
+                } else {
+                    $siswa->pelacakan()->create($trackingAttributes);
+                    $trackingChanged = true;
+                }
+
+                $siswa->update([
+                    'kegiatan_setelah_lulus' => "{$trackingAttributes['jenis']} · {$trackingAttributes['nama_tempat']}",
+                ]);
             }
 
             CatatanAktivitas::create([
@@ -238,6 +343,18 @@ class AlumniController extends Controller
                 'objek_id' => $siswa->id,
                 'alamat_ip' => $request->ip(),
             ]);
+
+            if ($trackingChanged) {
+                CatatanAktivitas::create([
+                    'pengguna_id' => auth()->id(),
+                    'peran' => auth()->user()->peran ?? 'admin',
+                    'aksi' => 'lacak_alumni',
+                    'keterangan' => "Memperbarui pelacakan alumni: {$siswa->nama_lengkap} ({$trackingAttributes['jenis']} di {$trackingAttributes['nama_tempat']})",
+                    'objek_tipe' => 'siswa',
+                    'objek_id' => $siswa->id,
+                    'alamat_ip' => $request->ip(),
+                ]);
+            }
         });
 
         return redirect()->route('admin.alumni', array_filter([
@@ -247,7 +364,6 @@ class AlumniController extends Controller
             'aq' => $request->input('aq'),
             'kelas' => $request->input('kelas'),
             'page' => $request->integer('page') ?: null,
-            'siswa' => $id,
         ], static fn ($value): bool => $value !== null && $value !== ''))
             ->with('success', "Kontrol Induk {$siswa->nama_lengkap} berhasil diperbarui.");
     }
@@ -378,6 +494,66 @@ class AlumniController extends Controller
         };
 
         return response()->stream($callback, 200, $headers);
+    }
+
+    public function bulkDestroy(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'mode' => ['required', Rule::in(['selected', 'all', 'class'])],
+            'aj' => ['required', Rule::in(array_keys(self::TYPES))],
+            'ay' => ['nullable', 'digits:4'],
+            'kelas' => ['nullable', 'required_if:mode,class', 'string', 'max:64', Rule::exists('sekolah_kelas', 'nama')],
+            'aq' => ['nullable', 'string', 'max:150'],
+            'konfirmasi' => ['required', 'in:hapus'],
+            'siswa_ids' => ['required_if:mode,selected', 'array', 'min:1', 'max:250'],
+            'siswa_ids.*' => ['required', 'integer', 'distinct', 'exists:siswa_biodata,id'],
+        ]);
+
+        $type = $validated['aj'];
+        $year = $validated['ay'] ?? '';
+        $class = $validated['kelas'] ?? '';
+        $search = trim($validated['aq'] ?? '');
+        $query = $this->filteredAlumniQuery($type, $year, $search, $class);
+
+        if ($validated['mode'] === 'selected') {
+            $query->whereIn('siswa_biodata.id', $validated['siswa_ids']);
+        }
+
+        $deletedCount = 0;
+        DB::transaction(function () use ($query, &$deletedCount, $request, $validated): void {
+            $query->orderBy('id')->chunkById(200, function ($alumni) use (&$deletedCount): void {
+                foreach ($alumni as $siswa) {
+                    $siswa->delete();
+                    $deletedCount++;
+                }
+            });
+
+            if ($deletedCount > 0) {
+                CatatanAktivitas::create([
+                    'pengguna_id' => auth()->id(),
+                    'peran' => auth()->user()->peran,
+                    'aksi' => 'hapus_alumni_massal',
+                    'keterangan' => "Memindahkan {$deletedCount} data alumni ke Tempat Sampah melalui aksi {$validated['mode']}.",
+                    'objek_tipe' => 'alumni',
+                    'alamat_ip' => $request->ip(),
+                ]);
+            }
+        });
+
+        $redirectFilters = array_filter([
+            'aj' => $type,
+            'ay' => $year,
+            'kelas' => $class,
+            'aq' => $search,
+        ], static fn ($value): bool => $value !== null && $value !== '');
+
+        if ($deletedCount === 0) {
+            return redirect()->route('admin.alumni', $redirectFilters)
+                ->with('error', 'Tidak ada alumni yang cocok dengan pilihan dan filter untuk dihapus.');
+        }
+
+        return redirect()->route('admin.alumni', $redirectFilters)
+            ->with('success', "{$deletedCount} data alumni berhasil dipindahkan ke Tempat Sampah.");
     }
 
     private function filteredAlumniQuery(string $type, string $year, string $search, string $kelas): Builder
