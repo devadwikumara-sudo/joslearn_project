@@ -246,6 +246,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin.only'])->grou
 
     // Kenaikan Kelas — batalkan
     Route::post('/kenaikan-kelas/{id}/batalkan', [KenaikanKelasController::class, 'batalkan'])->name('kenaikan-kelas.batalkan');
+    Route::delete('/kenaikan-kelas/{id}/siswa/{siswaId}', [KenaikanKelasController::class, 'batalkanSiswa'])->name('kenaikan-kelas.siswa.batalkan');
 
     // Import Guru (admin)
     Route::get('/import/guru', fn () => redirect()->route('admin.import', ['tab' => 'guru']))
@@ -320,6 +321,7 @@ Route::prefix('guru')->name('guru.')->middleware(['auth', 'role.web'])->group(fu
     })->name('kenaikan-kelas');
     Route::post('/kenaikan-kelas/proses', [KenaikanKelasController::class, 'proses'])->name('kenaikan-kelas.proses');
     Route::post('/kenaikan-kelas/{id}/batalkan', [KenaikanKelasController::class, 'batalkan'])->name('kenaikan-kelas.batalkan');
+    Route::delete('/kenaikan-kelas/{id}/siswa/{siswaId}', [KenaikanKelasController::class, 'batalkanSiswa'])->name('kenaikan-kelas.siswa.batalkan');
 });
 
 Route::middleware(['auth', 'role.web'])

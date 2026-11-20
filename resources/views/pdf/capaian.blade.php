@@ -95,10 +95,7 @@
 <div class="pg dc">
     <div class="ptt" style="text-align:left">
         {{ $ttl }}<br>
-        &nbsp;&nbsp;&nbsp;&nbsp;PESERTA DIDIK TAHUN AJARAN {{ $taNama }}
-        @if(count($semList) === 1)
-            · SEMESTER {{ $termSemesterNumbers[$semList[0]] ?? $semList[0] }}
-        @endif
+        <span class="ptt-sub">&nbsp;&nbsp;&nbsp;&nbsp;PESERTA DIDIK TAHUN AJARAN {{ $taNama }}@if(count($semList) === 1) &bull; SEMESTER {{ $termSemesterNumbers[$semList[0]] ?? $semList[0] }}@endif</span>
     </div>
 
     <div class="fh">A. IDENTITAS PESERTA DIDIK</div>
@@ -111,14 +108,14 @@
         <table class="lt">
             <thead>
                 <tr>
-                    <th rowspan="2" style="width:30px">No</th>
+                    <th rowspan="2" style="width:32px">No</th>
                     <th rowspan="2">Mata Pelajaran</th>
-                    <th rowspan="2" style="width:50px">KKTP</th>
+                    <th rowspan="2" style="width:52px">KKTP</th>
                     <th colspan="{{ $numSem }}">Kelas {{ $kelasNama }}</th>
                 </tr>
                 <tr>
                     @foreach($semList as $sm)
-                        <th style="width:80px">Semester {{ $termSemesterNumbers[$sm] ?? $sm }}</th>
+                        <th style="width:84px">Semester {{ $termSemesterNumbers[$sm] ?? $sm }}</th>
                     @endforeach
                 </tr>
             </thead>
@@ -155,7 +152,7 @@
                     @endforeach
                 @endforeach
 
-                <tr>
+                <tr class="summary-row">
                     <td colspan="3"><b>Rata-rata</b></td>
                     @foreach($semList as $sm)
                         @php
@@ -170,7 +167,7 @@
         </table>
 
         @if($adaMissing)
-            <div style="font-size:10px;color:#555;margin-top:4px">
+            <div style="font-size:9.5px;color:var(--jb-slate-600);margin-top:4px">
                 Keterangan:<br>&nbsp;X : Tidak diajarkan pada semester tersebut
             </div>
         @endif
@@ -195,7 +192,7 @@
         <table class="lt">
             <thead>
                 <tr>
-                    <th style="width:30px">No</th>
+                    <th style="width:32px">No</th>
                     <th>Ekstrakurikuler</th>
                     @foreach($semList as $sm)
                         <th style="width:100px">Semester {{ $termSemesterNumbers[$sm] ?? $sm }}</th>
@@ -229,7 +226,7 @@
         <table class="lt">
             <thead>
                 <tr>
-                    <th style="width:30px">No</th>
+                    <th style="width:32px">No</th>
                     <th>Keterangan</th>
                     @foreach($semList as $sm)
                         <th style="width:100px">Semester {{ $termSemesterNumbers[$sm] ?? $sm }}</th>
@@ -318,16 +315,15 @@
 
         <div class="ttd" style="margin-top:36px">
             <div>
-                Wali Kelas,<br><br><br><br>
-                <u>{{ $namaWali }}</u><br>
-                @if($nipWali) NIP. {{ $nipWali }} @endif
+                <div class="ttd-title">Wali Kelas,</div>
+                <div class="ttd-name"><u>{{ $namaWali }}</u></div>
+                @if($nipWali) <div class="ttd-nip">NIP. {{ $nipWali }}</div> @endif
             </div>
             @if($isXII)
             <div>
-                Mengetahui,<br>
-                Kepala Sekolah,<br><br><br><br>
-                <u>{{ $namaKepsek }}</u><br>
-                NIP. {{ $nipKepsek }}
+                <div class="ttd-title">Mengetahui,<br>Kepala Sekolah,</div>
+                <div class="ttd-name"><u>{{ $namaKepsek }}</u></div>
+                <div class="ttd-nip">NIP. {{ $nipKepsek }}</div>
             </div>
             @endif
         </div>

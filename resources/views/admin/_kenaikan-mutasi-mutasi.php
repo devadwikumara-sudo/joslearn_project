@@ -23,7 +23,6 @@
                         </option>
                     @endforeach
                 </select>
-                @error('siswa_id') <small class="err" style="display:block;margin-top:4px">{{ $message }}</small> @enderror
             </div>
             <div>
                 <label for="mutasi-jenis" style="font-size:11.5px;font-weight:700;color:var(--admin-text-secondary);text-transform:uppercase;letter-spacing:0.04em">Jenis Mutasi *</label>

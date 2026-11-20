@@ -88,7 +88,9 @@ class KenaikanKelasController extends Controller
         abort_unless($isAdmin || ($kelasObj && $aksesGuru->bolehKenaikanKelas($pengguna, (int) $kelasObj->id)), 403, 'Anda bukan wali kelas untuk kelas yang dipilih.');
 
         $kelasList = $kelasTujuanList;
-        $tingkatTujuanNaik = match ($kelasObj?->tingkat) {
+        $tingkatAsalKelas = $this->tingkatKelas($kelasAsal);
+        $isKelas12 = $tingkatAsalKelas === 'XII';
+        $tingkatTujuanNaik = match ($tingkatAsalKelas) {
             'X' => 'XI',
             'XI' => 'XII',
             default => null,
@@ -107,13 +109,17 @@ class KenaikanKelasController extends Controller
             $filterRiwayatKelas($query);
             $query->where('status', 'Aktif');
         };
+        $filterRiwayatBelumDiproses = function (Builder|Relation $query) use ($filterRiwayatAktif): void {
+            $filterRiwayatAktif($query);
+            $query->whereNull('keputusan_kenaikan');
+        };
 
         $siswaList = $kelasAsal === '*'
             ? collect()
             : SiswaBiodata::aktif((int) $taAktifId)
-                ->whereHas('riwayatKelas', $filterRiwayatAktif)
-                ->with(['riwayatKelas' => function (Builder|Relation $query) use ($filterRiwayatAktif): void {
-                    $filterRiwayatAktif($query);
+                ->whereHas('riwayatKelas', $filterRiwayatBelumDiproses)
+                ->with(['riwayatKelas' => function (Builder|Relation $query) use ($filterRiwayatBelumDiproses): void {
+                    $filterRiwayatBelumDiproses($query);
                     $query->with('kelas');
                 }])
                 ->get();
@@ -131,9 +137,90 @@ class KenaikanKelasController extends Controller
 
         $riwayatQuery = CatatanKenaikanKelas::with(['kelasAsal', 'tahunAjaranAsal', 'tahunAjaranTujuan'])
             ->whereNull('dibatalkan_at')
-            ->when($kelasAsalId !== null, fn (Builder $query): Builder => $query->where('kelas_asal_id', $kelasAsalId))
             ->where('tahun_ajaran_asal_id', $taAktifId);
-        $riwayatKenaikanTerakhir = $riwayatQuery->latest('id')->first();
+        $riwayatKenaikanList = $riwayatQuery->latest('id')->get();
+        $latestBatchIdBySourceClass = [];
+        foreach ($riwayatKenaikanList as $batch) {
+            $latestBatchIdBySourceClass[(int) $batch->kelas_asal_id] ??= (int) $batch->id;
+        }
+        $kelasWaliIds = array_map('intval', $waliKelasList->modelKeys());
+        $riwayatSumberKenaikan = collect();
+        foreach ($riwayatKenaikanList as $batch) {
+            $dataSebelumnya = json_decode($batch->data_sebelumnya ?? '[]', true);
+            foreach (is_array($dataSebelumnya) ? $dataSebelumnya : [] as $entry) {
+                if (! is_array($entry) || ($entry['type'] ?? null) !== 'riwayat_lama' || ! isset($entry['id'])) {
+                    continue;
+                }
+
+                $riwayatSumberKenaikan->push([
+                    'riwayat_id' => (int) $entry['id'],
+                    'batch' => $batch,
+                ]);
+            }
+        }
+
+        $riwayatKenaikanById = SiswaRiwayatKelas::with(['siswa', 'kelas', 'kelasTujuan'])
+            ->whereIn('id', $riwayatSumberKenaikan->pluck('riwayat_id')->unique()->all())
+            ->get()
+            ->keyBy('id');
+        $riwayatKenaikanSiswa = $riwayatSumberKenaikan
+            ->map(function (array $entry) use ($riwayatKenaikanById, $isAdmin, $kelasWaliIds, $latestBatchIdBySourceClass): ?array {
+                $riwayat = $riwayatKenaikanById->get($entry['riwayat_id']);
+                if ($riwayat === null) {
+                    return null;
+                }
+
+                $batch = $entry['batch'];
+                $keputusan = match ($riwayat->keputusan_kenaikan) {
+                    'NAIK' => 'Naik',
+                    'TIDAK NAIK' => 'Tinggal',
+                    'LULUS' => 'Lulus',
+                    default => $riwayat->status === 'Keluar' ? 'Keluar' : $riwayat->status,
+                };
+
+                return [
+                    'nama_siswa' => $riwayat->siswa?->nama_lengkap ?? '-',
+                    'nisn' => $riwayat->siswa?->nisn,
+                    'siswa_id' => (int) $riwayat->siswa_id,
+                    'batch_id' => (int) $batch->id,
+                    'kelas_asal' => $riwayat->kelas?->nama ?? '-',
+                    'kelas_asal_id' => (int) $riwayat->kelas_id,
+                    'keputusan' => $keputusan,
+                    'kelas_tujuan' => $riwayat->kelasTujuan?->nama,
+                    'kelas_tujuan_id' => $riwayat->kelas_tujuan_id === null
+                        ? null
+                        : (int) $riwayat->kelas_tujuan_id,
+                    'tahun_tujuan' => in_array($keputusan, ['Naik', 'Tinggal'], true)
+                        ? $batch->tahunAjaranTujuan?->nama
+                        : null,
+                    'tahun_tujuan_id' => in_array($keputusan, ['Naik', 'Tinggal'], true)
+                        ? ($batch->tahun_ajaran_tujuan_id === null
+                            ? null
+                            : (int) $batch->tahun_ajaran_tujuan_id)
+                        : null,
+                    'tanggal' => $riwayat->tanggal_keputusan_kenaikan ?? $batch->created_at,
+                    'boleh_hapus' => $isAdmin || (
+                        in_array((int) $batch->kelas_asal_id, $kelasWaliIds, true)
+                        && ($latestBatchIdBySourceClass[(int) $batch->kelas_asal_id] ?? null) === (int) $batch->id
+                    ),
+                ];
+            })
+            ->filter()
+            ->values();
+        if ($kelasAsalId !== null) {
+            $riwayatKenaikanSiswa = $riwayatKenaikanSiswa
+                ->filter(fn (array $riwayat): bool => $riwayat['kelas_asal_id'] === $kelasAsalId
+                    || $riwayat['kelas_tujuan_id'] === $kelasAsalId)
+                ->values();
+        }
+        $batchRiwayatTerakhirId = $riwayatKenaikanSiswa->first()['batch_id'] ?? null;
+        $riwayatKenaikanTerakhir = $batchRiwayatTerakhirId === null
+            ? null
+            : $riwayatKenaikanList->firstWhere('id', $batchRiwayatTerakhirId);
+        $riwayatKenaikanTerakhirBolehDibatalkan = $riwayatKenaikanTerakhir !== null && ($isAdmin || (
+            in_array((int) $riwayatKenaikanTerakhir->kelas_asal_id, $kelasWaliIds, true)
+            && ($latestBatchIdBySourceClass[(int) $riwayatKenaikanTerakhir->kelas_asal_id] ?? null) === (int) $riwayatKenaikanTerakhir->id
+        ));
 
         $siswaAktif = collect();
         $riwayatMutasi = collect();
@@ -175,9 +262,12 @@ class KenaikanKelasController extends Controller
             'kelasNaikList',
             'kelasAsalList',
             'kelasAsal',
+            'isKelas12',
             'siswaList',
             'nextKelasMap',
             'riwayatKenaikanTerakhir',
+            'riwayatKenaikanTerakhirBolehDibatalkan',
+            'riwayatKenaikanSiswa',
             'routePrefix',
             'tab',
             'isAdmin',
@@ -313,6 +403,7 @@ class KenaikanKelasController extends Controller
             );
 
             $naikCount = 0;
+            $tinggalCount = 0;
             $lulusCount = 0;
             $keluarCount = 0;
             $riwayatBaruIds = [];
@@ -368,7 +459,11 @@ class KenaikanKelasController extends Controller
                         $riwayatBaruIds,
                         $dataSebelumnya
                     );
-                    $naikCount++;
+                    if ($aksi === 'Naik') {
+                        $naikCount++;
+                    } else {
+                        $tinggalCount++;
+                    }
                 } elseif ($aksi === 'Lulus') {
                     $rkLama->update([
                         'status' => 'Lulus',
@@ -413,21 +508,12 @@ class KenaikanKelasController extends Controller
                 'pengguna_id' => $pengguna->id,
                 'peran' => $pengguna->peran,
                 'aksi' => 'kenaikan_kelas',
-                'keterangan' => "Kenaikan kelas {$kelasAsalObj->nama} ({$taAktif} -> {$taTujuan}): {$naikCount} lanjut, {$lulusCount} lulus, {$keluarCount} keluar.",
+                'keterangan' => "Kenaikan kelas {$kelasAsalObj->nama} ({$taAktif} -> {$taTujuan}): {$naikCount} naik, {$tinggalCount} tinggal, {$lulusCount} lulus, {$keluarCount} keluar.",
                 'objek_tipe' => 'kenaikan_kelas',
                 'alamat_ip' => $request->ip(),
             ]);
 
             DB::commit();
-
-            $routePrefix = $isAdmin ? 'admin' : 'guru';
-
-            return redirect()->route($routePrefix.'.kenaikan-mutasi', [
-                'tab' => 'kenaikan',
-                'tahun_ajaran' => $taAktifId,
-                'kelas' => $kelasAsalObj->nama,
-            ])
-                ->with('success', "Proses kenaikan kelas {$kelasAsalObj->nama} berhasil: {$naikCount} lanjut ke {$taTujuan}, {$lulusCount} lulus, {$keluarCount} keluar.");
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Gagal memproses kenaikan kelas.', [
@@ -439,6 +525,19 @@ class KenaikanKelasController extends Controller
 
             return back()->with('error', 'Proses kenaikan kelas gagal. Silakan coba kembali atau hubungi administrator.');
         }
+
+        if ($naikCount > 0 || $tinggalCount > 0) {
+            $request->session()->put('data_siswa_tahun_ajaran_id', (int) $taBaru->id);
+        }
+
+        $routePrefix = $isAdmin ? 'admin' : 'guru';
+        $successMessage = "Proses kenaikan kelas {$kelasAsalObj->nama} berhasil: {$naikCount} naik ke {$taTujuan}, {$tinggalCount} tinggal di kelas asal, {$lulusCount} lulus, {$keluarCount} keluar.";
+
+        return redirect()->to(route($routePrefix.'.kenaikan-mutasi', [
+            'tab' => 'kenaikan',
+            'tahun_ajaran' => $taAktifId,
+            'kelas' => $kelasAsalObj->nama,
+        ]).'#riwayat')->with('success', $successMessage);
     }
 
     public function batalkan(Request $request, $id, AksesGuru $aksesGuru)
@@ -449,25 +548,7 @@ class KenaikanKelasController extends Controller
         }
 
         $pengguna = $request->user();
-        $isAdmin = $pengguna->peran === 'admin';
-        if (! $isAdmin) {
-            $tahunBerjalanId = SekolahTahunAjaran::where('sedang_berjalan', 1)->value('id');
-            abort_unless(
-                $tahunBerjalanId
-                    && (int) $catatan->tahun_ajaran_asal_id === (int) $tahunBerjalanId
-                    && $aksesGuru->bolehKenaikanKelas($pengguna, (int) $catatan->kelas_asal_id),
-                403,
-                'Anda tidak berhak membatalkan kenaikan kelas ini.'
-            );
-
-            $idKenaikanTerakhir = CatatanKenaikanKelas::query()
-                ->where('kelas_asal_id', $catatan->kelas_asal_id)
-                ->where('tahun_ajaran_asal_id', $tahunBerjalanId)
-                ->whereNull('dibatalkan_at')
-                ->latest('id')
-                ->value('id');
-            abort_unless((int) $idKenaikanTerakhir === (int) $catatan->id, 403, 'Hanya kenaikan kelas terakhir yang dapat dibatalkan.');
-        }
+        $this->authorizeBatchCancellation($request, $catatan, $aksesGuru);
 
         DB::beginTransaction();
         try {
@@ -522,8 +603,6 @@ class KenaikanKelasController extends Controller
             ]);
 
             DB::commit();
-
-            return back()->with('success', 'Kenaikan kelas berhasil dibatalkan. Riwayat siswa dikembalikan ke kondisi sebelumnya.');
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Gagal membatalkan kenaikan kelas.', [
@@ -534,6 +613,181 @@ class KenaikanKelasController extends Controller
 
             return back()->with('error', 'Pembatalan kenaikan kelas gagal. Silakan coba kembali atau hubungi administrator.');
         }
+
+        $request->session()->put('data_siswa_tahun_ajaran_id', (int) $catatan->tahun_ajaran_asal_id);
+
+        return back()->with('success', 'Kenaikan kelas berhasil dibatalkan. Riwayat siswa dikembalikan ke kondisi sebelumnya.');
+    }
+
+    public function batalkanSiswa(Request $request, int $id, int $siswaId, AksesGuru $aksesGuru): RedirectResponse
+    {
+        $hasil = DB::transaction(function () use ($request, $id, $siswaId, $aksesGuru): array {
+            $catatan = CatatanKenaikanKelas::with('kelasAsal')
+                ->lockForUpdate()
+                ->findOrFail($id);
+            abort_unless($catatan->dibatalkan_at === null, 409, 'Riwayat kenaikan ini sudah dibatalkan.');
+            $this->authorizeBatchCancellation($request, $catatan, $aksesGuru);
+
+            $dataSebelumnya = json_decode($catatan->data_sebelumnya ?? '[]', true);
+            $riwayatBaru = json_decode($catatan->riwayat_baru ?? '[]', true);
+            abort_unless(is_array($dataSebelumnya) && is_array($riwayatBaru), 409, 'Data riwayat kenaikan tidak dapat dibaca.');
+
+            $snapshotSumber = collect($dataSebelumnya)->first(
+                fn (mixed $entry): bool => is_array($entry)
+                    && ($entry['type'] ?? null) === 'riwayat_lama'
+                    && (int) ($entry['siswa_id'] ?? 0) === $siswaId
+            );
+            abort_unless(is_array($snapshotSumber), 404, 'Siswa tidak ditemukan pada riwayat kenaikan ini.');
+
+            $riwayatSumber = SiswaRiwayatKelas::withTrashed()
+                ->whereKey((int) $snapshotSumber['id'])
+                ->where('siswa_id', $siswaId)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $snapshotTujuan = collect($dataSebelumnya)
+                ->filter(fn (mixed $entry): bool => is_array($entry)
+                    && ($entry['type'] ?? null) === 'riwayat_tujuan_sebelumnya'
+                    && isset($entry['id']))
+                ->values();
+            $riwayatTujuanLama = SiswaRiwayatKelas::withTrashed()
+                ->whereIn('id', $snapshotTujuan->pluck('id')->map(fn ($targetId): int => (int) $targetId)->all())
+                ->where('siswa_id', $siswaId)
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+            $riwayatTujuanBaru = SiswaRiwayatKelas::withTrashed()
+                ->whereIn('id', array_map('intval', array_filter($riwayatBaru, 'is_numeric')))
+                ->where('siswa_id', $siswaId)
+                ->lockForUpdate()
+                ->get();
+
+            if ($riwayatSumber->trashed()) {
+                $riwayatSumber->restore();
+            }
+            $riwayatSumber->update([
+                'kelas_id' => $snapshotSumber['kelas_id'],
+                'tahun_ajaran_id' => $snapshotSumber['tahun_ajaran_id'],
+                'status' => $snapshotSumber['status'],
+                'keputusan_kenaikan' => $snapshotSumber['keputusan_kenaikan'],
+                'kelas_tujuan_id' => $snapshotSumber['kelas_tujuan_id'],
+                'tanggal_keputusan_kenaikan' => $snapshotSumber['tanggal_keputusan_kenaikan'],
+            ]);
+
+            foreach ($riwayatTujuanLama as $riwayatTujuan) {
+                $snapshot = $snapshotTujuan->first(
+                    fn (array $entry): bool => (int) $entry['id'] === (int) $riwayatTujuan->id
+                );
+                abort_unless(is_array($snapshot), 409, 'Riwayat kelas tujuan sebelumnya tidak ditemukan.');
+                if ($riwayatTujuan->trashed()) {
+                    $riwayatTujuan->restore();
+                }
+                $riwayatTujuan->update([
+                    'kelas_id' => $snapshot['kelas_id'],
+                    'tahun_ajaran_id' => $snapshot['tahun_ajaran_id'],
+                    'status' => $snapshot['status'],
+                    'wali_guru_id' => $snapshot['wali_guru_id'],
+                    'nama_wali_kelas' => $snapshot['nama_wali_kelas'],
+                    'nip_wali_kelas' => $snapshot['nip_wali_kelas'],
+                ]);
+            }
+            foreach ($riwayatTujuanBaru as $riwayat) {
+                if (! $riwayat->trashed()) {
+                    $riwayat->delete();
+                }
+            }
+
+            $siswaQuery = SiswaBiodata::withTrashed()->whereKey($siswaId);
+            abort_unless($siswaQuery->exists(), 404, 'Data siswa tidak ditemukan.');
+            $siswaQuery->update([
+                'tahun_lulus' => $snapshotSumber['siswa_tahun_lulus'],
+                'alasan_keluar' => $snapshotSumber['siswa_alasan_keluar'],
+                'kelas_keluar' => $snapshotSumber['siswa_kelas_keluar'],
+                'tanggal_keluar' => $snapshotSumber['siswa_tanggal_keluar'],
+            ]);
+
+            $riwayatTujuanLamaIds = $riwayatTujuanLama->modelKeys();
+            $riwayatTujuanBaruIds = $riwayatTujuanBaru->modelKeys();
+            $dataSebelumnyaTersisa = array_values(array_filter(
+                $dataSebelumnya,
+                fn (mixed $entry): bool => ! is_array($entry)
+                    || ! (($entry['type'] ?? null) === 'riwayat_lama'
+                        && (int) ($entry['id'] ?? 0) === (int) $snapshotSumber['id'])
+                    && ! (($entry['type'] ?? null) === 'riwayat_tujuan_sebelumnya'
+                        && in_array((int) ($entry['id'] ?? 0), $riwayatTujuanLamaIds, true))
+            ));
+            $riwayatBaruTersisa = array_values(array_filter(
+                $riwayatBaru,
+                fn (mixed $targetId): bool => ! in_array((int) $targetId, $riwayatTujuanBaruIds, true)
+            ));
+            $jumlahSiswaTersisa = count(array_filter(
+                $dataSebelumnyaTersisa,
+                fn (mixed $entry): bool => is_array($entry) && ($entry['type'] ?? null) === 'riwayat_lama'
+            ));
+
+            $perubahanCatatan = [
+                'jumlah_siswa' => $jumlahSiswaTersisa,
+                'data_sebelumnya' => json_encode($dataSebelumnyaTersisa, JSON_THROW_ON_ERROR),
+                'riwayat_baru' => json_encode($riwayatBaruTersisa, JSON_THROW_ON_ERROR),
+            ];
+            if ($jumlahSiswaTersisa === 0) {
+                $perubahanCatatan['dibatalkan_at'] = now();
+            }
+            $catatan->update($perubahanCatatan);
+
+            $pengguna = $request->user();
+            CatatanAktivitas::create([
+                'pengguna_id' => $pengguna->id,
+                'peran' => $pengguna->peran,
+                'aksi' => 'batalkan_kenaikan_siswa',
+                'keterangan' => "Membatalkan kenaikan siswa #{$siswaId} pada batch #{$catatan->id}.",
+                'objek_tipe' => 'siswa_riwayat_kelas',
+                'objek_id' => (int) $snapshotSumber['id'],
+                'alamat_ip' => $request->ip(),
+            ]);
+
+            $kelasAsal = $catatan->kelasAsal?->nama;
+            abort_unless(is_string($kelasAsal) && $kelasAsal !== '', 404, 'Kelas asal tidak ditemukan.');
+
+            return [
+                'tahun_ajaran_id' => (int) $catatan->tahun_ajaran_asal_id,
+                'kelas_asal' => $kelasAsal,
+            ];
+        });
+
+        $request->session()->put('data_siswa_tahun_ajaran_id', $hasil['tahun_ajaran_id']);
+        $routePrefix = $request->user()->peran === 'admin' ? 'admin' : 'guru';
+
+        return redirect()->to(route($routePrefix.'.kenaikan-mutasi', [
+            'tab' => 'kenaikan',
+            'tahun_ajaran' => $hasil['tahun_ajaran_id'],
+            'kelas' => $hasil['kelas_asal'],
+        ]).'#riwayat')->with('success', 'Riwayat siswa dihapus dan kenaikan kelasnya dibatalkan. Siswa dikembalikan ke kelas asal.');
+    }
+
+    private function authorizeBatchCancellation(Request $request, CatatanKenaikanKelas $catatan, AksesGuru $aksesGuru): void
+    {
+        $pengguna = $request->user();
+        if ($pengguna->peran === 'admin') {
+            return;
+        }
+
+        $tahunBerjalanId = SekolahTahunAjaran::where('sedang_berjalan', 1)->value('id');
+        abort_unless(
+            $tahunBerjalanId
+                && (int) $catatan->tahun_ajaran_asal_id === (int) $tahunBerjalanId
+                && $aksesGuru->bolehKenaikanKelas($pengguna, (int) $catatan->kelas_asal_id),
+            403,
+            'Anda tidak berhak membatalkan kenaikan kelas ini.'
+        );
+
+        $idKenaikanTerakhir = CatatanKenaikanKelas::query()
+            ->where('kelas_asal_id', $catatan->kelas_asal_id)
+            ->where('tahun_ajaran_asal_id', $tahunBerjalanId)
+            ->whereNull('dibatalkan_at')
+            ->latest('id')
+            ->value('id');
+        abort_unless((int) $idKenaikanTerakhir === (int) $catatan->id, 403, 'Hanya kenaikan kelas terakhir yang dapat dibatalkan.');
     }
 
     private function simpanRiwayatTujuan(

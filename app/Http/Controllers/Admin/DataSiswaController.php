@@ -30,9 +30,26 @@ class DataSiswaController extends Controller
         $tahunAjaranList = SekolahTahunAjaran::orderBy('nama')->get(['id', 'nama']);
         $taAktifObj = SekolahTahunAjaran::where('sedang_berjalan', 1)->first();
         $taAktifDefaultId = $taAktifObj?->id ?? $tahunAjaranList->first()?->id;
-        $allYearsSelected = $request->input('tahun_ajaran') === '*';
-        $tahunAjaranTerpilih = $request->filled('tahun_ajaran') && ! $allYearsSelected
-            ? $tahunAjaranList->firstWhere('id', (int) $request->input('tahun_ajaran'))
+
+        $selectedYearInput = $request->input('tahun_ajaran');
+        if ($request->hasSession()) {
+            if ($request->has('tahun_ajaran')) {
+                $isValidYearSelection = $selectedYearInput === '*'
+                    || (is_numeric($selectedYearInput)
+                        && $tahunAjaranList->contains('id', (int) $selectedYearInput));
+                if ($isValidYearSelection) {
+                    $request->session()->put('data_siswa_tahun_ajaran_id', $selectedYearInput);
+                } else {
+                    $request->session()->forget('data_siswa_tahun_ajaran_id');
+                }
+            } else {
+                $selectedYearInput = $request->session()->get('data_siswa_tahun_ajaran_id');
+            }
+        }
+
+        $allYearsSelected = $selectedYearInput === '*';
+        $tahunAjaranTerpilih = filled($selectedYearInput) && ! $allYearsSelected
+            ? $tahunAjaranList->firstWhere('id', (int) $selectedYearInput)
             : null;
         $taAktifObj = $tahunAjaranTerpilih
             ?? $taAktifObj

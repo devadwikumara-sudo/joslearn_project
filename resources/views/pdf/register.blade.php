@@ -28,18 +28,23 @@
         <div class="hl">
             <div class="ptt">
                 I. BUKU INDUK REGISTER PESERTA DIDIK<br>
-                KURIKULUM MERDEKA<br>
-                {{ $namaSekolah }}
+                <span class="ptt-sub">KURIKULUM MERDEKA &bull; {{ $namaSekolah }}</span>
             </div>
             <div class="nn">
-                <span>NOMOR INDUK : <u>{{ $siswa->nomor_induk ?: '-' }}</u></span>
-                <span>NISN : <u>{{ $siswa->nisn ?: '-' }}</u></span>
+                <span class="nn-pill">NOMOR INDUK : <u>{{ $siswa->nomor_induk ?: '-' }}</u></span>
+                <span class="nn-pill">NISN : <u>{{ $siswa->nisn ?: '-' }}</u></span>
             </div>
         </div>
         <div class="ph1">
             @if($fotoSrc)
                 <img src="{{ $fotoSrc }}" alt="Pas Foto">
             @else
+                <div class="ph1-placeholder-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="8" r="5"></circle>
+                        <path d="M20 21a8 8 0 0 0-16 0"></path>
+                    </svg>
+                </div>
                 <span>Pas foto<br>3 &times; 4</span>
             @endif
         </div>
@@ -138,13 +143,13 @@
     <div class="fr in"><span></span><span>f. Penghasilan per bulan</span><span class="v">: {{ $v($siswa->penghasilan_wali) }}</span></div>
     <div class="fr in"><span></span><span>g. Nomor Telepon/HP</span><span class="v">: {{ $v($siswa->nomor_hp_wali) }}</span></div>
     <div class="fr in"><span></span><span>h. Alamat</span><span></span></div>
-    <div class="fr in" style="padding-left:60px"><span></span><span>Jalan</span><span class="v">: {{ $v($siswa->wali_alamat_jalan) }}</span></div>
-    <div class="fr in" style="padding-left:60px"><span></span><span>RT/RW</span><span class="v">: {{ $v($siswa->wali_alamat_rt_rw) }}</span></div>
-    <div class="fr in" style="padding-left:60px"><span></span><span>Desa</span><span class="v">: {{ $v($siswa->wali_alamat_desa) }}</span></div>
-    <div class="fr in" style="padding-left:60px"><span></span><span>Kecamatan</span><span class="v">: {{ $v($siswa->wali_alamat_kecamatan) }}</span></div>
-    <div class="fr in" style="padding-left:60px"><span></span><span>Kabupaten</span><span class="v">: {{ $v($siswa->wali_alamat_kabupaten) }}</span></div>
-    <div class="fr in" style="padding-left:60px"><span></span><span>Provinsi</span><span class="v">: {{ $v($siswa->wali_alamat_provinsi) }}</span></div>
-    <div class="fr in" style="padding-left:60px"><span></span><span>Kode Pos</span><span class="v">: {{ $v($siswa->wali_alamat_kode_pos) }}</span></div>
+    <div class="fr in" style="padding-left:48px"><span></span><span>Jalan</span><span class="v">: {{ $v($siswa->wali_alamat_jalan) }}</span></div>
+    <div class="fr in" style="padding-left:48px"><span></span><span>RT/RW</span><span class="v">: {{ $v($siswa->wali_alamat_rt_rw) }}</span></div>
+    <div class="fr in" style="padding-left:48px"><span></span><span>Desa</span><span class="v">: {{ $v($siswa->wali_alamat_desa) }}</span></div>
+    <div class="fr in" style="padding-left:48px"><span></span><span>Kecamatan</span><span class="v">: {{ $v($siswa->wali_alamat_kecamatan) }}</span></div>
+    <div class="fr in" style="padding-left:48px"><span></span><span>Kabupaten</span><span class="v">: {{ $v($siswa->wali_alamat_kabupaten) }}</span></div>
+    <div class="fr in" style="padding-left:48px"><span></span><span>Provinsi</span><span class="v">: {{ $v($siswa->wali_alamat_provinsi) }}</span></div>
+    <div class="fr in" style="padding-left:48px"><span></span><span>Kode Pos</span><span class="v">: {{ $v($siswa->wali_alamat_kode_pos) }}</span></div>
 
     <div class="fh">G. MENINGGALKAN SEKOLAH</div>
     <div class="fr"><span>26.</span><span>Meninggalkan Sekolah</span><span></span></div>
@@ -164,8 +169,7 @@
     <div class="fr"><span>28.</span><span>Melanjutkan Studi / Bekerja</span><span class="v">: {{ $v($siswa->kegiatan_setelah_lulus) }}</span></div>
 
     <div class="fh">I. CATATAN</div>
-    <div style="border-bottom:1px solid #000;min-height:30px;padding:4px 2px;font-size:11px">
-        {{ $siswa->catatan && $siswa->catatan !== '-' ? $siswa->catatan : '' }}
+    <div style="border: 1px solid var(--jb-slate-300); border-radius: 4px; background: var(--jb-slate-50); min-height: 48px; padding: 8px 12px; font-size: 10px; color: var(--jb-slate-800); line-height: 1.5;">
+        {{ $siswa->catatan && $siswa->catatan !== '-' ? $siswa->catatan : 'Tidak ada catatan khusus.' }}
     </div>
 </div>
-

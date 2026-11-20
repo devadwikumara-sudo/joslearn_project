@@ -233,7 +233,7 @@ class TeacherClassPromotionTest extends TestCase
             'tab' => 'kenaikan',
             'tahun_ajaran' => $year,
             'kelas' => 'X-1',
-        ]));
+        ]).'#riwayat');
 
         $this->assertDatabaseHas('siswa_riwayat_kelas', [
             'siswa_id' => $student,
@@ -250,6 +250,34 @@ class TeacherClassPromotionTest extends TestCase
             'kelas_tujuan_id' => $destinationClass,
         ]);
         $this->assertDatabaseHas('catatan_aktivitas', ['aksi' => 'kenaikan_kelas']);
+        $this->assertDatabaseHas('siswa_riwayat_kelas', [
+            'siswa_id' => $student,
+            'tahun_ajaran_id' => $year,
+            'kelas_id' => $sourceClass,
+        ]);
+        $this->actingAs($user)
+            ->get(route('guru.data-siswa'))
+            ->assertOk()
+            ->assertViewHas('filters', fn (array $filters): bool => $filters['tahun_ajaran'] === $nextYear)
+            ->assertViewHas('siswa', fn ($students): bool => $students->contains(
+                fn (SiswaBiodata $record): bool => $record->id === $student
+                    && $record->riwayatKelas->first()?->kelas?->nama === 'XI-1'
+            ));
+        $this->actingAs($user)
+            ->get(route('guru.data-siswa', ['tahun_ajaran' => $nextYear]))
+            ->assertOk()
+            ->assertViewHas('siswa', fn ($students): bool => $students->contains(
+                fn (SiswaBiodata $record): bool => $record->id === $student
+                    && $record->riwayatKelas->first()?->kelas?->nama === 'XI-1'
+            ));
+        $this->actingAs($user)
+            ->get(route('guru.data-siswa'))
+            ->assertOk()
+            ->assertViewHas('filters', fn (array $filters): bool => $filters['tahun_ajaran'] === $nextYear)
+            ->assertViewHas('siswa', fn ($students): bool => $students->contains(
+                fn (SiswaBiodata $record): bool => $record->id === $student
+                    && $record->riwayatKelas->first()?->kelas?->nama === 'XI-1'
+            ));
 
         $batchId = DB::table('catatan_kenaikan_kelas')->value('id');
         $pageUrl = route('guru.kenaikan-mutasi', [
@@ -257,6 +285,14 @@ class TeacherClassPromotionTest extends TestCase
             'tahun_ajaran' => $year,
             'kelas' => 'X-1',
         ]);
+        $this->actingAs($user)->get($pageUrl)
+            ->assertOk()
+            ->assertDontSee('name="keputusan['.$student.']"', false)
+            ->assertViewHas('riwayatKenaikanSiswa', fn ($histories): bool => $histories->contains(
+                fn (array $history): bool => $history['nama_siswa'] === 'Siswa Uji'
+                    && $history['kelas_tujuan'] === 'XI-1'
+            ));
+
         $this->from($pageUrl)->actingAs($user)
             ->post(route('guru.kenaikan-kelas.batalkan', $batchId))
             ->assertRedirect($pageUrl);
@@ -272,6 +308,309 @@ class TeacherClassPromotionTest extends TestCase
             'keputusan_kenaikan' => null,
         ]);
         $this->assertDatabaseHas('catatan_aktivitas', ['aksi' => 'batalkan_kenaikan']);
+        $this->actingAs($user)->get($pageUrl)
+            ->assertOk()
+            ->assertSee('name="keputusan['.$student.']"', false)
+            ->assertViewHas('riwayatKenaikanSiswa', fn ($histories): bool => $histories->isEmpty());
+        $this->actingAs($user)->get(route('guru.data-siswa'))
+            ->assertOk()
+            ->assertViewHas('filters', fn (array $filters): bool => $filters['tahun_ajaran'] === $year)
+            ->assertViewHas('siswa', fn ($students): bool => $students->contains(
+                fn (SiswaBiodata $record): bool => $record->id === $student
+                    && $record->riwayatKelas->first()?->kelas?->nama === 'X-1'
+            ));
+    }
+
+    public function test_admin_promotion_stays_on_kenaikan_page_and_records_student_in_history(): void
+    {
+        [$year, $nextYear, $sourceClass, $destinationClass, , $student] = $this->seedPromotionData();
+        DB::table('sekolah_kelas')->where('id', $destinationClass)->update(['nama' => 'XI-6']);
+        DB::table('sekolah_kelas')->insert([
+            'nama' => 'X-2',
+            'tingkat' => 'X',
+        ]);
+        $admin = $this->createUser('admin', 'admin-promosi', null);
+
+        $this->actingAs($admin)->post(route('admin.kenaikan-kelas.proses'), [
+            'ta_aktif' => '2025/2026',
+            'ta_berikutnya' => '2026/2027',
+            'kelas_asal' => 'X-1',
+            'keputusan' => [$student => 'Naik'],
+            'kelas_tujuan' => [$student => 'XI-6'],
+        ])->assertRedirect(route('admin.kenaikan-mutasi', [
+            'tab' => 'kenaikan',
+            'tahun_ajaran' => $year,
+            'kelas' => 'X-1',
+        ]).'#riwayat');
+
+        $this->actingAs($admin)
+            ->get(route('admin.data-siswa'))
+            ->assertOk()
+            ->assertViewHas('tahunAjaranTerpilihId', fn (int|string $yearId): bool => (int) $yearId === $nextYear)
+            ->assertViewHas('siswaList', fn ($students): bool => $students->contains(
+                fn (SiswaBiodata $record): bool => $record->id === $student
+                    && $record->riwayatKelas->first()?->kelas?->nama === 'XI-6'
+            ));
+
+        $this->assertDatabaseHas('siswa_riwayat_kelas', [
+            'siswa_id' => $student,
+            'tahun_ajaran_id' => $year,
+            'kelas_id' => $sourceClass,
+            'keputusan_kenaikan' => 'NAIK',
+        ]);
+        $this->actingAs($admin)
+            ->get(route('admin.kenaikan-mutasi', [
+                'tab' => 'kenaikan',
+                'tahun_ajaran' => $year,
+                'kelas' => 'X-1',
+            ]))
+            ->assertOk()
+            ->assertSee('Cari per kelas')
+            ->assertSee('Riwayat Kenaikan Kelas')
+            ->assertDontSee('Riwayat Mutasi Siswa')
+            ->assertViewHas('riwayatKenaikanSiswa', fn ($histories): bool => $histories->contains(
+                fn (array $history): bool => $history['nama_siswa'] === 'Siswa Uji'
+                    && $history['keputusan'] === 'Naik'
+                    && $history['kelas_tujuan'] === 'XI-6'
+                    && $history['tahun_tujuan'] === '2026/2027'
+            ));
+        $this->actingAs($admin)
+            ->get(route('admin.kenaikan-mutasi', [
+                'tab' => 'kenaikan',
+                'tahun_ajaran' => $year,
+                'kelas' => 'XI-6',
+            ]))
+            ->assertOk()
+            ->assertViewHas('riwayatKenaikanSiswa', fn ($histories): bool => $histories->contains(
+                fn (array $history): bool => $history['nama_siswa'] === 'Siswa Uji'
+                    && $history['kelas_tujuan'] === 'XI-6'
+            ))
+            ->assertSee(route('admin.data-siswa', [
+                'tahun_ajaran' => $nextYear,
+                'kelas' => 'XI-6',
+            ]));
+        $this->actingAs($admin)
+            ->get(route('admin.kenaikan-mutasi', [
+                'tab' => 'mutasi',
+                'tahun_ajaran' => $year,
+                'kelas' => 'X-1',
+            ]))
+            ->assertOk()
+            ->assertSee('Riwayat Mutasi Siswa')
+            ->assertDontSee('Riwayat Kenaikan Kelas Terakhir')
+            ->assertDontSee('Rincian Riwayat Kenaikan Kelas');
+        $this->actingAs($admin)
+            ->get(route('admin.kenaikan-mutasi', [
+                'tab' => 'kenaikan',
+                'tahun_ajaran' => $year,
+                'kelas' => 'X-2',
+            ]))
+            ->assertOk()
+            ->assertViewHas('riwayatKenaikanSiswa', fn ($histories): bool => $histories->isEmpty());
+        $this->actingAs($admin)
+            ->get(route('admin.data-siswa', ['tahun_ajaran' => $nextYear]))
+            ->assertOk()
+            ->assertViewHas('siswaList', fn ($students): bool => $students->contains(
+                fn (SiswaBiodata $record): bool => $record->id === $student
+                    && $record->riwayatKelas->first()?->kelas?->nama === 'XI-6'
+            ));
+        $this->actingAs($admin)
+            ->get(route('admin.data-siswa'))
+            ->assertOk()
+            ->assertViewHas('tahunAjaranTerpilihId', fn (int|string $yearId): bool => (int) $yearId === $nextYear)
+            ->assertViewHas('siswaList', fn ($students): bool => $students->contains(
+                fn (SiswaBiodata $record): bool => $record->id === $student
+                    && $record->riwayatKelas->first()?->kelas?->nama === 'XI-6'
+            ));
+        $this->assertDatabaseHas('siswa_riwayat_kelas', [
+            'siswa_id' => $student,
+            'tahun_ajaran_id' => $nextYear,
+            'kelas_id' => $destinationClass,
+            'status' => 'Aktif',
+        ]);
+    }
+
+    public function test_admin_can_delete_one_promotion_history_entry_and_restore_only_that_student(): void
+    {
+        [$year, $nextYear, $sourceClass, $destinationClass, , $firstStudent] = $this->seedPromotionData();
+        $secondStudent = DB::table('siswa_biodata')->insertGetId([
+            'nama_lengkap' => 'Siswa Uji Kedua',
+            'nisn' => '0000000003',
+        ]);
+        DB::table('siswa_riwayat_kelas')->insert([
+            'siswa_id' => $secondStudent,
+            'tahun_ajaran_id' => $year,
+            'kelas_id' => $sourceClass,
+            'status' => 'Aktif',
+        ]);
+        $previousTargetClass = DB::table('sekolah_kelas')->insertGetId([
+            'nama' => 'XII-9',
+            'tingkat' => 'XII',
+        ]);
+        $secondTargetHistoryId = DB::table('siswa_riwayat_kelas')->insertGetId([
+            'siswa_id' => $secondStudent,
+            'tahun_ajaran_id' => $nextYear,
+            'kelas_id' => $previousTargetClass,
+            'status' => 'Keluar',
+        ]);
+        $admin = $this->createUser('admin', 'admin-hapus-riwayat', null);
+
+        $this->actingAs($admin)->post(route('admin.kenaikan-kelas.proses'), [
+            'ta_aktif' => '2025/2026',
+            'ta_berikutnya' => '2026/2027',
+            'kelas_asal' => 'X-1',
+            'keputusan' => [
+                $firstStudent => 'Naik',
+                $secondStudent => 'Naik',
+            ],
+            'kelas_tujuan' => [
+                $firstStudent => 'XI-1',
+                $secondStudent => 'XI-1',
+            ],
+        ])->assertRedirect(route('admin.kenaikan-mutasi', [
+            'tab' => 'kenaikan',
+            'tahun_ajaran' => $year,
+            'kelas' => 'X-1',
+        ]).'#riwayat');
+
+        $batchId = (int) DB::table('catatan_kenaikan_kelas')->value('id');
+        $firstTargetHistoryId = (int) DB::table('siswa_riwayat_kelas')
+            ->where('siswa_id', $firstStudent)
+            ->where('tahun_ajaran_id', $nextYear)
+            ->value('id');
+        $historyUrl = route('admin.kenaikan-mutasi', [
+            'tab' => 'kenaikan',
+            'tahun_ajaran' => $year,
+            'kelas' => 'XI-1',
+        ]);
+
+        $this->actingAs($admin)->get($historyUrl)
+            ->assertOk()
+            ->assertSee('Hapus')
+            ->assertViewHas('riwayatKenaikanSiswa', fn ($histories): bool => $histories->count() === 2);
+
+        $this->actingAs($admin)
+            ->delete(route('admin.kenaikan-kelas.siswa.batalkan', [$batchId, $firstStudent]))
+            ->assertRedirect(route('admin.kenaikan-mutasi', [
+                'tab' => 'kenaikan',
+                'tahun_ajaran' => $year,
+                'kelas' => 'X-1',
+            ]).'#riwayat');
+
+        $this->assertDatabaseHas('siswa_riwayat_kelas', [
+            'siswa_id' => $firstStudent,
+            'tahun_ajaran_id' => $year,
+            'kelas_id' => $sourceClass,
+            'status' => 'Aktif',
+            'keputusan_kenaikan' => null,
+        ]);
+        $this->assertTrue(DB::table('siswa_riwayat_kelas')
+            ->where('id', $firstTargetHistoryId)
+            ->whereNotNull('deleted_at')
+            ->exists());
+        $this->assertDatabaseHas('siswa_riwayat_kelas', [
+            'siswa_id' => $secondStudent,
+            'tahun_ajaran_id' => $year,
+            'keputusan_kenaikan' => 'NAIK',
+        ]);
+        $this->assertDatabaseHas('siswa_riwayat_kelas', [
+            'id' => $secondTargetHistoryId,
+            'kelas_id' => $destinationClass,
+            'status' => 'Aktif',
+            'deleted_at' => null,
+        ]);
+        $this->assertDatabaseHas('catatan_kenaikan_kelas', [
+            'id' => $batchId,
+            'jumlah_siswa' => 1,
+            'dibatalkan_at' => null,
+        ]);
+
+        $this->actingAs($admin)
+            ->delete(route('admin.kenaikan-kelas.siswa.batalkan', [$batchId, $secondStudent]))
+            ->assertRedirect(route('admin.kenaikan-mutasi', [
+                'tab' => 'kenaikan',
+                'tahun_ajaran' => $year,
+                'kelas' => 'X-1',
+            ]).'#riwayat');
+
+        $this->assertDatabaseHas('siswa_riwayat_kelas', [
+            'siswa_id' => $secondStudent,
+            'tahun_ajaran_id' => $year,
+            'kelas_id' => $sourceClass,
+            'status' => 'Aktif',
+            'keputusan_kenaikan' => null,
+        ]);
+        $this->assertDatabaseHas('siswa_riwayat_kelas', [
+            'id' => $secondTargetHistoryId,
+            'kelas_id' => $previousTargetClass,
+            'status' => 'Keluar',
+            'deleted_at' => null,
+        ]);
+        $this->assertDatabaseHas('catatan_kenaikan_kelas', [
+            'id' => $batchId,
+            'jumlah_siswa' => 0,
+            'riwayat_baru' => '[]',
+            'data_sebelumnya' => '[]',
+        ]);
+        $this->assertTrue(DB::table('catatan_kenaikan_kelas')
+            ->where('id', $batchId)
+            ->whereNotNull('dibatalkan_at')
+            ->exists());
+        $this->assertDatabaseCount('catatan_aktivitas', 3);
+        $this->assertDatabaseHas('catatan_aktivitas', ['aksi' => 'batalkan_kenaikan_siswa']);
+        $this->actingAs($admin)->get($historyUrl)
+            ->assertOk()
+            ->assertViewHas('riwayatKenaikanSiswa', fn ($histories): bool => $histories->isEmpty());
+        $this->actingAs($admin)->get(route('admin.data-siswa'))
+            ->assertOk()
+            ->assertViewHas('tahunAjaranTerpilihId', fn (int|string $yearId): bool => (int) $yearId === $year)
+            ->assertViewHas('siswaList', fn ($students): bool => $students->contains(
+                fn (SiswaBiodata $record): bool => in_array($record->id, [$firstStudent, $secondStudent], true)
+                    && $record->riwayatKelas->first()?->kelas?->nama === 'X-1'
+            ));
+    }
+
+    public function test_teacher_cannot_delete_promotion_history_for_an_unassigned_class(): void
+    {
+        [$year, $nextYear, , , , $student] = $this->seedPromotionData();
+        $admin = $this->createUser('admin', 'admin-buat-batch', null);
+
+        $this->actingAs($admin)->post(route('admin.kenaikan-kelas.proses'), [
+            'ta_aktif' => '2025/2026',
+            'ta_berikutnya' => '2026/2027',
+            'kelas_asal' => 'X-1',
+            'keputusan' => [$student => 'Naik'],
+            'kelas_tujuan' => [$student => 'XI-1'],
+        ])->assertRedirect(route('admin.kenaikan-mutasi', [
+            'tab' => 'kenaikan',
+            'tahun_ajaran' => $year,
+            'kelas' => 'X-1',
+        ]).'#riwayat');
+
+        $batchId = (int) DB::table('catatan_kenaikan_kelas')->value('id');
+        $unassignedTeacher = $this->createTeacher('Guru Tidak Ditugaskan', '9876543210');
+        $user = $this->createUser('guru', 'guru-tidak-ditugaskan', $unassignedTeacher);
+
+        $this->actingAs($user)
+            ->delete(route('guru.kenaikan-kelas.siswa.batalkan', [$batchId, $student]))
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('siswa_riwayat_kelas', [
+            'siswa_id' => $student,
+            'tahun_ajaran_id' => $year,
+            'keputusan_kenaikan' => 'NAIK',
+        ]);
+        $this->assertDatabaseHas('siswa_riwayat_kelas', [
+            'siswa_id' => $student,
+            'tahun_ajaran_id' => $nextYear,
+            'deleted_at' => null,
+        ]);
+        $this->assertDatabaseHas('catatan_kenaikan_kelas', [
+            'id' => $batchId,
+            'jumlah_siswa' => 1,
+            'dibatalkan_at' => null,
+        ]);
+        $this->assertDatabaseMissing('catatan_aktivitas', ['aksi' => 'batalkan_kenaikan_siswa']);
     }
 
     public function test_final_class_graduation_is_excluded_from_the_active_student_scope(): void
@@ -290,7 +629,7 @@ class TeacherClassPromotionTest extends TestCase
             'tab' => 'kenaikan',
             'tahun_ajaran' => $year,
             'kelas' => 'XII-1',
-        ]));
+        ]).'#riwayat');
 
         $this->assertDatabaseHas('siswa_riwayat_kelas', [
             'siswa_id' => $student,
@@ -411,6 +750,26 @@ class TeacherClassPromotionTest extends TestCase
         $this->assertDatabaseMissing('catatan_aktivitas', ['aksi' => 'kenaikan_kelas']);
     }
 
+    public function test_promotion_validation_errors_are_displayed_after_redirect(): void
+    {
+        [$year, , , , , $student] = $this->seedPromotionData();
+        $admin = $this->createUser('admin', 'admin', null);
+        $pageUrl = route('admin.kenaikan-mutasi', [
+            'tab' => 'kenaikan',
+            'tahun_ajaran' => $year,
+            'kelas' => 'X-1',
+        ]);
+
+        $this->from($pageUrl)->actingAs($admin)->followingRedirects()
+            ->post(route('admin.kenaikan-kelas.proses'), [
+                'kelas_asal' => 'X-1',
+                'keputusan' => [$student => 'Naik'],
+            ])
+            ->assertOk()
+            ->assertSee('Periksa kembali data yang dikirim:')
+            ->assertSee('Kelas tujuan wajib');
+    }
+
     public function test_cancelling_graduation_restores_the_student_to_active_data(): void
     {
         [$year, , $sourceClass, , $teacher, $student] = $this->seedPromotionData();
@@ -430,7 +789,7 @@ class TeacherClassPromotionTest extends TestCase
                 'kelas_asal' => 'XII-1',
                 'keputusan' => [$student => 'Lulus'],
             ])
-            ->assertRedirect($pageUrl);
+            ->assertRedirect($pageUrl.'#riwayat');
 
         $batchId = DB::table('catatan_kenaikan_kelas')->value('id');
         $this->assertNotNull($batchId);
@@ -481,6 +840,101 @@ class TeacherClassPromotionTest extends TestCase
         $this->assertStringContainsString('value="XI-2"', $matches[0]);
         $this->assertStringNotContainsString('value="X-1"', $matches[0]);
         $this->assertStringNotContainsString('value="XII-1"', $matches[0]);
+    }
+
+    public function test_promotion_form_preserves_choices_and_shows_mass_actions_for_the_selected_grade(): void
+    {
+        [$year, , , , , $student] = $this->seedPromotionData();
+        DB::table('sekolah_kelas')->insert([
+            ['nama' => 'XI-2', 'tingkat' => 'XI'],
+        ]);
+        $admin = $this->createUser('admin', 'admin', null);
+        $pageUrl = route('admin.kenaikan-mutasi', [
+            'tahun_ajaran' => $year,
+            'kelas' => 'X-1',
+        ]);
+
+        $response = $this->withSession([
+            '_old_input' => [
+                'keputusan' => [$student => 'Tinggal'],
+                'kelas_tujuan' => [$student => 'XI-2'],
+            ],
+        ])->actingAs($admin)->get($pageUrl);
+        $html = (string) $response->assertOk()->getContent();
+
+        $this->assertStringContainsString('value="Tinggal" selected', $html);
+        $this->assertStringContainsString('value="XI-2" selected', $html);
+        $this->assertStringContainsString('Naikkan Semua', $html);
+        $this->assertStringNotContainsString('Luluskan Semua', $html);
+        $this->assertStringContainsString('targetSelect.disabled = !isNaik;', $html);
+        $this->assertStringNotContainsString('wrap.innerHTML', $html);
+
+        DB::table('sekolah_kelas')->where('nama', 'X-1')->update([
+            'nama' => 'XII-1',
+            'tingkat' => 'XII',
+        ]);
+        $graduationResponse = $this->withSession(['_old_input' => []])
+            ->actingAs($admin)
+            ->get(route('admin.kenaikan-mutasi', [
+                'tahun_ajaran' => $year,
+                'kelas' => 'XII-1',
+            ]));
+        $graduationHtml = (string) $graduationResponse->assertOk()->getContent();
+
+        $this->assertStringContainsString('Luluskan Semua', $graduationHtml);
+        $this->assertStringNotContainsString('Naikkan Semua', $graduationHtml);
+        $this->assertStringContainsString('value="Lulus" selected', $graduationHtml);
+        $this->assertStringNotContainsString('value="Naik"', $graduationHtml);
+    }
+
+    public function test_staying_students_are_not_counted_as_promoted(): void
+    {
+        [$year, $nextYear, $sourceClass, $destinationClass, $teacher, $student] = $this->seedPromotionData();
+        $stayingStudent = DB::table('siswa_biodata')->insertGetId([
+            'nama_lengkap' => 'Siswa Tetap',
+            'nisn' => '0000000002',
+        ]);
+        DB::table('siswa_riwayat_kelas')->insert([
+            'siswa_id' => $stayingStudent,
+            'tahun_ajaran_id' => $year,
+            'kelas_id' => $sourceClass,
+            'status' => 'Aktif',
+        ]);
+        $user = $this->createUser('guru', 'guru-x1', $teacher);
+
+        $this->actingAs($user)->post(route('guru.kenaikan-kelas.proses'), [
+            'kelas_asal' => 'X-1',
+            'keputusan' => [
+                $student => 'Naik',
+                $stayingStudent => 'Tinggal',
+            ],
+            'kelas_tujuan' => [$student => 'XI-1'],
+        ])->assertRedirect(route('guru.kenaikan-mutasi', [
+            'tab' => 'kenaikan',
+            'tahun_ajaran' => $year,
+            'kelas' => 'X-1',
+        ]).'#riwayat')
+            ->assertSessionHas(
+                'success',
+                'Proses kenaikan kelas X-1 berhasil: 1 naik ke 2026/2027, 1 tinggal di kelas asal, 0 lulus, 0 keluar.'
+            );
+
+        $this->assertDatabaseHas('siswa_riwayat_kelas', [
+            'siswa_id' => $stayingStudent,
+            'tahun_ajaran_id' => $nextYear,
+            'kelas_id' => $sourceClass,
+            'status' => 'Aktif',
+        ]);
+        $this->assertDatabaseHas('catatan_aktivitas', [
+            'aksi' => 'kenaikan_kelas',
+            'keterangan' => 'Kenaikan kelas X-1 (2025/2026 -> 2026/2027): 1 naik, 1 tinggal, 0 lulus, 0 keluar.',
+        ]);
+        $this->assertDatabaseHas('siswa_riwayat_kelas', [
+            'siswa_id' => $student,
+            'tahun_ajaran_id' => $nextYear,
+            'kelas_id' => $destinationClass,
+            'status' => 'Aktif',
+        ]);
     }
 
     public function test_promotion_list_excludes_a_graduate_with_an_active_history(): void

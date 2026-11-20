@@ -35,7 +35,20 @@ class AlumniController extends Controller
         $kelas = trim($this->queryString($request, 'kelas'));
         $panelTab = $request->query('tab') === 'pelacakan' ? 'pelacakan' : 'kontrol-induk';
         $selectedStudentId = $request->integer('siswa') ?: null;
-        $kelasList = SekolahKelas::query()->orderBy('nama')->pluck('nama');
+        $isGraduatedList = $aj === self::TYPE_GRADUATED;
+        $kelasListQuery = SekolahKelas::query();
+        if ($isGraduatedList) {
+            $kelasListQuery->where('tingkat', 'XII');
+        }
+        $kelasList = $kelasListQuery->orderBy('nama')->pluck('nama');
+        $kelasKeluarListQuery = $this->filteredAlumniQuery($aj, '', '', '')
+            ->whereNotNull('kelas_keluar')
+            ->where('kelas_keluar', '!=', '');
+        if ($isGraduatedList) {
+            $kelasKeluarListQuery->where('kelas_keluar', 'like', 'XII-%');
+        }
+        $kelasKeluarList = $kelasKeluarListQuery->distinct()->orderBy('kelas_keluar')->pluck('kelas_keluar');
+        $kelasList = $kelasList->merge($kelasKeluarList)->unique()->values();
 
         $tahunList = SiswaBiodata::query()
             ->graduated()
@@ -83,6 +96,7 @@ class AlumniController extends Controller
             $isGraduated = $siswa->isGraduated();
             $latestHistory = $siswa->riwayatKelas->first();
             $latestTracking = $siswa->pelacakan->last();
+            $siswa->setAttribute('kelas_masuk_display', $this->acceptedClassDisplay($siswa));
             $studentStatus = $isGraduated
                 ? 'Lulus'
                 : ($siswa->alasan_keluar ?: (in_array($latestHistory?->status, ['Pindah keluar', 'Keluar'], true) ? $latestHistory->status : 'Keluar'));
@@ -460,7 +474,7 @@ class AlumniController extends Controller
             foreach ($rows as $index => $siswa) {
                 $latestTracking = $siswa->pelacakan->last();
                 $isGraduated = $siswa->isGraduated();
-                $masukKelas = trim(($siswa->kelas_diterima ?: '').($siswa->rombel_diterima ? '-'.$siswa->rombel_diterima : ''));
+                $masukKelas = $this->acceptedClassDisplay($siswa);
                 $trackingStatus = $latestTracking
                     ? trim($latestTracking->jenis.' · '.$latestTracking->nama_tempat.' ('.$latestTracking->tahun.')')
                     : 'Belum dilacak';
@@ -573,19 +587,36 @@ class AlumniController extends Controller
 
         if ($search !== '') {
             $query->where(function (Builder $query) use ($search): void {
-                $query->where('nama_lengkap', 'like', "%{$search}%")
+                $query->where('nama_lengkap', 'like', "{$search}%")
                     ->orWhere('nomor_induk', 'like', "%{$search}%")
                     ->orWhere('nisn', 'like', "%{$search}%");
             });
         }
 
         if ($kelas !== '') {
-            $query->whereHas('riwayatKelas.kelas', function (Builder $classQuery) use ($kelas): void {
-                $classQuery->where('nama', $kelas);
-            });
+            $query->where('kelas_keluar', $kelas);
+            if ($type === self::TYPE_GRADUATED) {
+                $query->where('kelas_keluar', 'like', 'XII-%');
+            }
         }
 
         return $query;
+    }
+
+    private function acceptedClassDisplay(SiswaBiodata $siswa): string
+    {
+        $grade = mb_strtoupper(trim((string) $siswa->kelas_diterima));
+        $group = trim((string) $siswa->rombel_diterima);
+
+        if ($grade === '-') {
+            $grade = '';
+        }
+
+        if ($grade === '' && $group !== '') {
+            $grade = 'X';
+        }
+
+        return trim($grade.($group !== '' ? '-'.$group : ''));
     }
 
     private function selectedType(Request $request): string

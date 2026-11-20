@@ -11,6 +11,7 @@
     .km-tabs a:focus-visible{outline:2px solid var(--a);outline-offset:2px}
     .km-filter{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
     .km-filter select{min-width:170px;padding:8px 10px}
+    .mn .target-status.target-status-hidden{display:none!important}
 </style>
 @endpush
 
@@ -44,7 +45,8 @@
             <option value="">Tahun ajaran {{ $taAktif }}</option>
         @endforelse
     </select>
-    <select name="kelas" aria-label="Kelas" onchange="this.form.submit()">
+    <label for="km-filter-kelas" class="sub">Cari per kelas:</label>
+    <select id="km-filter-kelas" name="kelas" aria-label="Cari per kelas" onchange="this.form.submit()">
         @if($isAdmin)
             <option value="*" {{ $kelasAsal === '*' ? 'selected' : '' }}>Semua kelas</option>
         @endif
@@ -55,11 +57,22 @@
     <noscript><button type="submit" class="btn o">Terapkan</button></noscript>
 </form>
 
-@if($tab === 'kenaikan')
-    @include('admin._kenaikan-mutasi-kenaikan')
-@elseif($isAdmin && $tab === 'mutasi')
-    @include('admin._kenaikan-mutasi-mutasi')
+@if($errors->any())
+    <div class="note err" role="alert" style="margin-bottom:14px">
+        <b>Periksa kembali data yang dikirim:</b>
+        <ul style="margin:8px 0 0;padding-left:22px">
+            @foreach($errors->all() as $error)
+                <li>{{ $error }}</li>
+            @endforeach
+        </ul>
+    </div>
 @endif
 
-@include('admin._kenaikan-mutasi-riwayat')
+@if($tab === 'kenaikan')
+    @include('admin._kenaikan-mutasi-kenaikan')
+    @include('admin._kenaikan-mutasi-riwayat')
+@elseif($isAdmin && $tab === 'mutasi')
+    @include('admin._kenaikan-mutasi-mutasi')
+    @include('admin._kenaikan-mutasi-riwayat-mutasi')
+@endif
 @endsection

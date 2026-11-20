@@ -179,21 +179,6 @@
         <input type="hidden" name="konfirmasi" value="hapus">
     </form>
     <button type="submit" form="alumni-delete-selected-form" id="alumni-delete-selected-button" class="btn x" disabled>🗑 Hapus terpilih</button>
-    @if($kelas !== '')
-        <form method="POST" action="{{ route('admin.alumni.bulk-delete') }}" style="margin:0" onsubmit="return confirm('Semua alumni yang cocok di kelas terpilih akan dipindahkan ke Tempat Sampah. Lanjutkan?')">
-            @csrf
-            @method('DELETE')
-            <input type="hidden" name="mode" value="class">
-            <input type="hidden" name="aj" value="{{ $aj }}">
-            <input type="hidden" name="ay" value="{{ $ay }}">
-            <input type="hidden" name="kelas" value="{{ $kelas }}">
-            <input type="hidden" name="aq" value="{{ $aq }}">
-            <input type="hidden" name="konfirmasi" value="hapus">
-            <button type="submit" class="btn x" {{ $totalFiltered === 0 ? 'disabled' : '' }}>🗑 Hapus per kelas {{ $kelas }} ({{ $totalFiltered }})</button>
-        </form>
-    @else
-        <button type="button" class="btn x" disabled title="Pilih kelas pada filter terlebih dahulu">🗑 Hapus per kelas</button>
-    @endif
 </div>
 
 <div class="card wide">
@@ -234,7 +219,6 @@
                     $status = $s->status_alumni;
                     $statusClass = $status === 'Lulus' ? 'ok' : (in_array($status, ['Pindah keluar', 'Keluar', 'Pindah']) ? 'w' : '');
                     $thnLulusDisplay = $s->tahun_lulus ?: ($s->tanggal_keluar ? substr($s->tanggal_keluar, 0, 4) : '-');
-                    $masukKelas = trim(($s->kelas_diterima ?: '') . ($s->rombel_diterima ? '-' . $s->rombel_diterima : ''));
                     $panelUrl = route('admin.alumni', array_merge($panelQuery, ['siswa' => $s->id]));
                     $studentDetails = [
                         'id' => $s->id,
@@ -255,7 +239,7 @@
                     <td>{{ $s->nisn }}</td>
                     <td>{{ $s->jenis_registrasi ?: '-' }}</td>
                     <td>{{ $s->tanggal_diterima ? \Carbon\Carbon::parse($s->tanggal_diterima)->format('d/m/Y') : '-' }}</td>
-                    <td>{{ $masukKelas ?: '-' }}</td>
+                    <td>{{ $s->kelas_masuk_display ?: '-' }}</td>
                     <td>{{ $s->sekolah_asal ?: '-' }}</td>
                     <td>{{ $s->alasan_keluar ?: '-' }}</td>
                     <td>{{ $s->tanggal_keluar ? \Carbon\Carbon::parse($s->tanggal_keluar)->format('d/m/Y') : '-' }}</td>
@@ -381,7 +365,7 @@
                     <div class="alumni-detail-grid">
                         <div class="alumni-detail-item"><span>Jenis registrasi</span><b>{{ $selectedAlumni->jenis_registrasi ?: '-' }}</b></div>
                         <div class="alumni-detail-item"><span>Tanggal diterima</span><b>{{ $selectedAlumni->tanggal_diterima ?: '-' }}</b></div>
-                        <div class="alumni-detail-item"><span>Kelas diterima</span><b>{{ trim(($selectedAlumni->kelas_diterima ?: '').($selectedAlumni->rombel_diterima ? '-'.$selectedAlumni->rombel_diterima : '')) ?: '-' }}</b></div>
+                        <div class="alumni-detail-item"><span>Kelas diterima</span><b>{{ $selectedAlumni->kelas_masuk_display ?: '-' }}</b></div>
                         <div class="alumni-detail-item"><span>Sekolah asal</span><b>{{ $selectedAlumni->sekolah_asal ?: '-' }}</b></div>
                         <div class="alumni-detail-item"><span>Alasan keluar</span><b>{{ $selectedAlumni->alasan_keluar ?: '-' }}</b></div>
                         <div class="alumni-detail-item"><span>Tanggal keluar</span><b>{{ $selectedAlumni->tanggal_keluar ?: '-' }}</b></div>

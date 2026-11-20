@@ -164,7 +164,21 @@ class DataSiswaGuruController extends Controller
             'st' => ['nullable', 'in:Aktif'],
         ]);
 
-        $tahunAjaranId = $filters['tahun_ajaran'] ?? SekolahTahunAjaran::where('sedang_berjalan', true)->value('id');
+        if ($request->hasSession() && $request->filled('tahun_ajaran')) {
+            $request->session()->put('data_siswa_tahun_ajaran_id', (int) $filters['tahun_ajaran']);
+        }
+
+        $rememberedYearId = $request->hasSession()
+            ? $request->session()->get('data_siswa_tahun_ajaran_id')
+            : null;
+        if ($rememberedYearId !== null
+            && (! is_numeric($rememberedYearId) || ! SekolahTahunAjaran::whereKey((int) $rememberedYearId)->exists())) {
+            $request->session()->forget('data_siswa_tahun_ajaran_id');
+            $rememberedYearId = null;
+        }
+
+        $tahunAjaranId = $filters['tahun_ajaran'] ?? $rememberedYearId
+            ?? SekolahTahunAjaran::where('sedang_berjalan', true)->value('id');
         $tahunAjaranId ??= SekolahTahunAjaran::latest('id')->value('id');
 
         return [

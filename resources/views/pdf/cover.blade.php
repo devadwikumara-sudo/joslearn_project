@@ -12,31 +12,83 @@
     $provinsi = $sekolah->provinsi ?? '-';
 @endphp
 <div class="pg dc cv">
-    <div class="cvt">
-        <b>NOMOR POKOK SEKOLAH NASIONAL</b>
-        <b>KELAS {{ $kelasNama ?? '-' }}</b>
+    {{-- Frame Ornaments --}}
+    <div class="cv-frame"></div>
+    <div class="cv-frame-inner"></div>
+    <div class="cv-corner tl"></div>
+    <div class="cv-corner tr"></div>
+    <div class="cv-corner bl"></div>
+    <div class="cv-corner br"></div>
+
+    {{-- Top National / School Bar --}}
+    <div>
+        <div class="cvt">
+            <span><b>NOMOR POKOK SEKOLAH NASIONAL</b></span>
+            <span class="cvt-tag"><b>KELAS {{ $kelasNama ?? '-' }}</b></span>
+        </div>
+
+        <div class="npsn-wrap">
+            <div class="npsn" style="margin-top:6px">
+                @foreach($npsnChars as $c)
+                    <i>{{ $c }}</i>
+                @endforeach
+            </div>
+        </div>
     </div>
 
-    <div class="npsn" style="margin-top:6px">
-        @foreach($npsnChars as $c)
-            <i>{{ $c }}</i>
-        @endforeach
+    {{-- Center Crest & Title --}}
+    <div style="margin: auto 0; padding: 20px 0;">
+        <div class="cv-crest">
+            <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"></path>
+                <path d="M6 6h10"></path>
+                <path d="M6 10h10"></path>
+                <path d="M6 14h7"></path>
+            </svg>
+        </div>
+
+        <div class="cvh">
+            BUKU INDUK REGISTER PESERTA DIDIK<br>
+            <span style="font-size: 15px; font-weight: 700; color: var(--jb-navy-700); letter-spacing: 1px;">TAHUN ANGKATAN {{ $angkatan ?: '—' }} &bull; TAHUN LULUS {{ $tahunLulus ?: '—' }}</span>
+        </div>
+
+        <div class="cvh-sub">KURIKULUM MERDEKA</div>
+
+        <div style="margin-top: 24px;">
+            <div class="cvs">{{ $namaSekolah }}</div>
+        </div>
     </div>
 
-    <div class="cvh">
-        BUKU INDUK REGISTER PESERTA DIDIK<br>
-        TAHUN ANGKATAN {{ $angkatan ?: '—' }}<br>
-        TAHUN LULUS {{ $tahunLulus ?: '—' }}
-    </div>
-
-    <div class="cvs">{{ $namaSekolah }}</div>
-
-    <div class="cva">
-        Alamat &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: {{ $alamat }}<br>
-        Kelurahan : {{ $kelurahan }}<br>
-        Kecamatan : {{ $kecamatan }}<br>
-        Kab/Kota &nbsp;: {{ $kabupaten }}<br>
-        Provinsi &nbsp;&nbsp;&nbsp;: {{ $provinsi }}
+    {{-- Bottom School Address Card --}}
+    <div>
+        <div class="cva">
+            <table class="cva-table">
+                <tr>
+                    <td>Alamat</td>
+                    <td>:</td>
+                    <td>{{ $alamat }}</td>
+                </tr>
+                <tr>
+                    <td>Kelurahan</td>
+                    <td>:</td>
+                    <td>{{ $kelurahan }}</td>
+                </tr>
+                <tr>
+                    <td>Kecamatan</td>
+                    <td>:</td>
+                    <td>{{ $kecamatan }}</td>
+                </tr>
+                <tr>
+                    <td>Kab/Kota</td>
+                    <td>:</td>
+                    <td>{{ $kabupaten }}</td>
+                </tr>
+                <tr>
+                    <td>Provinsi</td>
+                    <td>:</td>
+                    <td>{{ $provinsi }}</td>
+                </tr>
+            </table>
+        </div>
     </div>
 </div>
-

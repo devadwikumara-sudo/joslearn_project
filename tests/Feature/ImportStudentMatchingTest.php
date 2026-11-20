@@ -2315,6 +2315,32 @@ class ImportStudentMatchingTest extends TestCase
         $this->assertNotContains($studentId, $activeStudents->getData()['siswaList']->getCollection()->pluck('id')->all());
     }
 
+    public function test_alumni_name_search_matches_only_the_start_of_the_first_name(): void
+    {
+        DB::table('siswa_biodata')->insert([
+            [
+                'nisn' => '0000000343',
+                'nomor_induk' => '10343',
+                'nama_lengkap' => 'Ayu Anggraini',
+                'tahun_lulus' => '2025',
+                'alasan_keluar' => 'Lulus',
+            ],
+            [
+                'nisn' => '0000000344',
+                'nomor_induk' => '10344',
+                'nama_lengkap' => 'Dewi Anggraini',
+                'tahun_lulus' => '2025',
+                'alasan_keluar' => 'Lulus',
+            ],
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.alumni', ['aq' => 'A']))
+            ->assertOk()
+            ->assertSee('Ayu Anggraini')
+            ->assertDontSee('Dewi Anggraini');
+    }
+
     public function test_three_year_student_import_renders_a_complete_six_semester_alumni_record(): void
     {
         DB::table('sekolah_mapel_per_tingkat')->insert([
@@ -2668,14 +2694,20 @@ class ImportStudentMatchingTest extends TestCase
         $this->assertSame([], array_values(array_intersect($activeIds, $alumniIds)));
     }
 
-    public function test_alumni_can_be_filtered_by_a_class_in_their_academic_history(): void
+    public function test_graduated_alumni_class_filter_only_offers_and_matches_grade_twelve_classes(): void
     {
         DB::table('siswa_biodata')->whereIn('id', [1, 2])->update(['tahun_lulus' => '2025']);
         DB::table('siswa_riwayat_kelas')->whereIn('siswa_id', [1, 2])->update(['status' => 'Lulus']);
         DB::table('siswa_riwayat_kelas')->where('siswa_id', 2)->update(['kelas_id' => 2]);
+        DB::table('siswa_biodata')->where('id', 1)->update([
+            'kelas_diterima' => null,
+            'rombel_diterima' => '1',
+            'kelas_keluar' => 'XII-2',
+        ]);
+        DB::table('siswa_biodata')->where('id', 2)->update(['kelas_keluar' => 'XI-1']);
 
         $response = $this->actingAs($this->admin)
-            ->get(route('admin.alumni', ['kelas' => 'X-1']));
+            ->get(route('admin.alumni', ['kelas' => 'XII-2']));
 
         $response->assertOk()
             ->assertViewHas('alumni', function ($alumni): bool {
@@ -2683,13 +2715,45 @@ class ImportStudentMatchingTest extends TestCase
                     && $alumni->getCollection()->pluck('id')->all() === [1];
             })
             ->assertSee('name="kelas"', false)
-            ->assertSee('value="X-1" selected', false)
+            ->assertSee('<option value="XII-2" selected>XII-2</option>', false)
+            ->assertDontSee('<option value="X-1"', false)
+            ->assertDontSee('<option value="XI-1"', false)
+            ->assertSee('X-1')
+            ->assertDontSee('Hapus per kelas')
             ->assertSee('href="'.e(route('admin.alumni.export', [
                 'aj' => 'Alumni (Lulus)',
                 'ay' => '',
-                'kelas' => 'X-1',
+                'kelas' => 'XII-2',
                 'aq' => '',
             ])).'"', false);
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.alumni', ['kelas' => 'XI-1']))
+            ->assertOk()
+            ->assertViewHas('alumni', fn ($alumni): bool => $alumni->total() === 0);
+    }
+
+    public function test_exit_alumni_class_filter_keeps_non_graduating_classes_available(): void
+    {
+        DB::table('siswa_biodata')->where('id', 2)->update([
+            'alasan_keluar' => 'Pindah',
+            'tanggal_keluar' => '2025-07-01',
+            'kelas_keluar' => 'XI-1',
+        ]);
+        DB::table('siswa_riwayat_kelas')->where('siswa_id', 2)->update(['status' => 'Pindah keluar']);
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.alumni', [
+                'aj' => 'Pindah / Keluar',
+                'kelas' => 'XI-1',
+            ]))
+            ->assertOk()
+            ->assertViewHas('alumni', function ($alumni): bool {
+                return $alumni->total() === 1
+                    && $alumni->getCollection()->pluck('id')->all() === [2];
+            })
+            ->assertSee('<option value="XI-1" selected>XI-1</option>', false)
+            ->assertSee('<option value="X-1"', false);
     }
 
     public function test_graduated_import_without_class_or_academic_year_is_listed_as_alumni(): void
@@ -2821,11 +2885,12 @@ class ImportStudentMatchingTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+        DB::table('siswa_biodata')->where('id', 1)->update(['kelas_keluar' => 'XII-1']);
         $historyBefore = DB::table('siswa_riwayat_kelas')->where('siswa_id', 1)->first();
         $filters = [
             'aj' => 'Alumni (Lulus)',
             'ay' => '2025',
-            'kelas' => 'X-1',
+            'kelas' => 'XII-1',
             'aq' => 'Nama',
             'page' => 1,
         ];
@@ -2835,7 +2900,7 @@ class ImportStudentMatchingTest extends TestCase
             'aj' => 'Alumni (Lulus)',
             'ay' => '2025',
             'aq' => 'Nama',
-            'kelas' => 'X-1',
+            'kelas' => 'XII-1',
             'page' => 1,
             'siswa' => 1,
         ]);
@@ -2888,7 +2953,7 @@ class ImportStudentMatchingTest extends TestCase
             ->assertOk()
             ->assertSee('Edit Biodata Alumni')
             ->assertSee('name="alumni_edit" value="1"', false)
-            ->assertSee('name="return_kelas" value="X-1"', false)
+            ->assertSee('name="return_kelas" value="XII-1"', false)
             ->assertSee('name="tracking_jenis"', false)
             ->assertSee('value="Kampus Contoh"', false)
             ->assertSee('value="2025"', false)
@@ -2935,14 +3000,14 @@ class ImportStudentMatchingTest extends TestCase
             'return_tab' => 'kontrol-induk',
             'return_aj' => 'Alumni (Lulus)',
             'return_ay' => '2025',
-            'return_kelas' => 'X-1',
+            'return_kelas' => 'XII-1',
             'return_aq' => 'Nama',
             'return_page' => '1',
         ])->assertRedirect(route('admin.alumni', [
             'tab' => 'kontrol-induk',
             'aj' => 'Alumni (Lulus)',
             'ay' => '2025',
-            'kelas' => 'X-1',
+            'kelas' => 'XII-1',
             'aq' => 'Nama',
             'page' => 1,
         ]));
@@ -3018,7 +3083,7 @@ class ImportStudentMatchingTest extends TestCase
             ->assertSee('name="siswa_ids[]"', false)
             ->assertSee('Hapus semua hasil filter')
             ->assertSee('Hapus terpilih')
-            ->assertSee('Hapus per kelas')
+            ->assertDontSee('Hapus per kelas')
             ->assertSee('data-edit-tab="control"', false)
             ->assertSee('data-edit-tab="tracking"', false)
             ->assertSee('class="btn alumni-tracking-action tracked"', false)
@@ -3065,7 +3130,7 @@ class ImportStudentMatchingTest extends TestCase
             'mode' => 'selected',
             'aj' => 'Alumni (Lulus)',
             'ay' => '2025',
-            'kelas' => 'X-1',
+            'kelas' => 'XII-1',
             'aq' => '',
             'siswa_ids' => [1, 2],
             'konfirmasi' => 'hapus',
@@ -3074,7 +3139,7 @@ class ImportStudentMatchingTest extends TestCase
         $response->assertRedirect(route('admin.alumni', [
             'aj' => 'Alumni (Lulus)',
             'ay' => '2025',
-            'kelas' => 'X-1',
+            'kelas' => 'XII-1',
         ]))->assertSessionHas('success', '1 data alumni berhasil dipindahkan ke Tempat Sampah.');
         $this->assertSoftDeleted('siswa_biodata', ['id' => 1]);
         $this->assertNotSoftDeleted('siswa_biodata', ['id' => 2]);
@@ -3089,7 +3154,7 @@ class ImportStudentMatchingTest extends TestCase
             'mode' => 'class',
             'aj' => 'Alumni (Lulus)',
             'ay' => '2025',
-            'kelas' => 'X-1',
+            'kelas' => 'XII-1',
             'aq' => '',
             'konfirmasi' => 'hapus',
         ]);
@@ -3097,7 +3162,7 @@ class ImportStudentMatchingTest extends TestCase
         $response->assertRedirect(route('admin.alumni', [
             'aj' => 'Alumni (Lulus)',
             'ay' => '2025',
-            'kelas' => 'X-1',
+            'kelas' => 'XII-1',
         ]))->assertSessionHas('success', '1 data alumni berhasil dipindahkan ke Tempat Sampah.');
         $this->assertSoftDeleted('siswa_biodata', ['id' => 1]);
         $this->assertNotSoftDeleted('siswa_biodata', ['id' => 2]);
@@ -3522,9 +3587,18 @@ class ImportStudentMatchingTest extends TestCase
 
     private function makeGraduatedAlumni(int $studentId, string $graduationYear, int $classId): void
     {
+        $exitClass = 'XII-'.$classId;
+        if (! DB::table('sekolah_kelas')->where('nama', $exitClass)->exists()) {
+            DB::table('sekolah_kelas')->insert([
+                'nama' => $exitClass,
+                'tingkat' => 'XII',
+            ]);
+        }
+
         DB::table('siswa_biodata')->where('id', $studentId)->update([
             'tahun_lulus' => $graduationYear,
             'alasan_keluar' => 'Lulus',
+            'kelas_keluar' => $exitClass,
         ]);
         DB::table('siswa_riwayat_kelas')->where('siswa_id', $studentId)->update([
             'kelas_id' => $classId,

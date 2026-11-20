@@ -28,9 +28,12 @@
 
         <div class="bar" style="background:#f8fafc;padding:10px 14px;border-radius:10px;border:1px solid #e2e8f0;margin-bottom:14px;flex-wrap:wrap;gap:8px">
             <span style="font-size:12px;font-weight:700;color:var(--admin-text-secondary);text-transform:uppercase;letter-spacing:0.04em">Pilihan Cepat Massal:</span>
-            <button type="button" class="btn o" style="font-size:12px;padding:5px 10px" onclick="setSemuaHasil('Naik')">⬆ Naikkan Semua</button>
+            @if($isKelas12)
+                <button type="button" class="btn o" style="font-size:12px;padding:5px 10px" onclick="setSemuaHasil('Lulus')">🎓 Luluskan Semua</button>
+            @else
+                <button type="button" class="btn o" style="font-size:12px;padding:5px 10px" onclick="setSemuaHasil('Naik')">⬆ Naikkan Semua</button>
+            @endif
             <button type="button" class="btn o" style="font-size:12px;padding:5px 10px" onclick="setSemuaHasil('Tinggal')">⏹ Tinggal Semua</button>
-            <button type="button" class="btn o" style="font-size:12px;padding:5px 10px" onclick="setSemuaHasil('Lulus')">🎓 Luluskan Semua</button>
         </div>
 
         <div class="tw">
@@ -45,12 +48,17 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @php
-                        $isKelas12 = str_starts_with(strtoupper($kelasAsal), 'XII');
-                    @endphp
                     @forelse($siswaList as $idx => $s)
                     @php
-                        $defaultTujuan = $nextKelasMap[$kelasAsal] ?? '';
+                        $pilihanKeputusan = $isKelas12 ? ['Lulus', 'Tinggal', 'Keluar'] : ['Naik', 'Tinggal', 'Keluar'];
+                        $keputusanLama = old("keputusan.{$s->id}");
+                        $keputusan = is_string($keputusanLama) && in_array($keputusanLama, $pilihanKeputusan, true)
+                            ? $keputusanLama
+                            : ($isKelas12 ? 'Lulus' : 'Naik');
+                        $tujuanLama = old("kelas_tujuan.{$s->id}");
+                        $defaultTujuan = is_string($tujuanLama) && in_array($tujuanLama, $kelasNaikList, true)
+                            ? $tujuanLama
+                            : ($nextKelasMap[$kelasAsal] ?? '');
                     @endphp
                     <tr>
                         <td style="text-align:center;color:var(--mu);font-size:12px">{{ $idx + 1 }}</td>
@@ -64,28 +72,32 @@
                         <td>
                             <select name="keputusan[{{ $s->id }}]" class="sel-keputusan" data-id="{{ $s->id }}" onchange="updateTargetKelas(this, '{{ $s->id }}')" style="width:100%;font-weight:700;font-size:13px">
                                 @if($isKelas12)
-                                    <option value="Lulus" selected>🎓 Lulus</option>
-                                    <option value="Tinggal">⏹ Tinggal</option>
-                                    <option value="Keluar">✕ Keluar</option>
+                                    <option value="Lulus" {{ $keputusan === 'Lulus' ? 'selected' : '' }}>🎓 Lulus</option>
+                                    <option value="Tinggal" {{ $keputusan === 'Tinggal' ? 'selected' : '' }}>⏹ Tinggal</option>
+                                    <option value="Keluar" {{ $keputusan === 'Keluar' ? 'selected' : '' }}>✕ Keluar</option>
                                 @else
-                                    <option value="Naik" selected>⬆ Naik</option>
-                                    <option value="Tinggal">⏹ Tinggal</option>
-                                    <option value="Keluar">✕ Keluar</option>
+                                    <option value="Naik" {{ $keputusan === 'Naik' ? 'selected' : '' }}>⬆ Naik</option>
+                                    <option value="Tinggal" {{ $keputusan === 'Tinggal' ? 'selected' : '' }}>⏹ Tinggal</option>
+                                    <option value="Keluar" {{ $keputusan === 'Keluar' ? 'selected' : '' }}>✕ Keluar</option>
                                 @endif
                             </select>
                         </td>
                         <td>
                             <div id="target-wrap-{{ $s->id }}">
                                 @if($isKelas12)
-                                    <span class="bd" style="background:#ecfdf5;color:#059669;border:1px solid #a7f3d0;font-weight:700">Lulus (Otomatis Masuk Alumni)</span>
+                                    <span class="bd target-status target-status-lulus {{ $keputusan === 'Lulus' ? '' : 'target-status-hidden' }}" style="background:#ecfdf5;color:#059669;border:1px solid #a7f3d0;font-weight:700">Lulus (Otomatis Masuk Alumni)</span>
+                                    <span class="bd w target-status target-status-tinggal {{ $keputusan === 'Tinggal' ? '' : 'target-status-hidden' }}">{{ $kelasAsal }} (Tinggal di Kelas Asal)</span>
+                                    <span class="target-status target-status-keluar {{ $keputusan === 'Keluar' ? '' : 'target-status-hidden' }}" style="color:var(--mu)">— (Keluar Sekolah)</span>
                                 @else
-                                    <select name="kelas_tujuan[{{ $s->id }}]" class="sel-tujuan" style="width:100%;max-width:240px">
+                                    <select name="kelas_tujuan[{{ $s->id }}]" class="sel-tujuan" style="width:100%;max-width:240px;{{ $keputusan === 'Naik' ? '' : 'display:none' }}" {{ $keputusan === 'Naik' ? '' : 'disabled' }}>
                                         @forelse($kelasNaikList as $kt)
                                             <option value="{{ $kt }}" {{ $defaultTujuan === $kt ? 'selected' : '' }}>{{ $kt }}</option>
                                         @empty
                                             <option value="" selected disabled>Belum ada kelas tujuan tingkat berikutnya</option>
                                         @endforelse
                                     </select>
+                                    <span class="bd w target-status target-status-tinggal {{ $keputusan === 'Tinggal' ? '' : 'target-status-hidden' }}">{{ $kelasAsal }} (Tinggal di Kelas Asal)</span>
+                                    <span class="target-status target-status-keluar {{ $keputusan === 'Keluar' ? '' : 'target-status-hidden' }}" style="color:var(--mu)">— (Keluar Sekolah)</span>
                                 @endif
                             </div>
                         </td>
@@ -137,13 +149,17 @@ function updateTargetKelas(sel, id) {
     var wrap = document.getElementById('target-wrap-' + id);
     if (!wrap) return;
 
-    if (val === 'Lulus') {
-        wrap.innerHTML = '<span class="bd" style="background:#ecfdf5;color:#059669;border:1px solid #a7f3d0;font-weight:700">Lulus (Masuk Alumni)</span>';
-    } else if (val === 'Tinggal') {
-        wrap.innerHTML = '<span class="bd w">{{ $kelasAsal }} (Tinggal di Kelas Asal)</span>';
-    } else if (val === 'Keluar') {
-        wrap.innerHTML = '<span style="color:var(--mu)">— (Keluar Sekolah)</span>';
+    var targetSelect = wrap.querySelector('.sel-tujuan');
+    if (targetSelect) {
+        var isNaik = val === 'Naik';
+        targetSelect.style.display = isNaik ? '' : 'none';
+        targetSelect.disabled = !isNaik;
     }
+
+    var statusClass = 'target-status-' + val.toLowerCase();
+    wrap.querySelectorAll('.target-status').forEach(function(status) {
+        status.classList.toggle('target-status-hidden', !status.classList.contains(statusClass));
+    });
 }
 </script>
 @endpush
