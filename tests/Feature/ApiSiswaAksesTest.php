@@ -2,12 +2,15 @@
 
 namespace Tests\Feature;
 
+use App\Models\Auth\AkunSiswa;
 use App\Models\Auth\Pengguna;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Barryvdh\DomPDF\PDF as DomPdf;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Mail\Message;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Schema;
 use Mockery;
@@ -17,10 +20,7 @@ use Tests\TestCase;
 #[RunTestsInSeparateProcesses]
 class ApiSiswaAksesTest extends TestCase
 {
-    private const TABLES = [
-        'akun_perangkat_login',
-        'akun_notifikasi',
-        'personal_access_tokens',
+    private const MAIN_TABLES = [
         'siswa_ekskul',
         'siswa_kehadiran',
         'siswa_nilai',
@@ -32,13 +32,18 @@ class ApiSiswaAksesTest extends TestCase
         'sekolah_tahun_ajaran',
         'siswa_biodata',
         'akun_pengguna',
+        'akun_perangkat_login',
+        'akun_notifikasi',
+        'akun_kode_otp',
+        'personal_access_tokens',
+        'akun_siswa',
     ];
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        foreach (self::TABLES as $table) {
+        foreach (self::MAIN_TABLES as $table) {
             Schema::dropIfExists($table);
         }
 
@@ -53,6 +58,20 @@ class ApiSiswaAksesTest extends TestCase
             $table->unsignedBigInteger('siswa_id')->nullable();
             $table->boolean('wajib_ganti_password')->default(false);
             $table->timestamp('email_diverifikasi_at')->nullable();
+            $table->rememberToken();
+            $table->timestamps();
+        });
+
+        Schema::create('akun_siswa', function (Blueprint $table): void {
+            $table->id();
+            $table->string('username')->unique();
+            $table->string('email')->nullable()->unique();
+            $table->timestamp('email_diverifikasi_at')->nullable();
+            $table->string('password');
+            $table->boolean('aktif')->default(true);
+            $table->unsignedBigInteger('siswa_id')->unique();
+            $table->boolean('wajib_ganti_password')->default(false);
+            $table->timestamp('terakhir_login_at')->nullable();
             $table->rememberToken();
             $table->timestamps();
         });
@@ -157,7 +176,8 @@ class ApiSiswaAksesTest extends TestCase
 
         Schema::create('akun_notifikasi', function (Blueprint $table): void {
             $table->id();
-            $table->unsignedBigInteger('pengguna_id');
+            $table->unsignedBigInteger('pengguna_id')->nullable();
+            $table->unsignedBigInteger('akun_siswa_id')->nullable();
             $table->string('judul');
             $table->text('isi')->nullable();
             $table->string('jenis');
@@ -166,15 +186,27 @@ class ApiSiswaAksesTest extends TestCase
 
         Schema::create('akun_perangkat_login', function (Blueprint $table): void {
             $table->id();
-            $table->unsignedBigInteger('pengguna_id');
+            $table->unsignedBigInteger('pengguna_id')->nullable();
+            $table->unsignedBigInteger('akun_siswa_id')->nullable();
             $table->unsignedBigInteger('token_id')->nullable();
+            $table->timestamp('created_at')->nullable();
+        });
+
+        Schema::create('akun_kode_otp', function (Blueprint $table): void {
+            $table->id();
+            $table->string('email');
+            $table->string('tujuan');
+            $table->string('kode_hash');
+            $table->unsignedTinyInteger('percobaan')->default(0);
+            $table->timestamp('berlaku_sampai');
+            $table->timestamp('dipakai_at')->nullable();
             $table->timestamp('created_at')->nullable();
         });
     }
 
     protected function tearDown(): void
     {
-        foreach (self::TABLES as $table) {
+        foreach (self::MAIN_TABLES as $table) {
             Schema::dropIfExists($table);
         }
 
@@ -281,6 +313,55 @@ class ApiSiswaAksesTest extends TestCase
         ])->assertStatus(429);
     }
 
+    public function test_mobile_registration_creates_account_only_in_student_account_table(): void
+    {
+        Mail::shouldReceive('raw')
+            ->once()
+            ->withArgs(function (string $content, callable $callback): bool {
+                $message = Mockery::mock(Message::class);
+                $message->shouldReceive('to')->once()->with('siswa@example.test')->andReturnSelf();
+                $message->shouldReceive('subject')->once()->with('Kode Verifikasi JosBook')->andReturnSelf();
+                $callback($message);
+
+                return true;
+            });
+
+        $this->createStudent('Siswa Pendaftar', '1234567890');
+
+        $this->postJson('/api/v1/daftar', [
+            'nama' => 'Siswa Pendaftar',
+            'nisn' => '1234567890',
+            'email' => 'siswa@example.test',
+            'password' => 'password-rahasia',
+        ])->assertCreated();
+
+        $this->assertSame(
+            1,
+            DB::table('akun_siswa')->where('username', '1234567890')->count()
+        );
+        $this->assertSame(
+            1,
+            DB::table('akun_kode_otp')->where('email', 'siswa@example.test')->count()
+        );
+        $this->assertDatabaseMissing('akun_pengguna', ['username' => '1234567890']);
+    }
+
+    public function test_mobile_login_does_not_authenticate_web_accounts(): void
+    {
+        Pengguna::query()->create([
+            'peran' => 'admin',
+            'username' => 'admin-web',
+            'email' => 'admin@example.test',
+            'password' => 'password-rahasia',
+            'aktif' => true,
+        ]);
+
+        $this->postJson('/api/v1/login', [
+            'username' => 'admin-web',
+            'password' => 'password-rahasia',
+        ])->assertUnauthorized();
+    }
+
     private function createStudent(string $name, string $nisn): int
     {
         return (int) DB::table('siswa_biodata')->insertGetId([
@@ -291,10 +372,9 @@ class ApiSiswaAksesTest extends TestCase
         ]);
     }
 
-    private function createStudentAccount(string $username, int $studentId): Pengguna
+    private function createStudentAccount(string $username, int $studentId): AkunSiswa
     {
-        return Pengguna::query()->create([
-            'peran' => 'siswa',
+        return AkunSiswa::query()->create([
             'username' => $username,
             'email' => $username.'@example.test',
             'password' => 'test-password',

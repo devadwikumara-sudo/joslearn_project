@@ -2814,6 +2814,27 @@ class ImportStudentMatchingTest extends TestCase
         $this->assertSame([], array_values(array_intersect($activeIds, $alumniIds)));
     }
 
+    public function test_alumni_export_downloads_a_formatted_workbook_with_text_identifiers(): void
+    {
+        $this->makeGraduatedAlumni(1, '2025', 1);
+
+        $response = $this->actingAs($this->admin)
+            ->get(route('admin.alumni.export', ['aj' => 'Alumni (Lulus)']));
+
+        $response->assertOk()
+            ->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+
+        $workbook = IOFactory::load($response->baseResponse->getFile()->getPathname());
+        $sheet = $workbook->getActiveSheet();
+
+        $this->assertSame('Kontrol Induk Alumni', $sheet->getTitle());
+        $this->assertSame('Nama Sama', $sheet->getCell('C2')->getValue());
+        $this->assertSame('0000000001', $sheet->getCell('D2')->getValue());
+        $this->assertSame('s', $sheet->getCell('D2')->getDataType());
+        $this->assertSame('A1:V2', $sheet->getAutoFilter()->getRange());
+        $workbook->disconnectWorksheets();
+    }
+
     public function test_alumni_page_combines_graduates_and_exits_with_control_and_tracking_statuses(): void
     {
         DB::table('siswa_biodata')->where('id', 1)->update([

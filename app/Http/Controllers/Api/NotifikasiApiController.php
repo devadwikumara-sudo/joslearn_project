@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
@@ -19,11 +20,11 @@ class NotifikasiApiController extends Controller
     public static function buat(int $penggunaId, string $judul, ?string $isi = null, string $jenis = 'info'): void
     {
         DB::table('akun_notifikasi')->insert([
-            'pengguna_id' => $penggunaId,
-            'judul'       => $judul,
-            'isi'         => $isi,
-            'jenis'       => $jenis,
-            'created_at'  => now(),
+            'akun_siswa_id' => $penggunaId,
+            'judul' => $judul,
+            'isi' => $isi,
+            'jenis' => $jenis,
+            'created_at' => now(),
         ]);
     }
 
@@ -33,17 +34,17 @@ class NotifikasiApiController extends Controller
     public static function terbaru(int $penggunaId, int $batas = 50): array
     {
         return DB::table('akun_notifikasi')
-            ->where('pengguna_id', $penggunaId)
+            ->where('akun_siswa_id', $penggunaId)
             ->orderByDesc('id')
             ->limit($batas)
             ->get()
             ->map(fn ($n) => [
-                'id'     => $n->id,
-                'judul'  => $n->judul,
-                'isi'    => $n->isi,
-                'jenis'  => $n->jenis,
+                'id' => $n->id,
+                'judul' => $n->judul,
+                'isi' => $n->isi,
+                'jenis' => $n->jenis,
                 'dibaca' => $n->dibaca_at !== null,
-                'waktu'  => $n->created_at,
+                'waktu' => $n->created_at,
             ])
             ->all();
     }
@@ -58,8 +59,8 @@ class NotifikasiApiController extends Controller
         return response()->json([
             'data' => [
                 'belum_dibaca' => DB::table('akun_notifikasi')
-                    ->where('pengguna_id', $id)->whereNull('dibaca_at')->count(),
-                'notifikasi'   => self::terbaru($id),
+                    ->where('akun_siswa_id', $id)->whereNull('dibaca_at')->count(),
+                'notifikasi' => self::terbaru($id),
             ],
         ]);
     }
@@ -70,7 +71,7 @@ class NotifikasiApiController extends Controller
     public function baca(Request $request): JsonResponse
     {
         DB::table('akun_notifikasi')
-            ->where('pengguna_id', $request->user()->id)
+            ->where('akun_siswa_id', $request->user()->id)
             ->whereNull('dibaca_at')
             ->update(['dibaca_at' => now()]);
 

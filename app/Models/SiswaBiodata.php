@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Models\Auth\Pengguna;
+use App\Models\Auth\AkunSiswa;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -48,9 +48,9 @@ class SiswaBiodata extends Model
         return $this->hasMany(SiswaPelacakanAlumni::class, 'siswa_id')->orderBy('id', 'asc');
     }
 
-    public function pengguna(): HasOne
+    public function akunSiswa(): HasOne
     {
-        return $this->hasOne(Pengguna::class, 'siswa_id');
+        return $this->hasOne(AkunSiswa::class, 'siswa_id');
     }
 
     public function berkas(): HasMany

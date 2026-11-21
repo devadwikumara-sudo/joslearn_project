@@ -1,7 +1,8 @@
 <?php
+
 namespace Database\Seeders;
 
-use App\Models\Auth\Pengguna;
+use App\Models\Auth\AkunSiswa;
 use App\Models\SiswaBiodata;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
@@ -25,22 +26,22 @@ class AkunSiswaSeeder extends Seeder
 
         SiswaBiodata::query()->orderBy('id')->chunkById(100, function ($kumpulan) use (&$dibuat, &$dilewati) {
             foreach ($kumpulan as $siswa) {
-                $sudahAda = Pengguna::where('siswa_id', $siswa->id)
+                $sudahAda = AkunSiswa::where('siswa_id', $siswa->id)
                     ->orWhere('username', $siswa->nisn)
                     ->exists();
 
                 if (empty($siswa->tanggal_lahir) || $sudahAda) {
                     $dilewati++;
+
                     continue;
                 }
 
-                Pengguna::create([
-                    'peran'                => 'siswa',
-                    'username'             => $siswa->nisn,
-                    'email'                => null,
-                    'password'             => Hash::make(Carbon::parse($siswa->tanggal_lahir)->format('dmY')),
-                    'aktif'                => true,
-                    'siswa_id'             => $siswa->id,
+                AkunSiswa::create([
+                    'username' => $siswa->nisn,
+                    'email' => null,
+                    'password' => Hash::make(Carbon::parse($siswa->tanggal_lahir)->format('dmY')),
+                    'aktif' => true,
+                    'siswa_id' => $siswa->id,
                     'wajib_ganti_password' => true,
                 ]);
 

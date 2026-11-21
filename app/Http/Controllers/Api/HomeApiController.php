@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
@@ -19,7 +20,7 @@ class HomeApiController extends Controller
     public function index(Request $request): JsonResponse
     {
         $pengguna = $request->user();
-        $siswa    = $pengguna->siswa;
+        $siswa = $pengguna->siswa;
 
         if (! $siswa) {
             return response()->json(['pesan' => 'Data siswa tidak ditemukan.'], 404);
@@ -41,16 +42,16 @@ class HomeApiController extends Controller
 
         return response()->json([
             'data' => [
-                'nama'          => $siswa->nama_lengkap,
+                'nama' => $siswa->nama_lengkap,
                 'nama_panggilan' => $siswa->nama_panggilan,
-                'nisn'          => $siswa->nisn,
-                'kelas'         => $riwayat?->kelas?->nama,
-                'status'        => $riwayat?->status,
-                'tahun_ajaran'  => $ta?->nama,
-                'semester'      => $semester,
-                'foto_url'      => $siswa->foto ? url('/api/v1/profil/foto') : null,
-                'belum_dibaca'  => DB::table('akun_notifikasi')
-                    ->where('pengguna_id', $pengguna->id)->whereNull('dibaca_at')->count(),
+                'nisn' => $siswa->nisn,
+                'kelas' => $riwayat?->kelas?->nama,
+                'status' => $riwayat?->status,
+                'tahun_ajaran' => $ta?->nama,
+                'semester' => $semester,
+                'foto_url' => $siswa->foto ? url('/api/v1/profil/foto') : null,
+                'belum_dibaca' => DB::table('akun_notifikasi')
+                    ->where('akun_siswa_id', $pengguna->id)->whereNull('dibaca_at')->count(),
                 'aktivitas_terbaru' => NotifikasiApiController::terbaru($pengguna->id, 3),
             ],
         ]);

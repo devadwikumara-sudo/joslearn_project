@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exports\FormattedTableExport;
 use App\Http\Controllers\Controller;
 use App\Models\Admin\CatatanAktivitas;
 use App\Models\SekolahKelas;
@@ -18,7 +19,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
-use RuntimeException;
+use Maatwebsite\Excel\Excel as ExcelWriter;
+use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -134,7 +136,7 @@ class DataSiswaController extends Controller
         return redirect()->route('admin.import', ['tab' => 'siswa']);
     }
 
-    public function export(Request $request): StreamedResponse
+    public function export(Request $request): BinaryFileResponse
     {
         $taAktifId = $this->selectedAcademicYearId($request);
         $kelasSelected = (string) $request->input('kelas', '');
@@ -148,34 +150,32 @@ class DataSiswaController extends Controller
             ->orderBy('nama_lengkap')
             ->get();
 
-        return response()->streamDownload(function () use ($siswaList): void {
-            $output = fopen('php://output', 'w');
-            if ($output === false) {
-                throw new RuntimeException('Tidak dapat membuka output ekspor data siswa.');
-            }
+        $rows = $siswaList->map(function (SiswaBiodata $siswa): array {
+            $riwayat = $siswa->riwayatKelas->first();
 
-            fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
-            fputcsv($output, ['NISN', 'NIS', 'Nama', 'Kelas', 'Jenis Kelamin', 'Tempat Lahir', 'Tanggal Lahir', 'Agama', 'Status']);
+            return [
+                $siswa->nisn,
+                $siswa->nomor_induk,
+                $siswa->nama_lengkap,
+                $riwayat?->kelas?->nama ?? '-',
+                $siswa->jenis_kelamin,
+                $siswa->tempat_lahir,
+                $siswa->tanggal_lahir,
+                $siswa->agama,
+                $riwayat?->status ?? '-',
+            ];
+        })->all();
 
-            foreach ($siswaList as $siswa) {
-                $riwayat = $siswa->riwayatKelas->first();
-                fputcsv($output, [
-                    $siswa->nisn,
-                    $siswa->nomor_induk,
-                    $siswa->nama_lengkap,
-                    $riwayat?->kelas?->nama ?? '-',
-                    $siswa->jenis_kelamin,
-                    $siswa->tempat_lahir,
-                    $siswa->tanggal_lahir,
-                    $siswa->agama,
-                    $riwayat?->status ?? '-',
-                ]);
-            }
-
-            fclose($output);
-        }, 'data-siswa-'.now()->format('Ymd-His').'.csv', [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-        ]);
+        return Excel::download(
+            new FormattedTableExport(
+                'Data Siswa',
+                ['NISN', 'NIS', 'Nama', 'Kelas', 'Jenis Kelamin', 'Tempat Lahir', 'Tanggal Lahir', 'Agama', 'Status'],
+                $rows,
+                ['A' => 16, 'B' => 16, 'C' => 32, 'D' => 18, 'E' => 18, 'F' => 22, 'G' => 18, 'H' => 18, 'I' => 20]
+            ),
+            'data-siswa-'.now()->format('Ymd-His').'.xlsx',
+            ExcelWriter::XLSX
+        );
     }
 
     public function pdf(Request $request, int $id): Response

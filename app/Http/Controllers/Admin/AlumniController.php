@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exports\FormattedTableExport;
 use App\Http\Controllers\Controller;
 use App\Models\Admin\CatatanAktivitas;
 use App\Models\SekolahKelas;
@@ -14,7 +15,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use Maatwebsite\Excel\Excel as ExcelWriter;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class AlumniController extends Controller
 {
@@ -440,7 +443,7 @@ class AlumniController extends Controller
             ->with('success', "Kelulusan {$siswa->nama_lengkap} berhasil dibatalkan.");
     }
 
-    public function export(Request $request): StreamedResponse
+    public function export(Request $request): BinaryFileResponse
     {
         $rows = $this->filteredAlumniQuery(
             $this->selectedType($request),
@@ -453,61 +456,52 @@ class AlumniController extends Controller
             ->orderBy('id')
             ->get();
 
-        $headers = [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="alumni-kontrol-induk-'.date('Ymd-His').'.csv"',
+        $headings = [
+            'No', 'Induk', 'Nama Peserta Didik', 'NISN', 'Jenis Registrasi',
+            'Tanggal Masuk', 'Masuk Kelas', 'Sekolah Asal SMP', 'Keluar Karena',
+            'Tanggal Keluar', 'Keluar Kelas', 'Sekolah Tujuan', 'Nomor Peserta PSAJ',
+            'Nomor SKL', 'Nomor Ijazah Nasional', 'Tgl Pengesahan Ijazah',
+            'Nomor Transkrip Nilai', 'Melanjutkan Studi / Bekerja', 'Tahun Lulus', 'Status',
+            'Kelengkapan Kontrol Induk', 'Status Pelacakan',
         ];
+        $exportRows = $rows->values()->map(function (SiswaBiodata $siswa, int $index): array {
+            $latestTracking = $siswa->pelacakan->last();
+            $isGraduated = $siswa->isGraduated();
+            $trackingStatus = $latestTracking
+                ? trim($latestTracking->jenis.' · '.$latestTracking->nama_tempat.' ('.$latestTracking->tahun.')')
+                : 'Belum dilacak';
 
-        $callback = function () use ($rows): void {
-            $output = fopen('php://output', 'w');
-            fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
+            return [
+                $index + 1,
+                $siswa->nomor_induk ?: '-',
+                $siswa->nama_lengkap ?: '-',
+                $siswa->nisn ?: '-',
+                $siswa->jenis_registrasi ?: '-',
+                $siswa->tanggal_diterima ?: '-',
+                $this->acceptedClassDisplay($siswa) ?: '-',
+                $siswa->sekolah_asal ?: '-',
+                $siswa->alasan_keluar ?: '-',
+                $siswa->tanggal_keluar ?: '-',
+                $siswa->kelas_keluar ?: '-',
+                $siswa->sekolah_tujuan ?: '-',
+                $siswa->nomor_peserta_psaj ?: '-',
+                $siswa->nomor_skl ?: '-',
+                $siswa->nomor_ijazah_sma ?: '-',
+                $siswa->tanggal_ijazah_sma ?: '-',
+                $siswa->nomor_transkrip ?: '-',
+                $siswa->kegiatan_setelah_lulus ?: '-',
+                $siswa->tahun_lulus ?: ($siswa->tanggal_keluar ? substr($siswa->tanggal_keluar, 0, 4) : '-'),
+                $isGraduated ? 'Lulus' : ($siswa->alasan_keluar ?: 'Pindah/Keluar'),
+                $this->controlIndukCompleteness($siswa, $isGraduated).'%',
+                $trackingStatus,
+            ];
+        })->all();
 
-            fputcsv($output, [
-                'No', 'Induk', 'Nama Peserta Didik', 'NISN', 'Jenis Registrasi',
-                'Tanggal Masuk', 'Masuk Kelas', 'Sekolah Asal SMP', 'Keluar Karena',
-                'Tanggal Keluar', 'Keluar Kelas', 'Sekolah Tujuan', 'Nomor Peserta PSAJ',
-                'Nomor SKL', 'Nomor Ijazah Nasional', 'Tgl Pengesahan Ijazah',
-                'Nomor Transkrip Nilai', 'Melanjutkan Studi / Bekerja', 'Tahun Lulus', 'Status',
-                'Kelengkapan Kontrol Induk', 'Status Pelacakan',
-            ]);
-
-            foreach ($rows as $index => $siswa) {
-                $latestTracking = $siswa->pelacakan->last();
-                $isGraduated = $siswa->isGraduated();
-                $masukKelas = $this->acceptedClassDisplay($siswa);
-                $trackingStatus = $latestTracking
-                    ? trim($latestTracking->jenis.' · '.$latestTracking->nama_tempat.' ('.$latestTracking->tahun.')')
-                    : 'Belum dilacak';
-
-                fputcsv($output, [
-                    $index + 1,
-                    $siswa->nomor_induk ?: '-',
-                    $siswa->nama_lengkap ?: '-',
-                    $siswa->nisn ?: '-',
-                    $siswa->jenis_registrasi ?: '-',
-                    $siswa->tanggal_diterima ?: '-',
-                    $masukKelas ?: '-',
-                    $siswa->sekolah_asal ?: '-',
-                    $siswa->alasan_keluar ?: '-',
-                    $siswa->tanggal_keluar ?: '-',
-                    $siswa->kelas_keluar ?: '-',
-                    $siswa->sekolah_tujuan ?: '-',
-                    $siswa->nomor_peserta_psaj ?: '-',
-                    $siswa->nomor_skl ?: '-',
-                    $siswa->nomor_ijazah_sma ?: '-',
-                    $siswa->tanggal_ijazah_sma ?: '-',
-                    $siswa->nomor_transkrip ?: '-',
-                    $siswa->kegiatan_setelah_lulus ?: '-',
-                    $siswa->tahun_lulus ?: ($siswa->tanggal_keluar ? substr($siswa->tanggal_keluar, 0, 4) : '-'),
-                    $isGraduated ? 'Lulus' : ($siswa->alasan_keluar ?: 'Pindah/Keluar'),
-                    $this->controlIndukCompleteness($siswa, $isGraduated).'%',
-                    $trackingStatus,
-                ]);
-            }
-            fclose($output);
-        };
-
-        return response()->stream($callback, 200, $headers);
+        return Excel::download(
+            new FormattedTableExport('Kontrol Induk Alumni', $headings, $exportRows),
+            'alumni-kontrol-induk-'.now()->format('Ymd-His').'.xlsx',
+            ExcelWriter::XLSX
+        );
     }
 
     public function bulkDestroy(Request $request): RedirectResponse

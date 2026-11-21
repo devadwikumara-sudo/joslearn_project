@@ -24,15 +24,16 @@ class OtpService
     public function buatDanKirim(string $email, string $tujuan): string
     {
         $kode = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        $connection = DB::connection();
 
-        DB::transaction(function () use ($email, $tujuan, $kode): void {
-            DB::table('akun_kode_otp')
+        $connection->transaction(function () use ($connection, $email, $tujuan, $kode): void {
+            $connection->table('akun_kode_otp')
                 ->where('email', $email)
                 ->where('tujuan', $tujuan)
                 ->whereNull('dipakai_at')
                 ->update(['dipakai_at' => now()]);
 
-            DB::table('akun_kode_otp')->insert([
+            $connection->table('akun_kode_otp')->insert([
                 'email' => $email,
                 'tujuan' => $tujuan,
                 'kode_hash' => Hash::make($kode),
@@ -56,8 +57,10 @@ class OtpService
 
     public function verifikasi(string $email, string $tujuan, string $kode): string
     {
-        return DB::transaction(function () use ($email, $tujuan, $kode): string {
-            $otp = DB::table('akun_kode_otp')
+        $connection = DB::connection();
+
+        return $connection->transaction(function () use ($connection, $email, $tujuan, $kode): string {
+            $otp = $connection->table('akun_kode_otp')
                 ->where('email', $email)
                 ->where('tujuan', $tujuan)
                 ->whereNull('dipakai_at')
@@ -74,12 +77,12 @@ class OtpService
             }
 
             if (! Hash::check($kode, $otp->kode_hash)) {
-                DB::table('akun_kode_otp')->where('id', $otp->id)->increment('percobaan');
+                $connection->table('akun_kode_otp')->where('id', $otp->id)->increment('percobaan');
 
                 return self::SALAH;
             }
 
-            DB::table('akun_kode_otp')->where('id', $otp->id)->update(['dipakai_at' => now()]);
+            $connection->table('akun_kode_otp')->where('id', $otp->id)->update(['dipakai_at' => now()]);
 
             return self::BERHASIL;
         });

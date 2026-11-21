@@ -9,6 +9,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Mockery;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use Tests\TestCase;
 
 class DataSiswaGuruTest extends TestCase
@@ -97,10 +98,20 @@ class DataSiswaGuruTest extends TestCase
         $response = $this->actingAs($this->createAccount('guru'))
             ->get(route('guru.data-siswa.export', ['kelas' => 'X-1']));
 
-        $response->assertOk();
-        $content = $response->streamedContent();
-        $this->assertStringContainsString('Siswa Satu', $content);
-        $this->assertStringNotContainsString('Siswa Dua', $content);
+        $response->assertOk()
+            ->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        $this->assertStringContainsString('.xlsx', (string) $response->headers->get('content-disposition'));
+
+        $workbook = IOFactory::load($response->baseResponse->getFile()->getPathname());
+        $sheet = $workbook->getActiveSheet();
+        $rows = $sheet->toArray();
+
+        $this->assertSame('NISN', $rows[0][0]);
+        $this->assertSame('Siswa Satu', $sheet->getCell('C2')->getValue());
+        $this->assertSame('A1:J2', $sheet->getAutoFilter()->getRange());
+        $this->assertSame('A2', $sheet->getFreezePane());
+        $this->assertSame('17365D', $sheet->getStyle('A1')->getFill()->getStartColor()->getRGB());
+        $workbook->disconnectWorksheets();
     }
 
     public function test_teacher_student_list_excludes_graduated_and_transferred_students(): void

@@ -9,6 +9,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
@@ -159,9 +160,17 @@ class SettingWorkflowTest extends TestCase
             ->assertSee('lf=admin', false)
             ->assertSee('lq=cocok', false);
 
-        $this->get(route('admin.log-aktivitas.export', ['lf' => 'admin', 'lq' => 'cocok']))
+        $response = $this->get(route('admin.log-aktivitas.export', ['lf' => 'admin', 'lq' => 'cocok']))
             ->assertOk()
-            ->assertHeader('Content-Type', 'text/csv; charset=UTF-8');
+            ->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+
+        $workbook = IOFactory::load($response->baseResponse->getFile()->getPathname());
+        $sheet = $workbook->getActiveSheet();
+
+        $this->assertSame(['Waktu', 'Pengguna', 'Aktivitas'], $sheet->toArray()[0]);
+        $this->assertSame('A1:C27', $sheet->getAutoFilter()->getRange());
+        $this->assertSame('A2', $sheet->getFreezePane());
+        $workbook->disconnectWorksheets();
     }
 
     public function test_year_tab_changes_the_active_year(): void
@@ -521,6 +530,7 @@ class SettingWorkflowTest extends TestCase
             'catatan_cadangan',
             'catatan_aktivitas',
             'akun_pengguna',
+            'akun_siswa',
             'personal_access_tokens',
         ];
 
@@ -611,6 +621,9 @@ class SettingWorkflowTest extends TestCase
                 'pengguna_id' => 'integer', 'peran' => 'string', 'aksi' => 'string',
                 'keterangan' => 'string', 'objek_tipe' => 'string', 'objek_id' => 'integer',
                 'alamat_ip' => 'string',
+            ],
+            'akun_siswa' => [
+                'username' => 'string', 'email' => 'string', 'siswa_id' => 'integer',
             ],
         ];
 

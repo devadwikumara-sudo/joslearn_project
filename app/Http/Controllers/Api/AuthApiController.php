@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Auth\Pengguna;
+use App\Models\Auth\AkunSiswa;
 use App\Models\SiswaBiodata;
 use App\Services\OtpService;
 use Illuminate\Contracts\Encryption\DecryptException;
@@ -54,7 +54,7 @@ class AuthApiController extends Controller
             return $this->gagal("Terlalu banyak percobaan login. Coba lagi dalam {$detik} detik.", 429, 'terlalu_banyak');
         }
 
-        $pengguna = Pengguna::where('username', $input)
+        $pengguna = AkunSiswa::where('username', $input)
             ->orWhere('email', $input)
             ->first();
 
@@ -66,10 +66,6 @@ class AuthApiController extends Controller
 
         RateLimiter::clear($kunci);
 
-        if ($pengguna->peran !== 'siswa') {
-            return $this->gagal('Aplikasi mobile khusus untuk siswa. Admin dan guru silakan masuk lewat portal web.', 403, 'bukan_siswa');
-        }
-
         if (! $pengguna->aktif) {
             return $pengguna->email_diverifikasi_at
                 ? $this->gagal('Akun Anda dinonaktifkan. Silakan hubungi administrator sekolah.', 403, 'akun_nonaktif')
@@ -80,7 +76,7 @@ class AuthApiController extends Controller
 
         // Catat perangkat untuk layar "Sesi Aktif"
         DB::table('akun_perangkat_login')->insert([
-            'pengguna_id' => $pengguna->id,
+            'akun_siswa_id' => $pengguna->id,
             'token_id' => $token->accessToken->id,
             'nama_perangkat' => $data['nama_perangkat'] ?? null,
             'alamat_ip' => $request->ip(),
@@ -137,14 +133,14 @@ class AuthApiController extends Controller
             return $this->gagal('Data tidak cocok dengan data siswa di sekolah. Periksa kembali nama dan NISN Anda.', 422, 'register_gagal');
         }
 
-        $akun = Pengguna::where('siswa_id', $siswa->id)->orWhere('username', $nisn)->first();
+        $akun = AkunSiswa::where('siswa_id', $siswa->id)->orWhere('username', $nisn)->first();
 
         // Akun yang sudah aktif tidak boleh didaftarkan ulang
-        if ($akun && ($akun->aktif || $akun->peran !== 'siswa')) {
+        if ($akun && $akun->aktif) {
             return $this->gagal('Akun untuk NISN ini sudah terdaftar. Silakan login.', 422, 'register_gagal');
         }
 
-        $emailDipakai = Pengguna::where('email', $email)
+        $emailDipakai = AkunSiswa::where('email', $email)
             ->when($akun, fn ($q) => $q->where('id', '!=', $akun->id))
             ->exists();
 
@@ -163,8 +159,7 @@ class AuthApiController extends Controller
                 return;
             }
 
-            Pengguna::create([
-                'peran' => 'siswa',
+            AkunSiswa::create([
                 'username' => $nisn,
                 'email' => $email,
                 'password' => Hash::make($data['password']),
@@ -220,7 +215,7 @@ class AuthApiController extends Controller
             return $this->gagal('Kode verifikasi salah.', 422, 'otp_salah');
         }
 
-        $pengguna = Pengguna::where('email', $email)->where('peran', 'siswa')->first();
+        $pengguna = AkunSiswa::where('email', $email)->first();
 
         if (! $pengguna) {
             return $this->gagal('Akun tidak ditemukan.', 404);
@@ -273,7 +268,7 @@ class AuthApiController extends Controller
 
         // Jawaban selalu sama agar email yang terdaftar tidak bisa ditebak
         $kode = null;
-        if (Pengguna::where('email', $email)->where('peran', 'siswa')->exists()) {
+        if (AkunSiswa::where('email', $email)->exists()) {
             try {
                 $kode = $this->buatDanKirimOtp($email, $tujuan);
             } catch (\Throwable $e) {
@@ -303,8 +298,7 @@ class AuthApiController extends Controller
 
         $email = Str::lower(trim($data['email']));
 
-        $pengguna = Pengguna::where('email', $email)
-            ->where('peran', 'siswa')
+        $pengguna = AkunSiswa::where('email', $email)
             ->where('aktif', true)
             ->first();
 
@@ -352,7 +346,7 @@ class AuthApiController extends Controller
 
         // Keluarkan semua perangkat yang sedang login
         $pengguna->tokens()->delete();
-        DB::table('akun_perangkat_login')->where('pengguna_id', $pengguna->id)->delete();
+        DB::table('akun_perangkat_login')->where('akun_siswa_id', $pengguna->id)->delete();
 
         NotifikasiApiController::buat($pengguna->id, 'Password berhasil diganti', 'Password akun Anda telah diperbarui.');
 
@@ -418,7 +412,7 @@ class AuthApiController extends Controller
      * Token reset tanpa tabel: terenkripsi dengan APP_KEY, berisi id, masa berlaku,
      * dan sidik password lama sehingga otomatis tidak berlaku setelah password diganti.
      */
-    private function buatResetToken(Pengguna $pengguna): string
+    private function buatResetToken(AkunSiswa $pengguna): string
     {
         return Crypt::encryptString(json_encode([
             'id' => $pengguna->id,
@@ -427,7 +421,7 @@ class AuthApiController extends Controller
         ]));
     }
 
-    private function bacaResetToken(string $token): ?Pengguna
+    private function bacaResetToken(string $token): ?AkunSiswa
     {
         try {
             $isi = json_decode(Crypt::decryptString($token), true);
@@ -439,7 +433,7 @@ class AuthApiController extends Controller
             return null;
         }
 
-        $pengguna = Pengguna::where('id', $isi['id'] ?? 0)->where('peran', 'siswa')->where('aktif', true)->first();
+        $pengguna = AkunSiswa::where('id', $isi['id'] ?? 0)->where('aktif', true)->first();
 
         if (! $pengguna || ! hash_equals($isi['sidik'] ?? '', hash('sha256', $pengguna->password))) {
             return null;

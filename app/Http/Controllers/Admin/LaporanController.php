@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exports\FormattedTableExport;
 use App\Http\Controllers\Controller;
 use App\Models\SekolahKelas;
 use App\Models\SekolahTahunAjaran;
@@ -14,11 +15,13 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use Maatwebsite\Excel\Excel as ExcelWriter;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class LaporanController extends Controller
 {
-    public function index(Request $request): View|StreamedResponse
+    public function index(Request $request): View|BinaryFileResponse
     {
         $tab = $request->query('tab', 'laporan');
         abort_unless(is_string($tab) && in_array($tab, ['laporan', 'kualitas'], true), 404);
@@ -30,7 +33,7 @@ class LaporanController extends Controller
             $qualityData = $this->buildQualityData($filter);
 
             if ($request->has('export')) {
-                return $this->exportCsv($qualityData['masalah']);
+                return $this->exportExcel($qualityData['masalah']);
             }
 
             return view('admin.laporan', [
@@ -252,24 +255,28 @@ class LaporanController extends Controller
     /**
      * @param  array<int, array{jenis: string, kolom: string, siswa: string, nisn: string, masalah: string, id: int|null, siswa_ids?: array<int, int>}>  $masalah
      */
-    private function exportCsv(array $masalah): StreamedResponse
+    private function exportExcel(array $masalah): BinaryFileResponse
     {
-        $filename = 'laporan-kualitas-data-'.date('Ymd').'.csv';
-        $headers = [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
-        ];
+        $rows = array_map(
+            static fn (array $issue): array => [
+                $issue['jenis'],
+                $issue['kolom'],
+                $issue['siswa'],
+                $issue['nisn'],
+                $issue['masalah'],
+            ],
+            $masalah
+        );
 
-        $callback = function () use ($masalah): void {
-            $file = fopen('php://output', 'w');
-            fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
-            fputcsv($file, ['Jenis', 'Kolom', 'Nama Siswa', 'NISN', 'Masalah']);
-            foreach ($masalah as $issue) {
-                fputcsv($file, [$issue['jenis'], $issue['kolom'], $issue['siswa'], $issue['nisn'], $issue['masalah']]);
-            }
-            fclose($file);
-        };
-
-        return response()->stream($callback, 200, $headers);
+        return Excel::download(
+            new FormattedTableExport(
+                'Kualitas Data',
+                ['Jenis', 'Kolom', 'Nama Siswa', 'NISN', 'Masalah'],
+                $rows,
+                ['A' => 18, 'B' => 22, 'C' => 32, 'D' => 18, 'E' => 60]
+            ),
+            'laporan-kualitas-data-'.now()->format('Ymd-His').'.xlsx',
+            ExcelWriter::XLSX
+        );
     }
 }

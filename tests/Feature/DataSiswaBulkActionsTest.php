@@ -10,6 +10,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
@@ -464,12 +465,17 @@ class DataSiswaBulkActionsTest extends TestCase
         DB::table('siswa_riwayat_kelas')->where('siswa_id', $transferredStudentId)->update(['status' => 'Pindah keluar']);
 
         $response = $this->actingAs($admin)->get(route('admin.data-siswa.export'));
-        $response->assertOk();
-        $content = $response->streamedContent();
+        $response->assertOk()
+            ->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 
-        $this->assertStringContainsString('Siswa Aktif', $content);
-        $this->assertStringNotContainsString('Siswa Lulus', $content);
-        $this->assertStringNotContainsString('Siswa Pindah', $content);
+        $workbook = IOFactory::load($response->baseResponse->getFile()->getPathname());
+        $sheet = $workbook->getActiveSheet();
+        $exportedNames = array_column($sheet->toArray(), 2);
+
+        $this->assertContains('Siswa Aktif', $exportedNames);
+        $this->assertNotContains('Siswa Lulus', $exportedNames);
+        $this->assertNotContains('Siswa Pindah', $exportedNames);
+        $workbook->disconnectWorksheets();
     }
 
     public function test_dashboard_report_and_data_siswa_count_the_same_active_students(): void
@@ -541,7 +547,7 @@ class DataSiswaBulkActionsTest extends TestCase
             ->assertDontSee(route('admin.data-siswa.edit', $graduatedStudentId), false);
     }
 
-    public function test_quality_csv_and_legacy_routes_redirect_to_the_quality_tab(): void
+    public function test_quality_excel_and_legacy_routes_redirect_to_the_quality_tab(): void
     {
         $admin = $this->createAccount('admin');
         $activeStudentId = $this->createStudent('Siswa Aktif', 2, 1);
@@ -562,10 +568,16 @@ class DataSiswaBulkActionsTest extends TestCase
             'export' => 1,
         ]));
 
-        $response->assertOk();
-        $content = $response->streamedContent();
-        $this->assertStringContainsString('Siswa Aktif', $content);
-        $this->assertStringNotContainsString('Siswa Lulus', $content);
+        $response->assertOk()
+            ->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+
+        $workbook = IOFactory::load($response->baseResponse->getFile()->getPathname());
+        $sheet = $workbook->getActiveSheet();
+        $exportedNames = array_column($sheet->toArray(), 2);
+
+        $this->assertContains('Siswa Aktif', $exportedNames);
+        $this->assertNotContains('Siswa Lulus', $exportedNames);
+        $workbook->disconnectWorksheets();
     }
 
     private function createAccount(string $role): Pengguna

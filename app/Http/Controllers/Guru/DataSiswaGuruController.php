@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Guru;
 
+use App\Exports\FormattedTableExport;
 use App\Http\Controllers\Controller;
 use App\Models\SekolahKelas;
 use App\Models\SekolahTahunAjaran;
@@ -14,8 +15,9 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Collection;
 use Illuminate\View\View;
-use RuntimeException;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use Maatwebsite\Excel\Excel as ExcelWriter;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class DataSiswaGuruController extends Controller
 {
@@ -36,40 +38,38 @@ class DataSiswaGuruController extends Controller
         ));
     }
 
-    public function export(Request $request): StreamedResponse
+    public function export(Request $request): BinaryFileResponse
     {
         $filters = $this->validatedFilters($request);
         $siswa = $this->filteredStudents($filters)->get();
 
-        return response()->streamDownload(function () use ($siswa): void {
-            $output = fopen('php://output', 'w');
-            if ($output === false) {
-                throw new RuntimeException('Tidak dapat membuka output ekspor data siswa.');
-            }
+        $rows = $siswa->map(function (SiswaBiodata $murid): array {
+            $riwayat = $murid->riwayatKelas->first();
 
-            fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
-            fputcsv($output, ['NISN', 'NIS', 'Nama', 'Kelas', 'Jenis Kelamin', 'Tempat Lahir', 'Tanggal Lahir', 'Agama', 'Orang Tua', 'Status']);
+            return [
+                $murid->nisn,
+                $murid->nomor_induk,
+                $murid->nama_lengkap,
+                $riwayat?->kelas?->nama ?? '-',
+                $murid->jenis_kelamin,
+                $murid->tempat_lahir,
+                $murid->tanggal_lahir,
+                $murid->agama,
+                $murid->nama_ayah ?? $murid->nama_ibu,
+                $riwayat?->status ?? '-',
+            ];
+        })->all();
 
-            foreach ($siswa as $murid) {
-                $riwayat = $murid->riwayatKelas->first();
-                fputcsv($output, [
-                    $murid->nisn,
-                    $murid->nomor_induk,
-                    $murid->nama_lengkap,
-                    $riwayat?->kelas?->nama ?? '-',
-                    $murid->jenis_kelamin,
-                    $murid->tempat_lahir,
-                    $murid->tanggal_lahir,
-                    $murid->agama,
-                    $murid->nama_ayah ?? $murid->nama_ibu,
-                    $riwayat?->status ?? '-',
-                ]);
-            }
-
-            fclose($output);
-        }, 'data-siswa-guru-'.now()->format('Ymd-His').'.csv', [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-        ]);
+        return Excel::download(
+            new FormattedTableExport(
+                'Data Siswa',
+                ['NISN', 'NIS', 'Nama', 'Kelas', 'Jenis Kelamin', 'Tempat Lahir', 'Tanggal Lahir', 'Agama', 'Orang Tua', 'Status'],
+                $rows,
+                ['A' => 16, 'B' => 16, 'C' => 32, 'D' => 18, 'E' => 18, 'F' => 22, 'G' => 18, 'H' => 18, 'I' => 28, 'J' => 20]
+            ),
+            'data-siswa-guru-'.now()->format('Ymd-His').'.xlsx',
+            ExcelWriter::XLSX
+        );
     }
 
     public function pdfAll(Request $request): Response

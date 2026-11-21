@@ -1,6 +1,8 @@
 <?php
+
 namespace App\Http\Middleware;
 
+use App\Models\Auth\AkunSiswa;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -15,7 +17,7 @@ class EnsureSiswaOnly
     {
         $pengguna = $request->user();
 
-        if (! $pengguna || $pengguna->peran !== 'siswa' || ! $pengguna->aktif) {
+        if (! ($pengguna instanceof AkunSiswa) || ! $pengguna->aktif) {
             return response()->json([
                 'pesan' => 'Akses ini khusus untuk akun siswa yang aktif.',
             ], 403);

@@ -57,7 +57,7 @@
         </select>
     </div>
     <span class="sp"></span>
-    <a href="{{ route('admin.laporan', ['tab' => 'kualitas', 'jenis' => $filter, 'export' => 1]) }}" class="btn o">⬇ Ekspor CSV Temuan</a>
+    <a href="{{ route('admin.laporan', ['tab' => 'kualitas', 'jenis' => $filter, 'export' => 1]) }}" class="btn o">⬇ Ekspor Excel Temuan</a>
 </div>
 
 {{-- Card Tabel Temuan --}}

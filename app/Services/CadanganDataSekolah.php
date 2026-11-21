@@ -302,36 +302,43 @@ class CadanganDataSekolah
             return;
         }
 
-        $studentIds = static fn (): Builder => DB::table('akun_pengguna')
+        if (! Schema::hasTable('akun_siswa')) {
+            throw new RuntimeException('Tabel akun_siswa belum dimigrasikan.');
+        }
+
+        $studentIds = DB::table('akun_siswa')
             ->whereNotNull('siswa_id')
-            ->select('siswa_id');
-        $teacherIds = static fn (): Builder => DB::table('akun_pengguna')
+            ->pluck('siswa_id')
+            ->all();
+        $teacherIds = DB::table('akun_pengguna')
             ->whereNotNull('guru_id')
-            ->select('guru_id');
-        $studentHistoryIds = static fn (): Builder => DB::table('siswa_riwayat_kelas')
-            ->whereIn('siswa_id', $studentIds())
-            ->select('id');
+            ->pluck('guru_id')
+            ->all();
+        $studentHistoryIds = DB::table('siswa_riwayat_kelas')
+            ->whereIn('siswa_id', $studentIds)
+            ->pluck('id')
+            ->all();
 
         match ($table) {
-            'siswa_biodata' => $query->whereNotIn('id', $studentIds()),
-            'guru_biodata' => $query->whereNotIn('id', $teacherIds()),
-            'siswa_riwayat_kelas' => $query->whereNotIn('siswa_id', $studentIds()),
+            'siswa_biodata' => $query->whereNotIn('id', $studentIds),
+            'guru_biodata' => $query->whereNotIn('id', $teacherIds),
+            'siswa_riwayat_kelas' => $query->whereNotIn('siswa_id', $studentIds),
             'siswa_berkas', 'siswa_riwayat_mutasi', 'siswa_pelacakan_alumni' => $query
-                ->whereNotIn('siswa_id', $studentIds()),
+                ->whereNotIn('siswa_id', $studentIds),
             'siswa_nilai', 'siswa_kehadiran', 'siswa_ekskul' => $query
-                ->whereNotIn('riwayat_kelas_id', $studentHistoryIds()),
-            'guru_wali_kelas', 'guru_mengajar' => $query->whereNotIn('guru_id', $teacherIds()),
+                ->whereNotIn('riwayat_kelas_id', $studentHistoryIds),
+            'guru_wali_kelas', 'guru_mengajar' => $query->whereNotIn('guru_id', $teacherIds),
             'catatan_tempat_sampah' => $query
                 ->whereNotIn('id', DB::table('siswa_biodata')
-                    ->whereIn('id', $studentIds())
+                    ->whereIn('id', $studentIds)
                     ->whereNotNull('tempat_sampah_id')
                     ->select('tempat_sampah_id'))
                 ->whereNotIn('id', DB::table('guru_biodata')
-                    ->whereIn('id', $teacherIds())
+                    ->whereIn('id', $teacherIds)
                     ->whereNotNull('tempat_sampah_id')
                     ->select('tempat_sampah_id'))
                 ->whereNotIn('id', DB::table('siswa_riwayat_kelas')
-                    ->whereIn('siswa_id', $studentIds())
+                    ->whereIn('siswa_id', $studentIds)
                     ->whereNotNull('tempat_sampah_id')
                     ->select('tempat_sampah_id')),
             default => null,

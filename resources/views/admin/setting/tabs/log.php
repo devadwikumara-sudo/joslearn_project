@@ -21,7 +21,7 @@
         <button type="submit" class="btn" style="display:none"></button>
     </div>
     <span class="sp"></span>
-    <a href="{{ route('admin.log-aktivitas.export', ['lf' => $lf, 'lq' => $lq]) }}" class="btn o">⬇ Ekspor CSV Log</a>
+    <a href="{{ route('admin.log-aktivitas.export', ['lf' => $lf, 'lq' => $lq]) }}" class="btn o">⬇ Ekspor Excel Log</a>
 </form>
 
 <div class="card">
