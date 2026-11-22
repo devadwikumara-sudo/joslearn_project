@@ -2,12 +2,14 @@
    JOSBOOK AUTHENTICATION — FULL SCREEN CINEMATIC EDUCATION THEME
    Khusus Website Instansi Pendidikan SMA Negeri 1 Rejoso Nganjuk
    Konsep: Full Background Tema Pendidikan, Gradient Biru Terang,
-   Glassmorphism Elegan, Form Bersih & Tombol Cyan/Electric Blue Pill.
+   Open Frameless Layout (Tanpa Kotak Kaku), Input Glassmorphism Lebih Lega
+   & Enak Dilihat Mata, dan Tombol Cyan/Electric Blue Pill.
    ========================================================================== */
 
 :root {
     --jb-cyan-500: #06b6d4;
     --jb-cyan-400: #22d3ee;
+    --jb-cyan-300: #67e8f9;
     --jb-sky-600: #0284c7;
     --jb-sky-500: #0ea5e9;
     --jb-sky-400: #38bdf8;
@@ -30,9 +32,9 @@
     --jb-slate-200: #e2e8f0;
     --jb-slate-100: #f1f5f9;
 
-    --jb-glass-bg: rgba(255, 255, 255, 0.12);
-    --jb-glass-bg-focus: rgba(255, 255, 255, 0.2);
-    --jb-glass-border: rgba(255, 255, 255, 0.25);
+    --jb-glass-bg: rgba(255, 255, 255, 0.13);
+    --jb-glass-bg-focus: rgba(255, 255, 255, 0.22);
+    --jb-glass-border: rgba(255, 255, 255, 0.28);
     --jb-glass-border-focus: #38bdf8;
 }
 
@@ -45,18 +47,21 @@ body {
     margin: 0;
     padding: 0;
     width: 100%;
-    min-height: 100vh;
+    height: 100%;
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     -webkit-font-smoothing: antialiased;
+    background-color: var(--jb-navy-950);
+    overflow: hidden; /* Locked to 1 page on desktop, no sliding */
 }
 
 /* ==========================================================================
-   FULL-SCREEN HERO VIEWPORT
+   FULL-SCREEN HERO VIEWPORT (Locked 1 Page Fit)
    ========================================================================== */
 .jb-edu-viewport {
     position: relative;
-    width: 100vw;
-    min-height: 100vh;
+    width: 100%;
+    height: 100vh;
+    max-height: 100vh;
     background-image: url('../images/pendidikan-nganjuk-still-life.jpg');
     background-size: cover;
     background-position: center right;
@@ -64,7 +69,8 @@ body {
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    overflow-x: hidden;
+    overflow: hidden;
+    box-sizing: border-box;
 }
 
 /* Left-to-Right Cinematic Gradient Wash */
@@ -73,10 +79,10 @@ body {
     position: absolute;
     inset: 0;
     background: linear-gradient(90deg,
-            rgba(6, 21, 45, 0.94) 0%,
-            rgba(8, 31, 68, 0.90) 30%,
-            rgba(10, 47, 98, 0.78) 50%,
-            rgba(14, 116, 144, 0.38) 72%,
+            rgba(6, 21, 45, 0.96) 0%,
+            rgba(8, 31, 68, 0.92) 36%,
+            rgba(10, 47, 98, 0.80) 56%,
+            rgba(14, 116, 144, 0.38) 76%,
             rgba(2, 132, 199, 0.12) 90%,
             rgba(255, 255, 255, 0) 100%);
     pointer-events: none;
@@ -91,24 +97,26 @@ body {
     right: 0;
     width: 60%;
     height: 40%;
-    background: radial-gradient(circle at 80% 20%, rgba(254, 240, 138, 0.22) 0%, transparent 60%);
+    background: radial-gradient(circle at 80% 20%, rgba(254, 240, 138, 0.20) 0%, transparent 60%);
     pointer-events: none;
     z-index: 1;
 }
 
-/* Content Container */
+/* Main Container (Edge-to-edge frame) */
 .jb-edu-container {
     position: relative;
     z-index: 2;
     width: 100%;
-    max-width: 1360px;
+    max-width: 1440px;
     margin: 0 auto;
-    padding: 36px 48px;
+    padding: 24px 56px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    min-height: 100vh;
+    height: 100vh;
+    max-height: 100vh;
     box-sizing: border-box;
+    overflow: hidden;
 }
 
 /* ==========================================================================
@@ -118,7 +126,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 24px;
+    flex-shrink: 0;
 }
 
 .jb-edu-brand {
@@ -152,16 +160,16 @@ body {
 }
 
 .jb-edu-brand-title {
-    font-size: 19px;
+    font-size: 20px;
     font-weight: 800;
     color: #ffffff;
     letter-spacing: 0.8px;
     line-height: 1.2;
-    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 }
 
 .jb-edu-brand-subtitle {
-    font-size: 11px;
+    font-size: 11.5px;
     font-weight: 600;
     color: var(--jb-sky-300);
     letter-spacing: 0.5px;
@@ -171,12 +179,12 @@ body {
 .jb-edu-portal-badge {
     display: inline-flex;
     align-items: center;
-    gap: 7px;
+    gap: 8px;
     background: rgba(255, 255, 255, 0.12);
-    border: 1px solid rgba(255, 255, 255, 0.22);
-    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    backdrop-filter: blur(10px);
     color: #ffffff;
-    padding: 6px 14px;
+    padding: 7px 16px;
     border-radius: 9999px;
     font-size: 11.5px;
     font-weight: 700;
@@ -184,50 +192,88 @@ body {
 }
 
 .jb-edu-portal-badge .dot {
-    width: 7px;
-    height: 7px;
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
     background: #34d399;
-    box-shadow: 0 0 8px #34d399;
+    box-shadow: 0 0 10px #34d399;
 }
 
 /* ==========================================================================
-   MAIN AUTH FORM PANEL (Left Aligned)
+   CENTER STAGE / OPEN FRAMELESS PANELS (Lebih Lega, Nyaman di Mata)
    ========================================================================== */
-.jb-edu-main {
+.jb-edu-stage {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    min-height: 0;
+    padding: 10px 0;
+}
+
+/* Open Frameless Form Panel */
+.jb-edu-open-panel {
     width: 100%;
-    max-width: 440px;
-    margin: 20px 0 30px;
+    max-width: 520px; /* Lebih lega dari 480px sebelumnya */
+    display: flex;
+    flex-direction: column;
+    color: #ffffff;
+}
+
+.jb-edu-open-panel.wide {
+    max-width: 660px; /* Lebih lega dari 600px sebelumnya */
+}
+
+/* Kicker / Tag above Title */
+.jb-edu-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: #38bdf8;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+.jb-edu-kicker .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #38bdf8;
+    box-shadow: 0 0 8px #38bdf8;
 }
 
 .jb-edu-title {
-    font-size: 32px;
+    font-size: 34px;
     font-weight: 800;
     color: #ffffff;
-    margin: 0 0 8px;
+    margin: 0 0 6px;
     letter-spacing: -0.5px;
-    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+    text-shadow: 0 2px 14px rgba(0, 0, 0, 0.5);
     line-height: 1.2;
 }
 
 .jb-edu-subtitle {
-    font-size: 14px;
-    color: rgba(255, 255, 255, 0.82);
-    margin: 0 0 26px;
-    line-height: 1.5;
+    font-size: 14.5px;
+    color: rgba(255, 255, 255, 0.88);
+    margin: 0 0 22px;
+    line-height: 1.55;
     text-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
 }
 
 /* Alert Notifications */
 .jb-edu-alert-error {
-    background: rgba(239, 68, 68, 0.25);
+    background: rgba(239, 68, 68, 0.28);
     border: 1px solid rgba(248, 113, 113, 0.6);
     backdrop-filter: blur(10px);
     color: #ffffff;
     padding: 12px 16px;
-    border-radius: 12px;
+    border-radius: 14px;
     font-size: 13px;
-    margin-bottom: 20px;
+    margin-bottom: 18px;
     display: flex;
     flex-direction: column;
     gap: 3px;
@@ -239,24 +285,23 @@ body {
 }
 
 .jb-edu-alert-success {
-    background: rgba(16, 185, 129, 0.25);
+    background: rgba(16, 185, 129, 0.28);
     border: 1px solid rgba(52, 211, 153, 0.6);
     backdrop-filter: blur(10px);
     color: #ffffff;
     padding: 12px 16px;
-    border-radius: 12px;
+    border-radius: 14px;
     font-size: 13px;
-    margin-bottom: 20px;
+    margin-bottom: 18px;
 }
 
-/* Form Layout */
+/* Form Controls (Diperbesar Proporsional & Enak Dilihat) */
 .jb-edu-form {
     display: flex;
     flex-direction: column;
     gap: 16px;
 }
 
-/* Frosted Glass Input Groups */
 .jb-edu-field-group {
     position: relative;
     display: flex;
@@ -265,9 +310,9 @@ body {
 }
 
 .jb-edu-label {
-    font-size: 12.5px;
+    font-size: 13px;
     font-weight: 600;
-    color: rgba(255, 255, 255, 0.9);
+    color: rgba(255, 255, 255, 0.95);
     text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
@@ -278,40 +323,40 @@ body {
     width: 100%;
 }
 
+/* Kotak Input Lebih Besar & Mantap (Tinggi 54px, Radius 15px) */
 .jb-edu-input {
     width: 100%;
-    height: 50px;
+    height: 54px;
     background: var(--jb-glass-bg);
-    border: 1px solid var(--jb-glass-border);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    border-radius: 14px;
-    padding: 0 46px 0 18px;
+    border: 1.5px solid var(--jb-glass-border);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-radius: 15px;
+    padding: 0 48px 0 18px;
     font-family: inherit;
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 500;
     color: #ffffff;
     outline: none;
-    transition: all 0.25s ease;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) inset;
+    transition: all 0.24s ease;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16) inset;
 }
 
 .jb-edu-input::placeholder {
-    color: rgba(255, 255, 255, 0.45);
-    font-size: 13px;
+    color: rgba(255, 255, 255, 0.48);
+    font-size: 14px;
 }
 
 .jb-edu-input:focus {
     background: var(--jb-glass-bg-focus);
     border-color: var(--jb-glass-border-focus);
-    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.3), 0 4px 12px rgba(0, 0, 0, 0.15) inset;
+    box-shadow: 0 0 0 3.5px rgba(56, 189, 248, 0.38), 0 4px 14px rgba(0, 0, 0, 0.16) inset;
 }
 
-/* Right-side Icons */
 .jb-edu-input-icon {
     position: absolute;
     right: 16px;
-    color: rgba(255, 255, 255, 0.65);
+    color: rgba(255, 255, 255, 0.70);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -328,28 +373,28 @@ body {
     color: #ffffff;
 }
 
-/* Row (Ingat Sesi & Lupa Kata Sandi) */
+/* Row (Ingat Sesi & Lupa Sandi) */
 .jb-edu-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    font-size: 12.5px;
+    font-size: 13px;
     margin-top: 2px;
 }
 
 .jb-edu-checkbox-label {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: 9px;
     cursor: pointer;
-    color: rgba(255, 255, 255, 0.85);
+    color: rgba(255, 255, 255, 0.90);
     user-select: none;
     font-weight: 500;
 }
 
 .jb-edu-checkbox-label input[type="checkbox"] {
-    width: 16px;
-    height: 16px;
+    width: 17px;
+    height: 17px;
     accent-color: var(--jb-sky-400);
     cursor: pointer;
 }
@@ -358,6 +403,7 @@ body {
     color: var(--jb-sky-300);
     text-decoration: none;
     font-weight: 600;
+    font-size: 13px;
     transition: color 0.2s;
 }
 
@@ -366,45 +412,42 @@ body {
     text-decoration: underline;
 }
 
-/* ==========================================================================
-   PRIMARY CTA BUTTON: VIBRANT CYAN/ELECTRIC BLUE PILL
-   ========================================================================== */
+/* Primary Pill CTA Button (Tinggi 52px, Font 15.5px) */
 .jb-edu-btn {
     width: 100%;
-    height: 48px;
+    height: 52px;
     border-radius: 9999px;
     border: none;
     background: linear-gradient(90deg, #06b6d4 0%, #0ea5e9 100%);
     color: #ffffff;
     font-family: inherit;
-    font-size: 15px;
+    font-size: 15.5px;
     font-weight: 700;
-    letter-spacing: 0.3px;
+    letter-spacing: 0.4px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    box-shadow: 0 8px 24px rgba(14, 165, 233, 0.45);
-    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-    margin-top: 8px;
+    box-shadow: 0 10px 28px rgba(14, 165, 233, 0.48);
+    transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    margin-top: 6px;
 }
 
 .jb-edu-btn:hover {
     background: linear-gradient(90deg, #0891b2 0%, #0284c7 100%);
-    transform: translateY(-1.5px);
-    box-shadow: 0 12px 28px rgba(14, 165, 233, 0.6);
+    transform: translateY(-2px);
+    box-shadow: 0 14px 32px rgba(14, 165, 233, 0.62);
 }
 
 .jb-edu-btn:active {
     transform: translateY(0);
 }
 
-/* Footer Links */
 .jb-edu-footer-text {
     font-size: 13.5px;
-    color: rgba(255, 255, 255, 0.85);
+    color: rgba(255, 255, 255, 0.88);
     text-align: center;
-    margin: 20px 0 0;
+    margin: 18px 0 0;
 }
 
 .jb-edu-footer-text a {
@@ -419,84 +462,58 @@ body {
     text-decoration: underline;
 }
 
-/* Bottom Footer Bar */
-.jb-edu-footer {
+/* Trust Bar / Accents */
+.jb-edu-trust-bar {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-start;
+    gap: 22px;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.16);
     font-size: 12px;
-    color: rgba(255, 255, 255, 0.65);
-    padding-top: 20px;
-    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.80);
 }
 
-.jb-edu-footer-badges {
-    display: flex;
+.jb-edu-trust-bar span {
+    display: inline-flex;
     align-items: center;
-    gap: 12px;
+    gap: 7px;
 }
 
-.jb-edu-footer-badge {
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    padding: 3px 10px;
-    border-radius: 6px;
-    font-size: 11px;
-    color: #ffffff;
-    font-weight: 600;
+/* 2-Column Responsive Form Grid for Register */
+.jb-edu-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
 }
 
-/* ==========================================================================
-   GLASS CARD FORMAT (For Daftar & Reset Sandi)
-   ========================================================================== */
-.jb-edu-glass-card {
-    background: rgba(10, 31, 68, 0.75);
-    border: 1px solid rgba(255, 255, 255, 0.22);
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
-    border-radius: 20px;
-    padding: 36px 32px;
-    box-shadow: 0 20px 45px rgba(0, 0, 0, 0.35);
-    color: #ffffff;
+.jb-edu-form-grid .full-span {
+    grid-column: 1 / -1;
 }
 
-.jb-edu-glass-card h2 {
-    font-size: 24px;
-    font-weight: 800;
-    color: #ffffff;
-    margin: 0 0 6px;
-    text-align: center;
-}
-
-.jb-edu-glass-card .subtitle {
-    font-size: 13px;
-    color: rgba(255, 255, 255, 0.8);
-    margin: 0 0 22px;
-    text-align: center;
-    line-height: 1.5;
-}
-
-/* Role Selector Glass */
+/* Role Selector Pill Tabs (Lebih Lega) */
 .jb-edu-role-selector {
     display: flex;
     background: rgba(255, 255, 255, 0.12);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    border: 1.5px solid rgba(255, 255, 255, 0.24);
     border-radius: 9999px;
     padding: 4px;
-    gap: 4px;
-    margin-bottom: 20px;
+    gap: 5px;
+    margin-bottom: 16px;
+    max-width: 360px;
 }
 
 .jb-edu-role-tab {
     flex: 1;
-    padding: 9px;
+    padding: 9px 16px;
     border-radius: 9999px;
     border: none;
     background: transparent;
     font-family: inherit;
-    font-size: 12.5px;
+    font-size: 13px;
     font-weight: 700;
-    color: rgba(255, 255, 255, 0.75);
+    color: rgba(255, 255, 255, 0.78);
     cursor: pointer;
     transition: all 0.2s;
     text-align: center;
@@ -505,26 +522,173 @@ body {
 .jb-edu-role-tab.active {
     background: linear-gradient(90deg, #06b6d4, #0ea5e9);
     color: #ffffff;
-    box-shadow: 0 4px 12px rgba(14, 165, 233, 0.4);
+    box-shadow: 0 4px 14px rgba(14, 165, 233, 0.45);
 }
 
 /* ==========================================================================
-   RESPONSIVE
+   BOTTOM FOOTER BAR
    ========================================================================== */
-@media (max-width: 768px) {
+.jb-edu-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.70);
+    padding-top: 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    flex-shrink: 0;
+}
+
+.jb-edu-footer-badges {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.jb-edu-footer-badge {
+    background: rgba(255, 255, 255, 0.10);
+    border: 1px solid rgba(255, 255, 255, 0.20);
+    padding: 4px 11px;
+    border-radius: 6px;
+    font-size: 11px;
+    color: #ffffff;
+    font-weight: 600;
+}
+
+/* ==========================================================================
+   SUPPORT FOR MULTI-STEP FLOWS (Verifikasi, Buat Sandi, Selesai)
+   ========================================================================== */
+.jb-auth-body {
+    background-color: var(--jb-navy-950);
+    overflow: hidden;
+    height: 100vh;
+    max-height: 100vh;
+}
+
+.jb-auth-body .jc {
+    background-image: url('../images/pendidikan-nganjuk-still-life.jpg');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    position: relative;
+    height: 100vh;
+    max-height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    padding: 24px 20px;
+    box-sizing: border-box;
+}
+
+.jb-auth-body .jc::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(6, 21, 45, 0.90) 0%, rgba(10, 47, 98, 0.82) 100%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+.jb-auth-body .jc>* {
+    position: relative;
+    z-index: 1;
+}
+
+.jb-auth-body .wcard {
+    width: 100%;
+    max-width: 500px;
+    background: rgba(8, 25, 54, 0.78);
+    border: 1.5px solid rgba(255, 255, 255, 0.24);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 20px;
+    padding: 30px 36px;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.45);
+    color: #ffffff;
+}
+
+.jb-auth-body .wcard h2 {
+    color: #ffffff;
+}
+
+.jb-auth-body .wcard .ws {
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.jb-auth-body .wcard label {
+    color: rgba(255, 255, 255, 0.95);
+    font-size: 13px;
+}
+
+.jb-auth-body .wcard .wb {
+    border-radius: 9999px;
+    background: linear-gradient(90deg, #06b6d4 0%, #0ea5e9 100%);
+    box-shadow: 0 10px 28px rgba(14, 165, 233, 0.48);
+    font-size: 14.5px;
+    font-weight: 700;
+    padding: 14px;
+    transition: all 0.2s;
+}
+
+.jb-auth-body .wcard .wb:hover {
+    background: linear-gradient(90deg, #0891b2 0%, #0284c7 100%);
+    box-shadow: 0 14px 32px rgba(14, 165, 233, 0.62);
+    transform: translateY(-2px);
+}
+
+.jb-auth-body .wh b {
+    color: #ffffff;
+}
+
+.jb-auth-body .wh small {
+    color: var(--jb-sky-300);
+}
+
+.jb-auth-body .wft {
+    color: rgba(255, 255, 255, 0.75);
+}
+
+.jb-auth-body .wft b {
+    color: #ffffff;
+}
+
+.jb-auth-body .wft a {
+    color: var(--jb-sky-300);
+}
+
+/* ==========================================================================
+   RESPONSIVE (Locked on desktop, scrollable on very small screens)
+   ========================================================================== */
+@media (max-width: 900px), (max-height: 640px) {
+    html, body {
+        overflow: auto;
+        height: auto;
+        min-height: 100vh;
+    }
+
+    .jb-edu-viewport {
+        height: auto;
+        min-height: 100vh;
+        max-height: none;
+        overflow: visible;
+    }
+
     .jb-edu-container {
-        padding: 24px 20px;
+        height: auto;
+        min-height: 100vh;
+        max-height: none;
+        overflow: visible;
+        padding: 20px 20px;
     }
 
-    .jb-edu-viewport::before {
-        background: linear-gradient(180deg,
-                rgba(6, 21, 45, 0.95) 0%,
-                rgba(8, 31, 68, 0.92) 50%,
-                rgba(10, 47, 98, 0.95) 100%);
+    .jb-edu-stage {
+        padding: 20px 0;
     }
 
-    .jb-edu-title {
-        font-size: 26px;
+    .jb-edu-form-grid {
+        grid-template-columns: 1fr;
     }
 
     .jb-edu-header {
@@ -538,104 +702,4 @@ body {
         gap: 12px;
         align-items: flex-start;
     }
-}
-
-/* ==========================================================================
-   SUPPORT FOR MULTI-STEP FLOWS (Verifikasi, Buat Sandi, Selesai)
-   ========================================================================== */
-.jb-auth-body {
-    background-color: var(--jb-navy-950);
-}
-
-.jb-auth-body .jc {
-    background-image: url('../images/pendidikan-nganjuk-still-life.jpg');
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
-    position: relative;
-    min-height: 100vh;
-}
-
-.jb-auth-body .jc::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(135deg, rgba(6, 21, 45, 0.88) 0%, rgba(10, 47, 98, 0.78) 100%);
-    pointer-events: none;
-    z-index: 0;
-}
-
-.jb-auth-body .jc>* {
-    position: relative;
-    z-index: 1;
-}
-
-.jb-auth-body .wh b {
-    color: #ffffff;
-}
-
-.jb-auth-body .wh small {
-    color: var(--jb-sky-300);
-}
-
-.jb-auth-body .wft {
-    color: rgba(255, 255, 255, 0.75);
-}
-
-.jb-auth-body .wft b {
-    color: #ffffff;
-}
-
-.jb-auth-body .wft a {
-    color: var(--jb-sky-300);
-}
-
-/* ==========================================================================
-   SUPPORT FOR MULTI-STEP FLOWS (Verifikasi, Buat Sandi, Selesai)
-   ========================================================================== */
-.jb-auth-body {
-    background-color: var(--jb-navy-950);
-}
-
-.jb-auth-body .jc {
-    background-image: url('../images/pendidikan-nganjuk-still-life.jpg');
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
-    position: relative;
-    min-height: 100vh;
-}
-
-.jb-auth-body .jc::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(135deg, rgba(6, 21, 45, 0.88) 0%, rgba(10, 47, 98, 0.78) 100%);
-    pointer-events: none;
-    z-index: 0;
-}
-
-.jb-auth-body .jc>* {
-    position: relative;
-    z-index: 1;
-}
-
-.jb-auth-body .wh b {
-    color: #ffffff;
-}
-
-.jb-auth-body .wh small {
-    color: var(--jb-sky-300);
-}
-
-.jb-auth-body .wft {
-    color: rgba(255, 255, 255, 0.75);
-}
-
-.jb-auth-body .wft b {
-    color: #ffffff;
-}
-
-.jb-auth-body .wft a {
-    color: var(--jb-sky-300);
 }

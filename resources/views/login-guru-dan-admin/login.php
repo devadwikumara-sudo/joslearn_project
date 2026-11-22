@@ -13,7 +13,7 @@
 </head>
 <body>
 
-    <!-- Full-Screen Viewport with Educational Theme Still Life Background & Gradient Overlay -->
+    <!-- Full-Screen Viewport Locked to 1 Page (Open Frameless Layout) -->
     <div class="jb-edu-viewport">
         <div class="jb-edu-container">
 
@@ -35,77 +35,101 @@
                 </div>
             </header>
 
-            <!-- Main Auth Form (Overlaid on Left with High Readability & Frosted Glass) -->
-            <main class="jb-edu-main">
-                <h1 class="jb-edu-title">Akses Akun Portal</h1>
-                <p class="jb-edu-subtitle">Silakan masuk menggunakan akun Guru atau Administrator resmi SMA Negeri 1 Rejoso.</p>
+            <!-- Main Stage (Open Frameless Left Aligned) -->
+            <main class="jb-edu-stage">
+                <div class="jb-edu-open-panel">
+                    <!-- Kicker / Tag -->
+                    <div class="jb-edu-kicker">
+                        <span class="dot"></span>
+                        <span>PORTAL RESMI AKADEMIK</span>
+                    </div>
 
-                <!-- Flash Message Alerts -->
-                @if(session('error'))
-                <div class="jb-edu-alert-error">
-                    <b>Login Gagal</b>
-                    <span>{{ session('error') }}</span>
-                </div>
-                @endif
+                    <h1 class="jb-edu-title">Akses Akun Portal</h1>
+                    <p class="jb-edu-subtitle">Silakan masuk menggunakan akun Guru atau Administrator resmi SMA Negeri 1 Rejoso.</p>
 
-                @if(session('success'))
-                <div class="jb-edu-alert-success">
-                    <span>{{ session('success') }}</span>
-                </div>
-                @endif
+                    <!-- Flash Message Alerts -->
+                    @if(session('error'))
+                    <div class="jb-edu-alert-error">
+                        <b>Login Gagal</b>
+                        <span>{{ session('error') }}</span>
+                    </div>
+                    @endif
 
-                @if(isset($errors) && $errors->any())
-                <div class="jb-edu-alert-error">
-                    <b>Login Gagal</b>
-                    <span>{{ $errors->first() }}</span>
-                </div>
-                @endif
+                    @if(session('success'))
+                    <div class="jb-edu-alert-success">
+                        <span>{{ session('success') }}</span>
+                    </div>
+                    @endif
 
-                <!-- Login Form -->
-                <form class="jb-edu-form" method="POST" action="{{ route('login.post') }}">
-                    @csrf
+                    @if(isset($errors) && $errors->any())
+                    <div class="jb-edu-alert-error">
+                        <b>Login Gagal</b>
+                        <span>{{ $errors->first() }}</span>
+                    </div>
+                    @endif
 
-                    <!-- Field 1: E-mail / NIP / Username -->
-                    <div class="jb-edu-field-group">
-                        <label for="l_u" class="jb-edu-label">E-mail / NIP / Nama Pengguna</label>
-                        <div class="jb-edu-input-wrap">
-                            <input id="l_u" name="username" type="text" class="jb-edu-input" placeholder="nama@sman1rejoso.sch.id / NIP" value="{{ old('username') }}" autocomplete="username" required autofocus>
-                            <span class="jb-edu-input-icon">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                            </span>
+                    <!-- Login Form -->
+                    <form class="jb-edu-form" method="POST" action="{{ route('login.post') }}">
+                        @csrf
+
+                        <!-- Field 1: E-mail / NIP / Username -->
+                        <div class="jb-edu-field-group">
+                            <label for="l_u" class="jb-edu-label">E-mail / NIP / Nama Pengguna</label>
+                            <div class="jb-edu-input-wrap">
+                                <input id="l_u" name="username" type="text" class="jb-edu-input" placeholder="nama@sman1rejoso.sch.id / NIP" value="{{ old('username') }}" autocomplete="username" required autofocus>
+                                <span class="jb-edu-input-icon">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                                </span>
+                            </div>
                         </div>
-                    </div>
 
-                    <!-- Field 2: Password -->
-                    <div class="jb-edu-field-group">
-                        <label for="l_p" class="jb-edu-label">Kata Sandi</label>
-                        <div class="jb-edu-input-wrap">
-                            <input id="l_p" name="password" type="password" class="jb-edu-input" placeholder="••••••••••••" autocomplete="current-password" required>
-                            <span class="jb-edu-input-icon clickable" onclick="togglePassword('l_p')" title="Tampilkan / Sembunyikan Sandi">
-                                <svg id="eye-icon-l_p" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
-                            </span>
+                        <!-- Field 2: Password -->
+                        <div class="jb-edu-field-group">
+                            <label for="l_p" class="jb-edu-label">Kata Sandi</label>
+                            <div class="jb-edu-input-wrap">
+                                <input id="l_p" name="password" type="password" class="jb-edu-input" placeholder="••••••••••••" autocomplete="current-password" required>
+                                <span class="jb-edu-input-icon clickable" onclick="togglePassword('l_p')" title="Tampilkan / Sembunyikan Sandi">
+                                    <svg id="eye-icon-l_p" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                                </span>
+                            </div>
                         </div>
+
+                        <!-- Row: Remember Session & Forgot Password -->
+                        <div class="jb-edu-row">
+                            <label class="jb-edu-checkbox-label">
+                                <input type="checkbox" name="remember" {{ old('remember') ? 'checked' : '' }}>
+                                <span>Ingat sesi masuk</span>
+                            </label>
+                            <a href="{{ route('reset-sandi') }}" class="jb-edu-forgot-link">Lupa kata sandi?</a>
+                        </div>
+
+                        <!-- Primary Pill Action Button (Vibrant Cyan / Sky Blue Pill) -->
+                        <button type="submit" class="jb-edu-btn">
+                            <span>Masuk ke Akun</span>
+                        </button>
+                    </form>
+
+                    <!-- New User Link -->
+                    <p class="jb-edu-footer-text">
+                        Pengguna baru? <a href="{{ route('daftar') }}">Buat akun di sini</a>
+                    </p>
+
+                    <!-- Trust Bar / Indicators -->
+                    <div class="jb-edu-trust-bar">
+                        <span>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.2"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                            Terenkripsi SSL
+                        </span>
+                        <span>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.2"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10M6 10h10"/></svg>
+                            Buku Induk Digital
+                        </span>
+                        <span>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                            Dapodik Terpadu
+                        </span>
                     </div>
-
-                    <!-- Row: Remember Session & Forgot Password -->
-                    <div class="jb-edu-row">
-                        <label class="jb-edu-checkbox-label">
-                            <input type="checkbox" name="remember" {{ old('remember') ? 'checked' : '' }}>
-                            <span>Ingat sesi masuk</span>
-                        </label>
-                        <a href="{{ route('reset-sandi') }}" class="jb-edu-forgot-link">Lupa kata sandi?</a>
-                    </div>
-
-                    <!-- Primary Pill Action Button (Vibrant Cyan / Sky Blue Pill) -->
-                    <button type="submit" class="jb-edu-btn">
-                        <span>Masuk ke Akun</span>
-                    </button>
-                </form>
-
-                <!-- New User Link -->
-                <p class="jb-edu-footer-text">
-                    Pengguna baru? <a href="{{ route('daftar') }}">Buat akun di sini</a>
-                </p>
+                </div>
             </main>
 
             <!-- Bottom Footer: Accreditation & Copyright -->

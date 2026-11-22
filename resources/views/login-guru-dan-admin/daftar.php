@@ -13,117 +13,152 @@
 </head>
 <body>
 
+    <!-- Full-Screen Viewport Locked to 1 Page (Open Frameless Layout) -->
     <div class="jb-edu-viewport">
-        <div class="jb-edu-container" style="justify-content:center;align-items:center;padding:40px 20px">
-            
-            <div class="jb-edu-glass-card" style="width:100%;max-width:480px">
-                <!-- Brand Header -->
-                <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:18px">
-                    <img src="{{ asset('images/josbook-logo.png') }}" alt="Logo JosBook" style="width:36px;height:36px;object-fit:contain">
-                    <span style="font-size:18px;font-weight:800;letter-spacing:0.5px">JOSBOOK PORTAL</span>
+        <div class="jb-edu-container">
+
+            <!-- Top Header: School Brand & Portal Badge -->
+            <header class="jb-edu-header">
+                <div class="jb-edu-brand">
+                    <div class="jb-edu-brand-logo">
+                        <img src="{{ asset('images/josbook-logo.png') }}" alt="Logo JosBook">
+                    </div>
+                    <div class="jb-edu-brand-info">
+                        <span class="jb-edu-brand-title">JOSBOOK</span>
+                        <span class="jb-edu-brand-subtitle">SMA NEGERI 1 REJOSO NGANJUK</span>
+                    </div>
                 </div>
 
-                <h2>Daftar Akun Baru</h2>
-                <p class="subtitle">Pilih jenis akun yang akan didaftarkan ke sistem sekolah</p>
-
-                @if(isset($errors) && $errors->any())
-                <div class="jb-edu-alert-error">
-                    <b>Terjadi kesalahan</b>
-                    <span>{{ $errors->first() }}</span>
+                <div class="jb-edu-portal-badge">
+                    <span class="dot"></span>
+                    <span>PORTAL BUKU INDUK DIGITAL</span>
                 </div>
-                @endif
+            </header>
 
-                <form class="jb-edu-form" method="POST" action="{{ route('daftar.post') }}">
-                    @csrf
-                    <input type="hidden" name="peran" id="role_input" value="{{ old('peran', 'admin') }}">
+            <!-- Main Stage (Open Frameless Left Aligned) -->
+            <main class="jb-edu-stage">
+                <div class="jb-edu-open-panel wide">
 
-                    <!-- Role Switcher -->
-                    <div class="jb-edu-role-selector">
-                        <button type="button" id="tab_admin" class="jb-edu-role-tab {{ old('peran', 'admin') === 'admin' ? 'active' : '' }}" onclick="selectRole('admin')">
-                            Administrator
-                        </button>
-                        <button type="button" id="tab_guru" class="jb-edu-role-tab {{ old('peran') === 'guru' ? 'active' : '' }}" onclick="selectRole('guru')">
-                            Guru Pengajar
-                        </button>
+                    <!-- Kicker / Tag -->
+                    <div class="jb-edu-kicker">
+                        <span class="dot"></span>
+                        <span>REGISTRASI PENGGUNA BARU</span>
                     </div>
 
-                    <!-- Nama Lengkap -->
-                    <div class="jb-edu-field-group">
-                        <label for="d_n" class="jb-edu-label">Nama Lengkap &amp; Gelar</label>
-                        <div class="jb-edu-input-wrap">
-                            <input id="d_n" name="nama" type="text" class="jb-edu-input" placeholder="Masukkan nama lengkap Anda" value="{{ old('nama') }}" required>
-                            <span class="jb-edu-input-icon">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                            </span>
+                    <h1 class="jb-edu-title">Daftar Akun Baru</h1>
+                    <p class="jb-edu-subtitle">Pilih jenis akun dan lengkapi data diri Anda untuk pendaftaran ke sistem Dapodik sekolah.</p>
+
+                    @if(isset($errors) && $errors->any())
+                    <div class="jb-edu-alert-error">
+                        <b>Terjadi kesalahan</b>
+                        <span>{{ $errors->first() }}</span>
+                    </div>
+                    @endif
+
+                    <form class="jb-edu-form" method="POST" action="{{ route('daftar.post') }}">
+                        @csrf
+                        <input type="hidden" name="peran" id="role_input" value="{{ old('peran', 'admin') }}">
+
+                        <!-- Role Switcher Tabs -->
+                        <div class="jb-edu-role-selector">
+                            <button type="button" id="tab_admin" class="jb-edu-role-tab {{ old('peran', 'admin') === 'admin' ? 'active' : '' }}" onclick="selectRole('admin')">
+                                Administrator
+                            </button>
+                            <button type="button" id="tab_guru" class="jb-edu-role-tab {{ old('peran') === 'guru' ? 'active' : '' }}" onclick="selectRole('guru')">
+                                Guru Pengajar
+                            </button>
                         </div>
-                    </div>
 
-                    <!-- Email Resmi -->
-                    <div class="jb-edu-field-group">
-                        <label for="d_e" class="jb-edu-label">Email Resmi Sekolah</label>
-                        <div class="jb-edu-input-wrap">
-                            <input id="d_e" name="email" type="email" class="jb-edu-input" placeholder="nama@sman1rejoso.sch.id" value="{{ old('email') }}" required>
-                            <span class="jb-edu-input-icon">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
-                            </span>
-                        </div>
-                    </div>
+                        <!-- 2-Column Responsive Form Fields -->
+                        <div class="jb-edu-form-grid">
+                            <!-- Nama Lengkap -->
+                            <div class="jb-edu-field-group">
+                                <label for="d_n" class="jb-edu-label">Nama Lengkap &amp; Gelar</label>
+                                <div class="jb-edu-input-wrap">
+                                    <input id="d_n" name="nama" type="text" class="jb-edu-input" placeholder="cth. Joko Susanto, S.Pd." value="{{ old('nama') }}" required>
+                                    <span class="jb-edu-input-icon">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                                    </span>
+                                </div>
+                            </div>
 
-                    <!-- Identitas / NIP -->
-                    <div class="jb-edu-field-group">
-                        <label for="d_i" class="jb-edu-label" id="label_identitas">Nomor Identitas / NIP</label>
-                        <div class="jb-edu-input-wrap">
-                            <input id="d_i" name="identitas" type="text" class="jb-edu-input" placeholder="19820415..." value="{{ old('identitas') }}" required>
-                            <span class="jb-edu-input-icon">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 8h10M7 12h6M7 16h8"/></svg>
-                            </span>
-                        </div>
-                    </div>
+                            <!-- Email Resmi -->
+                            <div class="jb-edu-field-group">
+                                <label for="d_e" class="jb-edu-label">Email Resmi Sekolah</label>
+                                <div class="jb-edu-input-wrap">
+                                    <input id="d_e" name="email" type="email" class="jb-edu-input" placeholder="nama@sman1rejoso.sch.id" value="{{ old('email') }}" required>
+                                    <span class="jb-edu-input-icon">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                                    </span>
+                                </div>
+                            </div>
 
-                    <!-- Kode Admin -->
-                    <div id="admin_code_group" style="{{ old('peran', 'admin') === 'admin' ? '' : 'display:none' }}">
-                        <div class="jb-edu-field-group">
-                            <label for="admin_registration_code" class="jb-edu-label">Kode Pendaftaran Admin</label>
-                            <div class="jb-edu-input-wrap">
-                                <input id="admin_registration_code" name="admin_registration_code" type="password" class="jb-edu-input" placeholder="Kode verifikasi admin sekolah" autocomplete="off" {{ old('peran', 'admin') === 'admin' ? 'required' : '' }}>
-                                <span class="jb-edu-input-icon">
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4"/><path d="m21 2-9.6 9.6"/><circle cx="7.5" cy="16.5" r="5.5"/></svg>
-                                </span>
+                            <!-- Identitas / NIP -->
+                            <div class="jb-edu-field-group" id="group_identitas">
+                                <label for="d_i" class="jb-edu-label" id="label_identitas">Nomor Identitas / NIP</label>
+                                <div class="jb-edu-input-wrap">
+                                    <input id="d_i" name="identitas" type="text" class="jb-edu-input" placeholder="19820415..." value="{{ old('identitas') }}" required>
+                                    <span class="jb-edu-input-icon">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 8h10M7 12h6M7 16h8"/></svg>
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Kode Admin (Conditional) -->
+                            <div class="jb-edu-field-group" id="admin_code_group" style="{{ old('peran', 'admin') === 'admin' ? '' : 'display:none' }}">
+                                <label for="admin_registration_code" class="jb-edu-label">Kode Otorisasi Admin</label>
+                                <div class="jb-edu-input-wrap">
+                                    <input id="admin_registration_code" name="admin_registration_code" type="password" class="jb-edu-input" placeholder="Kode verifikasi admin sekolah" autocomplete="off" {{ old('peran', 'admin') === 'admin' ? 'required' : '' }}>
+                                    <span class="jb-edu-input-icon">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4"/><path d="m21 2-9.6 9.6"/><circle cx="7.5" cy="16.5" r="5.5"/></svg>
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Kata Sandi -->
+                            <div class="jb-edu-field-group">
+                                <label for="d_p" class="jb-edu-label">Kata Sandi</label>
+                                <div class="jb-edu-input-wrap">
+                                    <input id="d_p" name="password" type="password" class="jb-edu-input" placeholder="Minimal 8 karakter" required>
+                                    <span class="jb-edu-input-icon clickable" onclick="togglePassword('d_p')" title="Tampilkan / Sembunyikan Sandi">
+                                        <svg id="eye-icon-d_p" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Konfirmasi Kata Sandi -->
+                            <div class="jb-edu-field-group">
+                                <label for="d_p2" class="jb-edu-label">Konfirmasi Kata Sandi</label>
+                                <div class="jb-edu-input-wrap">
+                                    <input id="d_p2" name="password_confirmation" type="password" class="jb-edu-input" placeholder="Ulangi kata sandi" required>
+                                    <span class="jb-edu-input-icon clickable" onclick="togglePassword('d_p2')" title="Tampilkan / Sembunyikan Sandi">
+                                        <svg id="eye-icon-d_p2" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                                    </span>
+                                </div>
                             </div>
                         </div>
-                    </div>
 
-                    <!-- Kata Sandi -->
-                    <div class="jb-edu-field-group">
-                        <label for="d_p" class="jb-edu-label">Kata Sandi</label>
-                        <div class="jb-edu-input-wrap">
-                            <input id="d_p" name="password" type="password" class="jb-edu-input" placeholder="Minimal 8 karakter" required>
-                            <span class="jb-edu-input-icon clickable" onclick="togglePassword('d_p')" title="Tampilkan / Sembunyikan Sandi">
-                                <svg id="eye-icon-d_p" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
-                            </span>
-                        </div>
-                    </div>
+                        <button type="submit" class="jb-edu-btn" style="margin-top:6px">
+                            <span>Daftar Akun Sekarang</span>
+                        </button>
+                    </form>
 
-                    <!-- Konfirmasi Kata Sandi -->
-                    <div class="jb-edu-field-group">
-                        <label for="d_p2" class="jb-edu-label">Konfirmasi Kata Sandi</label>
-                        <div class="jb-edu-input-wrap">
-                            <input id="d_p2" name="password_confirmation" type="password" class="jb-edu-input" placeholder="Ulangi kata sandi" required>
-                            <span class="jb-edu-input-icon clickable" onclick="togglePassword('d_p2')" title="Tampilkan / Sembunyikan Sandi">
-                                <svg id="eye-icon-d_p2" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
-                            </span>
-                        </div>
-                    </div>
+                    <p class="jb-edu-footer-text">
+                        Sudah memiliki akun terdaftar? <a href="{{ route('login') }}">Masuk di sini</a>
+                    </p>
 
-                    <button type="submit" class="jb-edu-btn">
-                        <span>Daftar Akun Sekarang</span>
-                    </button>
-                </form>
+                </div>
+            </main>
 
-                <p class="jb-edu-footer-text">
-                    Sudah memiliki akun? <a href="{{ route('login') }}">Masuk</a>
-                </p>
-            </div>
+            <!-- Bottom Footer: Accreditation & Copyright -->
+            <footer class="jb-edu-footer">
+                <span>&copy; 2026 SMA Negeri 1 Rejoso Nganjuk &bull; Hak Cipta Dilindungi</span>
+                <div class="jb-edu-footer-badges">
+                    <span class="jb-edu-footer-badge">Terakreditasi A</span>
+                    <span class="jb-edu-footer-badge">Kurikulum Merdeka</span>
+                    <span class="jb-edu-footer-badge">Dapodik Terintegrasi</span>
+                </div>
+            </footer>
 
         </div>
     </div>
