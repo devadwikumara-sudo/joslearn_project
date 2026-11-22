@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Admin\CatatanAktivitas;
 use App\Models\Admin\CatatanCadangan;
+use App\Models\Auth\AkunSiswa;
 use App\Models\Auth\Pengguna;
 use App\Models\Guru\GuruBiodata;
 use App\Models\SekolahTahunAjaran;
@@ -74,7 +75,11 @@ class SettingController extends Controller
             $data = compact('lf', 'lq', 'whoList', 'totalLogs', 'logs');
         } elseif ($tab === 'akun') {
             $pengguna = Pengguna::with('guru')->orderBy('peran')->orderBy('username')->get();
-            $data = compact('pengguna');
+            $akunSiswa = AkunSiswa::with('siswa:id,nama_lengkap,nisn')
+                ->orderBy('username')
+                ->paginate(25)
+                ->withQueryString();
+            $data = compact('pengguna', 'akunSiswa');
         }
 
         return view('admin.setting', [
@@ -356,7 +361,7 @@ class SettingController extends Controller
         );
     }
 
-    public function hapusAkun(int $id)
+    public function hapusAkun(int $id): RedirectResponse
     {
         if ($id === auth()->id()) {
             return back()->with('error', 'Anda tidak bisa menghapus akun sendiri.');
@@ -365,6 +370,63 @@ class SettingController extends Controller
         $pengguna->delete();
 
         return back()->with('success', "Akun {$pengguna->username} berhasil dihapus.");
+    }
+
+    public function updateNamaAkun(Request $request, int $id): RedirectResponse
+    {
+        $validated = $request->validate([
+            'nama' => ['required', 'string', 'max:150'],
+        ]);
+
+        $pengguna = Pengguna::query()
+            ->where('peran', 'admin')
+            ->findOrFail($id);
+        $pengguna->nama = trim($validated['nama']);
+        $pengguna->save();
+
+        $this->catatAktivitas(
+            $request,
+            'ubah_nama_akun',
+            "Mengubah nama tampilan akun admin {$pengguna->username}.",
+            'akun_pengguna',
+            $pengguna->id
+        );
+
+        return back()->with('success', 'Nama akun berhasil diperbarui.');
+    }
+
+    public function hapusLog(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'lf' => ['nullable', 'string', 'max:50'],
+            'lq' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $lf = $validated['lf'] ?? '';
+        $lq = trim($validated['lq'] ?? '');
+
+        return DB::transaction(function () use ($request, $lf, $lq): RedirectResponse {
+            $query = CatatanAktivitas::query()->forAdminLog($lf, $lq);
+            $jumlah = $query->count();
+
+            if ($jumlah > 0) {
+                $query->delete();
+                $this->catatAktivitas(
+                    $request,
+                    'hapus_log_aktivitas',
+                    "Menghapus {$jumlah} catatan aktivitas sesuai filter.",
+                    'catatan_aktivitas'
+                );
+            }
+
+            $pesan = $jumlah > 0
+                ? "{$jumlah} catatan aktivitas sesuai filter berhasil dihapus."
+                : 'Tidak ada catatan aktivitas yang cocok untuk dihapus.';
+
+            return redirect()
+                ->route('admin.setting', ['tab' => 'log', 'lf' => $lf, 'lq' => $lq])
+                ->with('success', $pesan);
+        });
     }
 
     private function jadikanTahunBerjalan(int $id): SekolahTahunAjaran

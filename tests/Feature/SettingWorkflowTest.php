@@ -173,6 +173,134 @@ class SettingWorkflowTest extends TestCase
         $workbook->disconnectWorksheets();
     }
 
+    public function test_admin_can_delete_filtered_logs_and_the_deletion_is_audited(): void
+    {
+        $matchingId = DB::table('catatan_aktivitas')->insertGetId([
+            'peran' => 'guru',
+            'aksi' => 'ubah_nilai',
+            'keterangan' => 'Log uji-hapus yang cocok',
+            'created_at' => now(),
+        ]);
+        $otherId = DB::table('catatan_aktivitas')->insertGetId([
+            'peran' => 'admin',
+            'aksi' => 'ubah_setting',
+            'keterangan' => 'Log lain',
+            'created_at' => now(),
+        ]);
+
+        $response = $this->actingAs($this->user('admin', 1))
+            ->delete(route('admin.setting.log.hapus'), [
+                'lf' => 'guru',
+                'lq' => 'uji-hapus',
+            ]);
+
+        $response->assertRedirect(route('admin.setting', [
+            'tab' => 'log',
+            'lf' => 'guru',
+            'lq' => 'uji-hapus',
+        ]));
+        $this->assertDatabaseMissing('catatan_aktivitas', ['id' => $matchingId]);
+        $this->assertDatabaseHas('catatan_aktivitas', ['id' => $otherId]);
+        $this->assertDatabaseHas('catatan_aktivitas', [
+            'aksi' => 'hapus_log_aktivitas',
+            'keterangan' => 'Menghapus 1 catatan aktivitas sesuai filter.',
+        ]);
+    }
+
+    public function test_non_admin_cannot_delete_activity_logs(): void
+    {
+        $this->actingAs($this->user('guru', 2))
+            ->delete(route('admin.setting.log.hapus'), ['lf' => 'guru'])
+            ->assertForbidden();
+
+        $this->assertSame(0, DB::table('catatan_aktivitas')->count());
+    }
+
+    public function test_account_tab_shows_staff_and_mobile_student_account_details(): void
+    {
+        DB::table('guru_biodata')->insert([
+            'id' => 31,
+            'nama' => 'Guru Terdaftar',
+            'nip' => '198001012010011001',
+        ]);
+        DB::table('akun_pengguna')->insert([
+            'id' => 2,
+            'peran' => 'guru',
+            'username' => '198001012010011001',
+            'email' => 'guru@example.test',
+            'password' => 'hash',
+            'aktif' => true,
+            'guru_id' => 31,
+            'terakhir_login_at' => now(),
+        ]);
+        DB::table('siswa_biodata')->insert([
+            'id' => 41,
+            'nama_lengkap' => 'Siswa Terdaftar',
+            'nisn' => '1234567890',
+        ]);
+        DB::table('akun_siswa')->insert([
+            'username' => '1234567890',
+            'email' => 'siswa@example.test',
+            'siswa_id' => 41,
+            'aktif' => true,
+            'terakhir_login_at' => now(),
+        ]);
+
+        $this->actingAs($this->user('admin', 1))
+            ->get(route('admin.setting', ['tab' => 'akun']))
+            ->assertOk()
+            ->assertSee('Guru Terdaftar')
+            ->assertSee('guru@example.test')
+            ->assertSee('Akun Siswa Mobile')
+            ->assertSee('Siswa Terdaftar')
+            ->assertSee('1234567890')
+            ->assertSee('siswa@example.test');
+    }
+
+    public function test_admin_can_update_display_name_and_profile_menu_hides_password_link(): void
+    {
+        DB::table('akun_pengguna')->insert([
+            'id' => 2,
+            'peran' => 'admin',
+            'username' => 'admin-kedua',
+            'nama' => null,
+            'password' => 'hash',
+            'aktif' => true,
+        ]);
+
+        $this->actingAs($this->user('admin', 1))
+            ->put(route('admin.setting.akun.nama', 2), ['nama' => 'Nama Admin Baru'])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('akun_pengguna', [
+            'id' => 2,
+            'nama' => 'Nama Admin Baru',
+        ]);
+        $this->assertDatabaseHas('catatan_aktivitas', [
+            'aksi' => 'ubah_nama_akun',
+            'objek_tipe' => 'akun_pengguna',
+            'objek_id' => 2,
+        ]);
+
+        $admin = $this->user('admin', 1);
+        $admin->setAttribute('nama', 'Nama Admin');
+
+        $this->actingAs($admin)
+            ->get(route('admin.setting'))
+            ->assertOk()
+            ->assertSee('Nama Admin')
+            ->assertDontSee('Ganti password');
+    }
+
+    public function test_non_admin_cannot_update_an_admin_display_name(): void
+    {
+        $this->actingAs($this->user('guru', 2))
+            ->put(route('admin.setting.akun.nama', 3), ['nama' => 'Nama Tidak Sah'])
+            ->assertForbidden();
+
+        $this->assertSame(0, DB::table('catatan_aktivitas')->count());
+    }
+
     public function test_year_tab_changes_the_active_year(): void
     {
         DB::table('sekolah_tahun_ajaran')->insert([
@@ -624,6 +752,7 @@ class SettingWorkflowTest extends TestCase
             ],
             'akun_siswa' => [
                 'username' => 'string', 'email' => 'string', 'siswa_id' => 'integer',
+                'aktif' => 'boolean', 'terakhir_login_at' => 'timestamp',
             ],
         ];
 
@@ -659,9 +788,14 @@ class SettingWorkflowTest extends TestCase
             $table->id();
             $table->string('peran');
             $table->string('username');
+            $table->string('nama')->nullable();
+            $table->string('email')->nullable();
             $table->string('password');
+            $table->boolean('aktif')->default(true);
             $table->unsignedBigInteger('guru_id')->nullable();
             $table->unsignedBigInteger('siswa_id')->nullable();
+            $table->timestamp('terakhir_login_at')->nullable();
+            $table->timestamps();
         });
 
         Schema::create('personal_access_tokens', function (Blueprint $table): void {

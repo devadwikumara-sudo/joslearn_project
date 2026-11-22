@@ -40,6 +40,7 @@ class ProductionSeeder extends Seeder
         DB::table('akun_pengguna')->insert([
             'peran' => 'admin',
             'username' => config('auth.admin_initial_username', 'admin'),
+            'nama' => config('auth.admin_initial_name', 'Administrator'),
             'email' => config('auth.admin_initial_email') ?: null,
             'password' => Hash::make($password),
             'wajib_ganti_password' => true,

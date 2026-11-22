@@ -33,6 +33,7 @@ class ProductionSeederTest extends TestCase
             $table->id();
             $table->string('peran');
             $table->string('username')->unique();
+            $table->string('nama')->nullable();
             $table->string('email')->nullable()->unique();
             $table->string('password');
             $table->boolean('wajib_ganti_password')->default(false);
@@ -68,6 +69,7 @@ class ProductionSeederTest extends TestCase
         config([
             'app.env' => 'production',
             'auth.admin_initial_username' => 'admin-pertama',
+            'auth.admin_initial_name' => 'Nama Admin Pertama',
             'auth.admin_initial_email' => 'admin@example.test',
             'auth.admin_initial_password' => 'StrongTestPassword-2026',
         ]);
@@ -82,6 +84,7 @@ class ProductionSeederTest extends TestCase
         $admin = DB::table('akun_pengguna')->first();
         $this->assertSame('admin', $admin->peran);
         $this->assertSame('admin-pertama', $admin->username);
+        $this->assertSame('Nama Admin Pertama', $admin->nama);
         $this->assertTrue(Hash::check('StrongTestPassword-2026', $admin->password));
         $this->assertTrue((bool) $admin->wajib_ganti_password);
         $this->assertDatabaseCount('guru_biodata', 0);

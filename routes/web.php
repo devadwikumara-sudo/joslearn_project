@@ -266,6 +266,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin.only'])->grou
     Route::post('/setting/cadangan/pulihkan', [SettingController::class, 'pulihkanCadangan'])->name('setting.cadangan.pulihkan');
     Route::delete('/setting/tahun-ajaran/hapus-data', [SettingController::class, 'hapusDataTahunAjaran'])->name('setting.tahun-ajaran.hapus-data');
     Route::delete('/setting/akun/{id}', [SettingController::class, 'hapusAkun'])->name('setting.akun.hapus');
+    Route::put('/setting/akun/{id}/nama', [SettingController::class, 'updateNamaAkun'])->name('setting.akun.nama');
+    Route::delete('/setting/log', [SettingController::class, 'hapusLog'])->name('setting.log.hapus');
 });
 
 // ─── AREA GURU (hanya guru) ───────────────────────────────────────────────────

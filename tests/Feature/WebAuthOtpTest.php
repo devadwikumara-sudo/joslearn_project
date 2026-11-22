@@ -35,6 +35,7 @@ class WebAuthOtpTest extends TestCase
             $table->id();
             $table->string('peran');
             $table->string('username')->unique();
+            $table->string('nama')->nullable();
             $table->string('email')->unique();
             $table->string('password');
             $table->boolean('aktif')->default(false);

@@ -80,7 +80,7 @@
                     <tr>
                         <td colspan="4" style="text-align:center;color:var(--mu);padding:36px">
                             <div style="font-size:32px;margin-bottom:8px">🗑</div>
-                            <div style="font-size:14px;font-weight:600">Tempat sampah bersih dan kosong.</div>
+                            <div style="font-size:14px;font-weight:600">Tempat sampah kosong.</div>
                             <p class="sub" style="margin:4px 0 0">Tidak ada data siswa atau guru yang sedang berada di dalam penampungan sampah.</p>
                         </td>
                     </tr>

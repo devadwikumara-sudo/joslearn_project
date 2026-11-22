@@ -5,7 +5,7 @@
                 <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
                 Manajemen Akun Pengguna &amp; Akses
             </h3>
-            <p class="sub" style="margin:3px 0 0">Kelola kredensial akun administrator dan tenaga pendidik yang memiliki hak akses login ke sistem JosBook</p>
+            <p class="sub" style="margin:3px 0 0">Lihat data akun administrator dan tenaga pendidik yang terdaftar di JosBook</p>
         </div>
         <span class="sp"></span>
         <button class="btn a" onclick="document.getElementById('md-akun').style.display='flex'">+ Tambah Akun Baru</button>
@@ -17,7 +17,10 @@
                 <tr>
                     <th style="width:200px">Username Akses</th>
                     <th>Nama Pengguna</th>
+                    <th>Email</th>
                     <th style="width:140px">Peran (Role)</th>
+                    <th>Status</th>
+                    <th>Login Terakhir</th>
                     <th style="width:110px;text-align:right">Aksi</th>
                 </tr>
             </thead>
@@ -34,12 +37,25 @@
                                 </div>
                                 <b style="color:var(--admin-text);font-size:13.5px">{{ $p->nama }}</b>
                             </div>
+                            @if($p->peran === 'admin')
+                                <form method="POST" action="{{ route('admin.setting.akun.nama', $p->id) }}" style="display:flex;gap:5px;margin-top:8px">
+                                    @csrf
+                                    @method('PUT')
+                                    <input type="text" name="nama" value="{{ $p->getRawOriginal('nama') }}" maxlength="150" required placeholder="Nama admin" aria-label="Nama admin {{ $p->username }}" style="min-width:120px;padding:4px 7px;font-size:12px">
+                                    <button type="submit" class="btn o" style="padding:4px 7px;font-size:11px">Simpan</button>
+                                </form>
+                            @endif
                         </td>
+                        <td>{{ $p->email ?: '-' }}</td>
                         <td>
                             <span class="bd {{ $p->peran === 'admin' ? '' : 'ok' }}" style="font-weight:700;font-size:11px">
                                 {{ $p->peran === 'admin' ? '🛡 ADMIN' : '👨‍🏫 GURU' }}
                             </span>
                         </td>
+                        <td>
+                            <span class="bd {{ $p->aktif ? 'ok' : 'w' }}">{{ $p->aktif ? 'Aktif' : 'Nonaktif' }}</span>
+                        </td>
+                        <td>{{ $p->terakhir_login_at?->format('d/m/Y H:i') ?? 'Belum pernah' }}</td>
                         <td style="text-align:right">
                             @if($p->id !== Auth::id())
                                 <form method="POST" action="{{ route('admin.setting.akun.hapus', $p->id) }}" style="display:inline">
@@ -55,7 +71,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="4" style="text-align:center;color:var(--mu);padding:32px">
+                        <td colspan="7" style="text-align:center;color:var(--mu);padding:32px">
                             Tidak ada akun pengguna yang terdaftar.
                         </td>
                     </tr>
@@ -63,6 +79,48 @@
             </tbody>
         </table>
     </div>
+</div>
+
+<div class="card" style="margin-top:16px">
+    <div class="bar" style="margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid #eef2f6">
+        <div>
+            <h3 style="margin:0;font-size:17px;color:var(--admin-text)">Akun Siswa Mobile</h3>
+            <p class="sub" style="margin:3px 0 0">Data akun siswa yang terdaftar di aplikasi mobile JosBook</p>
+        </div>
+    </div>
+    <div class="tw">
+        <table>
+            <thead>
+                <tr>
+                    <th>Nama Siswa</th>
+                    <th>NISN</th>
+                    <th>Email</th>
+                    <th>Status</th>
+                    <th>Login Terakhir</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse($akunSiswa as $akun)
+                    <tr>
+                        <td>{{ $akun->siswa?->nama_lengkap ?? '-' }}</td>
+                        <td><code>{{ $akun->username }}</code></td>
+                        <td>{{ $akun->email ?: '-' }}</td>
+                        <td><span class="bd {{ $akun->aktif ? 'ok' : 'w' }}">{{ $akun->aktif ? 'Aktif' : 'Nonaktif' }}</span></td>
+                        <td>{{ $akun->terakhir_login_at?->format('d/m/Y H:i') ?? 'Belum pernah' }}</td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="5" style="text-align:center;color:var(--mu);padding:32px">Belum ada akun siswa mobile terdaftar.</td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
+    @if($akunSiswa->hasPages())
+        <div style="margin-top:16px;display:flex;justify-content:center">
+            {{ $akunSiswa->links() }}
+        </div>
+    @endif
 </div>
 
 {{-- MODAL TAMBAH AKUN --}}

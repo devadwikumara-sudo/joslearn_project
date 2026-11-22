@@ -4,101 +4,127 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Daftar Akun — JosBook</title>
+    <title>Daftar Akun — JosBook SMA Negeri 1 Rejoso</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ asset('css/josbook.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/josbook-auth-modern.css') }}?v={{ file_exists(public_path('css/josbook-auth-modern.css')) ? filemtime(public_path('css/josbook-auth-modern.css')) : time() }}">
 </head>
-<body style="margin:0;padding:0;background:#f6f9fe;font-family:'Plus Jakarta Sans',Inter,sans-serif">
-    <div class="jc">
-        <div class="wbg"></div>
+<body>
 
-        <!-- Header Logo sesuai desain -->
-        <div class="wh">
-            <div class="wh-logo">
-                <img src="{{ asset('images/josbook-logo.png') }}" alt="JosBook Logo">
-            </div>
-            <div class="wh-text">
-                <div class="wh-title">
-                    <b>JosBook</b>
-                    <span class="wh-badge">PORTAL</span>
-                </div>
-                <small>SMA NEGERI 1 REJOSO NGANJUK</small>
-            </div>
-        </div>
-
-        <div class="wcard">
-            <h2>Daftar Akun</h2>
-            <p class="ws">Pilih jenis akun yang akan dibuat</p>
-
-            @if(isset($errors) && $errors->any())
-            <div class="mban">
-                <b>Terjadi kesalahan</b>
-                <small>{{ $errors->first() }}</small>
-            </div>
-            @endif
-
-            <form method="POST" action="{{ route('daftar.post') }}">
-                @csrf
-                <input type="hidden" name="peran" id="role_input" value="{{ old('peran', 'admin') }}">
-
-                <!-- Tab Pemilihan Peran: ADMIN dan GURU sesuai Desain -->
-                <div class="jt">
-                    <span id="tab_admin" class="{{ old('peran', 'admin') === 'admin' ? 'on' : '' }}" onclick="selectRole('admin')">
-                        <b>ADMIN</b>
-                        <small>Pengelola sistem</small>
-                    </span>
-                    <span id="tab_guru" class="{{ old('peran') === 'guru' ? 'on' : '' }}" onclick="selectRole('guru')">
-                        <b>GURU</b>
-                        <small>Tenaga Pendidik</small>
-                    </span>
+    <div class="jb-edu-viewport">
+        <div class="jb-edu-container" style="justify-content:center;align-items:center;padding:40px 20px">
+            
+            <div class="jb-edu-glass-card" style="width:100%;max-width:480px">
+                <!-- Brand Header -->
+                <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:18px">
+                    <img src="{{ asset('images/josbook-logo.png') }}" alt="Logo JosBook" style="width:36px;height:36px;object-fit:contain">
+                    <span style="font-size:18px;font-weight:800;letter-spacing:0.5px">JOSBOOK PORTAL</span>
                 </div>
 
-                <label for="d_n">Nama Lengkap</label>
-                <div class="wf">
-                    <input id="d_n" class="no-icon" name="nama" type="text" placeholder="Joko Susanto" value="{{ old('nama') }}" required>
-                </div>
+                <h2>Daftar Akun Baru</h2>
+                <p class="subtitle">Pilih jenis akun yang akan didaftarkan ke sistem sekolah</p>
 
-                <label for="d_e">Email resmi</label>
-                <div class="wf">
-                    <input id="d_e" class="no-icon" name="email" type="email" placeholder="198204152008011007@sman1rejoso.sch.id" value="{{ old('email') }}" required>
+                @if(isset($errors) && $errors->any())
+                <div class="jb-edu-alert-error">
+                    <b>Terjadi kesalahan</b>
+                    <span>{{ $errors->first() }}</span>
                 </div>
-                <small>Untuk guru, email harus sama dengan yang tersimpan pada data Guru &amp; Master.</small>
+                @endif
 
-                <label for="d_i" id="label_identitas">Nomor Identitas / NIP</label>
-                <div class="wf">
-                    <input id="d_i" class="no-icon" name="identitas" type="text" placeholder="19820415" value="{{ old('identitas') }}" required>
-                </div>
+                <form class="jb-edu-form" method="POST" action="{{ route('daftar.post') }}">
+                    @csrf
+                    <input type="hidden" name="peran" id="role_input" value="{{ old('peran', 'admin') }}">
 
-                <div id="admin_code_group" style="{{ old('peran', 'admin') === 'admin' ? '' : 'display:none' }}">
-                    <label for="admin_registration_code">Kode Pendaftaran Admin</label>
-                    <div class="wf">
-                        <input id="admin_registration_code" class="no-icon" name="admin_registration_code" type="password" autocomplete="off" {{ old('peran', 'admin') === 'admin' ? 'required' : '' }}>
+                    <!-- Role Switcher -->
+                    <div class="jb-edu-role-selector">
+                        <button type="button" id="tab_admin" class="jb-edu-role-tab {{ old('peran', 'admin') === 'admin' ? 'active' : '' }}" onclick="selectRole('admin')">
+                            Administrator
+                        </button>
+                        <button type="button" id="tab_guru" class="jb-edu-role-tab {{ old('peran') === 'guru' ? 'active' : '' }}" onclick="selectRole('guru')">
+                            Guru Pengajar
+                        </button>
                     </div>
-                </div>
 
-                <label for="d_p">Password</label>
-                <div class="wf">
-                    <input id="d_p" class="no-icon" name="password" type="password" placeholder="••••••••••••" required>
-                    <span class="eye" onclick="togglePassword('d_p')">👁</span>
-                </div>
+                    <!-- Nama Lengkap -->
+                    <div class="jb-edu-field-group">
+                        <label for="d_n" class="jb-edu-label">Nama Lengkap &amp; Gelar</label>
+                        <div class="jb-edu-input-wrap">
+                            <input id="d_n" name="nama" type="text" class="jb-edu-input" placeholder="Masukkan nama lengkap Anda" value="{{ old('nama') }}" required>
+                            <span class="jb-edu-input-icon">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                            </span>
+                        </div>
+                    </div>
 
-                <label for="d_p2">Konfirmasi Password</label>
-                <div class="wf">
-                    <input id="d_p2" class="no-icon" name="password_confirmation" type="password" placeholder="••••••••••••" required>
-                    <span class="eye" onclick="togglePassword('d_p2')">👁</span>
-                </div>
+                    <!-- Email Resmi -->
+                    <div class="jb-edu-field-group">
+                        <label for="d_e" class="jb-edu-label">Email Resmi Sekolah</label>
+                        <div class="jb-edu-input-wrap">
+                            <input id="d_e" name="email" type="email" class="jb-edu-input" placeholder="nama@sman1rejoso.sch.id" value="{{ old('email') }}" required>
+                            <span class="jb-edu-input-icon">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                            </span>
+                        </div>
+                    </div>
 
-                <button type="submit" class="wb">DAFTAR AKUN →</button>
-            </form>
+                    <!-- Identitas / NIP -->
+                    <div class="jb-edu-field-group">
+                        <label for="d_i" class="jb-edu-label" id="label_identitas">Nomor Identitas / NIP</label>
+                        <div class="jb-edu-input-wrap">
+                            <input id="d_i" name="identitas" type="text" class="jb-edu-input" placeholder="19820415..." value="{{ old('identitas') }}" required>
+                            <span class="jb-edu-input-icon">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 8h10M7 12h6M7 16h8"/></svg>
+                            </span>
+                        </div>
+                    </div>
 
-            <p class="wfo">Sudah punya akun? <a href="{{ route('login') }}">Masuk</a></p>
-        </div>
+                    <!-- Kode Admin -->
+                    <div id="admin_code_group" style="{{ old('peran', 'admin') === 'admin' ? '' : 'display:none' }}">
+                        <div class="jb-edu-field-group">
+                            <label for="admin_registration_code" class="jb-edu-label">Kode Pendaftaran Admin</label>
+                            <div class="jb-edu-input-wrap">
+                                <input id="admin_registration_code" name="admin_registration_code" type="password" class="jb-edu-input" placeholder="Kode verifikasi admin sekolah" autocomplete="off" {{ old('peran', 'admin') === 'admin' ? 'required' : '' }}>
+                                <span class="jb-edu-input-icon">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4"/><path d="m21 2-9.6 9.6"/><circle cx="7.5" cy="16.5" r="5.5"/></svg>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
 
-        <div class="wft">
-            <b>JosBook</b> · SMA Negeri 1 Rejoso Nganjuk<br>
-            Butuh bantuan cepat? <a href="#">Hubungi Operator Dapodik Sekolah ↗</a>
+                    <!-- Kata Sandi -->
+                    <div class="jb-edu-field-group">
+                        <label for="d_p" class="jb-edu-label">Kata Sandi</label>
+                        <div class="jb-edu-input-wrap">
+                            <input id="d_p" name="password" type="password" class="jb-edu-input" placeholder="Minimal 8 karakter" required>
+                            <span class="jb-edu-input-icon clickable" onclick="togglePassword('d_p')" title="Tampilkan / Sembunyikan Sandi">
+                                <svg id="eye-icon-d_p" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Konfirmasi Kata Sandi -->
+                    <div class="jb-edu-field-group">
+                        <label for="d_p2" class="jb-edu-label">Konfirmasi Kata Sandi</label>
+                        <div class="jb-edu-input-wrap">
+                            <input id="d_p2" name="password_confirmation" type="password" class="jb-edu-input" placeholder="Ulangi kata sandi" required>
+                            <span class="jb-edu-input-icon clickable" onclick="togglePassword('d_p2')" title="Tampilkan / Sembunyikan Sandi">
+                                <svg id="eye-icon-d_p2" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                            </span>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="jb-edu-btn">
+                        <span>Daftar Akun Sekarang</span>
+                    </button>
+                </form>
+
+                <p class="jb-edu-footer-text">
+                    Sudah memiliki akun? <a href="{{ route('login') }}">Masuk</a>
+                </p>
+            </div>
+
         </div>
     </div>
 
@@ -113,27 +139,38 @@
             const adminCode = document.getElementById('admin_registration_code');
 
             if (role === 'admin') {
-                tabAdmin.classList.add('on');
-                tabGuru.classList.remove('on');
+                tabAdmin.classList.add('active');
+                tabGuru.classList.remove('active');
                 adminCodeGroup.style.display = '';
                 adminCode.required = true;
-                labelIdentitas.innerText = 'Nomor Identitas / NIP';
-                inputIdentitas.placeholder = '19820415';
+                labelIdentitas.innerText = 'Nomor Identitas / NIP Admin';
+                inputIdentitas.placeholder = '19820415...';
             } else {
-                tabGuru.classList.add('on');
-                tabAdmin.classList.remove('on');
+                tabGuru.classList.add('active');
+                tabAdmin.classList.remove('active');
                 adminCodeGroup.style.display = 'none';
                 adminCode.required = false;
                 adminCode.value = '';
                 labelIdentitas.innerText = 'Nomor Identitas / NIP Guru';
-                inputIdentitas.placeholder = 'Masukkan NIP Guru';
+                inputIdentitas.placeholder = 'Masukkan NIP Guru Terdaftar';
             }
         }
 
         function togglePassword(id) {
             const el = document.getElementById(id);
+            const icon = document.getElementById('eye-icon-' + id);
             if (el) {
-                el.type = el.type === 'password' ? 'text' : 'password';
+                if (el.type === 'password') {
+                    el.type = 'text';
+                    if (icon) {
+                        icon.innerHTML = '<path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/>';
+                    }
+                } else {
+                    el.type = 'password';
+                    if (icon) {
+                        icon.innerHTML = '<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>';
+                    }
+                }
             }
         }
     </script>

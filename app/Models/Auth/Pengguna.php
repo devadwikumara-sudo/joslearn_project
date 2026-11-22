@@ -16,6 +16,7 @@ class Pengguna extends Authenticatable
     protected $fillable = [
         'peran',
         'username',
+        'nama',
         'email',
         'email_diverifikasi_at',
         'password',
@@ -49,7 +50,13 @@ class Pengguna extends Authenticatable
             return $this->guru->nama;
         }
 
-        return ucfirst($this->username);
+        $nama = trim((string) ($this->attributes['nama'] ?? ''));
+
+        if ($nama !== '') {
+            return $nama;
+        }
+
+        return $this->peran === 'admin' ? 'Administrator' : ucfirst($this->username);
     }
 
     public function getAuthPassword(): string

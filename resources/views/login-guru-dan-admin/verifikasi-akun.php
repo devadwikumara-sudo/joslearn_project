@@ -4,20 +4,19 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Verifikasi Akun — JosBook</title>
+    <title>Verifikasi Akun — JosBook SMA Negeri 1 Rejoso</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ asset('css/josbook.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/josbook-auth-modern.css') }}?v={{ file_exists(public_path('css/josbook-auth-modern.css')) ? filemtime(public_path('css/josbook-auth-modern.css')) : time() }}">
 </head>
-<body style="margin:0;padding:0;background:#f6f9fe;font-family:'Plus Jakarta Sans',Inter,sans-serif">
+<body class="jb-auth-body">
     <div class="jc">
-        <div class="wbg"></div>
-
-        <!-- Header Logo sesuai desain -->
+        <!-- Header Logo Instansi -->
         <div class="wh">
             <div class="wh-logo">
-                <img src="{{ asset('images/josbook-logo.png') }}" alt="JosBook Logo">
+                <img src="{{ asset('images/josbook-logo.png') }}" alt="Logo JosBook">
             </div>
             <div class="wh-text">
                 <div class="wh-title">
@@ -29,20 +28,30 @@
         </div>
 
         <div class="wcard">
-            <span class="wic">✉</span>
-            <div class="pl">⟳ Langkah 2 dari 3: Verifikasi Kode Keamanan</div>
+            <div class="wic">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect width="20" height="16" x="2" y="4" rx="2"></rect>
+                    <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path>
+                </svg>
+            </div>
+
+            <div class="pl">
+                ● Langkah 2 dari 3: Verifikasi Kode Keamanan
+            </div>
+
             <h2>Verifikasi Akun</h2>
             <p class="ws">Kami telah mengirimkan 6 digit kode keamanan ke email kedinasan Anda:</p>
 
             @if(isset($errors) && $errors->any())
             <div class="mban">
-                <b>◎ Verifikasi gagal</b>
+                <b>Verifikasi gagal</b>
                 <small>{{ $errors->first() }}</small>
             </div>
             @endif
 
-            <div class="mp">
-                ✔ <b>{{ session('masked_email', 'bu***@sman1rejoso.sch.id') }}</b> <em>TERVALIDASI</em>
+            <div style="background:#f1f5f9;border:1px solid #e2e8f0;border-radius:99px;padding:6px 14px;font-size:12px;margin-bottom:14px;display:inline-block">
+                ✔ <b>{{ session('masked_email', 'bu***@sman1rejoso.sch.id') }}</b> 
+                <span style="font-size:10px;background:#e2e8f0;color:#475569;border-radius:4px;padding:2px 6px;margin-left:4px">TERVALIDASI</span>
             </div>
 
             <form method="POST" action="{{ route('verifikasi-akun.post') }}" id="otpForm">
@@ -58,7 +67,9 @@
                     <input class="otp" id="o5" maxlength="1" inputmode="numeric" pattern="[0-9]*">
                 </div>
 
-                <button type="submit" class="wb">VERIFIKASI KODE →</button>
+                <button type="submit" class="wb">
+                    <span>VERIFIKASI KODE &rarr;</span>
+                </button>
             </form>
 
             <form method="POST" action="{{ route('verifikasi-akun.kirim-ulang') }}" id="resendForm" style="display:none">
@@ -67,18 +78,18 @@
 
             <p class="wfo">
                 Belum menerima kode verifikasi?<br>
-                Kirim ulang kode: <em class="tm" id="timer_text">⏱ Kirim ulang dalam 00:45</em><br>
+                <span id="timer_text" style="color:var(--edu-blue-600);font-weight:700">⏱ Kirim ulang dalam 00:45</span>
             </p>
 
-            <div class="wlk">
-                <a href="{{ route('login') }}">← Kembali ke Login</a>
-                <a href="#">ⓘ Bantuan Guru</a>
+            <div style="display:flex;justify-content:space-between;margin-top:16px;font-size:12px">
+                <a href="{{ route('login') }}" style="color:var(--edu-blue-600);text-decoration:none;font-weight:600">&larr; Kembali ke Login</a>
+                <a href="#" style="color:var(--edu-slate-500);text-decoration:none">Bantuan &nearr;</a>
             </div>
         </div>
 
         <div class="wft">
-            <b>JosBook</b> · SMA Negeri 1 Rejoso Nganjuk<br>
-            Butuh bantuan cepat? <a href="#">Hubungi Operator Dapodik Sekolah ↗</a>
+            <b>JosBook</b> &bull; SMA Negeri 1 Rejoso Nganjuk<br>
+            Butuh bantuan cepat? <a href="#">Hubungi Operator Dapodik Sekolah &nearr;</a>
         </div>
     </div>
 
@@ -121,11 +132,10 @@
             updateCode();
         });
 
-        // Resend countdown timer
         let seconds = {{ $sisaKirimUlang ?? 45 }};
         const timerEl = document.getElementById('timer_text');
         const showResendLink = () => {
-            timerEl.innerHTML = '<a href="#" onclick="document.getElementById(\'resendForm\').submit();return false;" style="color:#1967d2;font-weight:700">Kirim Ulang Sekarang</a>';
+            timerEl.innerHTML = '<a href="#" onclick="document.getElementById(\'resendForm\').submit();return false;" style="color:#1d4ed8;font-weight:700">Kirim Ulang Sekarang</a>';
         };
         if (seconds <= 0) {
             showResendLink();

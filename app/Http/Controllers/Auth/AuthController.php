@@ -233,6 +233,7 @@ class AuthController extends Controller
             return Pengguna::create([
                 'peran' => $request->peran,
                 'username' => trim($request->identitas),
+                'nama' => $request->peran === 'admin' ? trim($request->nama) : null,
                 'email' => $email,
                 'password' => Hash::make($request->password),
                 'aktif' => false,

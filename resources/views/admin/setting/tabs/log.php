@@ -17,11 +17,20 @@
                 <option value="{{ $user }}" {{ $lf === $user ? 'selected' : '' }}>{{ $user }}</option>
             @endforeach
         </select>
-        <input type="text" name="lq" placeholder="🔍 Cari rincian aktivitas..." value="{{ $lq }}" style="min-width:240px;padding:7px 12px;font-size:13px">
+        <input type="text" name="lq" placeholder="Cari aktivitas" value="{{ $lq }}" style="min-width:240px;padding:7px 12px;font-size:13px">
         <button type="submit" class="btn" style="display:none"></button>
     </div>
     <span class="sp"></span>
     <a href="{{ route('admin.log-aktivitas.export', ['lf' => $lf, 'lq' => $lq]) }}" class="btn o">⬇ Ekspor Excel Log</a>
+</form>
+
+<form method="POST" action="{{ route('admin.setting.log.hapus') }}" class="bar" style="justify-content:flex-end;margin-bottom:14px"
+    onsubmit="return confirm('Hapus semua catatan aktivitas yang sesuai dengan filter saat ini?')">
+    @csrf
+    @method('DELETE')
+    <input type="hidden" name="lf" value="{{ $lf }}">
+    <input type="hidden" name="lq" value="{{ $lq }}">
+    <button type="submit" class="btn x">Hapus log sesuai filter</button>
 </form>
 
 <div class="card">

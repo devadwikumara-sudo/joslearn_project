@@ -4,107 +4,140 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Masuk — JosBook</title>
+    <title>Masuk — JosBook SMA Negeri 1 Rejoso</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ asset('css/josbook.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/josbook-auth-modern.css') }}?v={{ file_exists(public_path('css/josbook-auth-modern.css')) ? filemtime(public_path('css/josbook-auth-modern.css')) : time() }}">
 </head>
-<body style="margin:0;padding:0;background:#fff;font-family:'Plus Jakarta Sans',Inter,sans-serif">
-    <div class="jl">
-        <!-- Panel Kiri Sesuai Desain Login.png -->
-        <div class="jlf">
-            <div class="jb">
-                <div class="jb-logo">
-                    <img src="{{ asset('images/josbook-logo.png') }}" alt="JosBook Logo">
+<body>
+
+    <!-- Full-Screen Viewport with Educational Theme Still Life Background & Gradient Overlay -->
+    <div class="jb-edu-viewport">
+        <div class="jb-edu-container">
+
+            <!-- Top Header: School Brand & Portal Badge -->
+            <header class="jb-edu-header">
+                <div class="jb-edu-brand">
+                    <div class="jb-edu-brand-logo">
+                        <img src="{{ asset('images/josbook-logo.png') }}" alt="Logo JosBook">
+                    </div>
+                    <div class="jb-edu-brand-info">
+                        <span class="jb-edu-brand-title">JOSBOOK</span>
+                        <span class="jb-edu-brand-subtitle">SMA NEGERI 1 REJOSO NGANJUK</span>
+                    </div>
                 </div>
-                <b>JOSBOOK</b>
-            </div>
 
-            <div class="jlc">
-                <div class="jlc-logo">
-                    <img src="{{ asset('images/josbook-logo.png') }}" alt="JosBook Logo">
+                <div class="jb-edu-portal-badge">
+                    <span class="dot"></span>
+                    <span>PORTAL BUKU INDUK DIGITAL</span>
                 </div>
-                <h1>JosBook</h1>
-                <p>Absensi &amp; Nilai Raport Real Time</p>
-                <ul>
-                    <li>Pemantauan kehadiran siswa otomatis &amp; akurat</li>
-                    <li>Pengolahan nilai raport terpadu &amp; transparan</li>
-                </ul>
-            </div>
+            </header>
 
-            <small>2026 JosLearn. Hak Cipta Dilindungi.</small>
-        </div>
+            <!-- Main Auth Form (Overlaid on Left with High Readability & Frosted Glass) -->
+            <main class="jb-edu-main">
+                <h1 class="jb-edu-title">Akses Akun Portal</h1>
+                <p class="jb-edu-subtitle">Silakan masuk menggunakan akun Guru atau Administrator resmi SMA Negeri 1 Rejoso.</p>
 
-        <!-- Panel Kanan Form Login Sesuai Desain Login.png -->
-        <div class="jr">
-            <div class="jm">
-                <img src="{{ asset('images/josbook-logo.png') }}" alt="JosBook Logo" style="width:90px;height:90px;object-fit:contain">
-            </div>
-
-            <div class="jfm">
-                <h1>Selamat Datang</h1>
-                <h4>Masuk ke JosBook</h4>
-                <small class="jh">Gunakan akun Admin atau Guru yang terdaftar</small>
-
+                <!-- Flash Message Alerts -->
                 @if(session('error'))
-                <div class="mban">
-                    <b>Login gagal</b>
-                    <small>{{ session('error') }}</small>
+                <div class="jb-edu-alert-error">
+                    <b>Login Gagal</b>
+                    <span>{{ session('error') }}</span>
                 </div>
                 @endif
 
                 @if(session('success'))
-                <div style="background:#e8f8f0;border:1px solid #a3e6c0;color:#1f8a5b;border-radius:10px;padding:9px 12px;font-size:12px;margin-bottom:12px">
-                    <b>Berhasil</b>
-                    <small style="display:block;margin-top:2px">{{ session('success') }}</small>
+                <div class="jb-edu-alert-success">
+                    <span>{{ session('success') }}</span>
                 </div>
                 @endif
 
                 @if(isset($errors) && $errors->any())
-                <div class="mban">
-                    <b>Login gagal</b>
-                    <small>{{ $errors->first() }}</small>
+                <div class="jb-edu-alert-error">
+                    <b>Login Gagal</b>
+                    <span>{{ $errors->first() }}</span>
                 </div>
                 @endif
 
-                <form method="POST" action="{{ route('login.post') }}">
+                <!-- Login Form -->
+                <form class="jb-edu-form" method="POST" action="{{ route('login.post') }}">
                     @csrf
-                    <label for="l_u">NIS/NIP, Email</label>
-                    <div class="wf">
-                        <input id="l_u" name="username" type="text" placeholder="Masukkan Nama Pengguna atau NIS/NIP" value="{{ old('username') }}" autocomplete="username" required autofocus>
+
+                    <!-- Field 1: E-mail / NIP / Username -->
+                    <div class="jb-edu-field-group">
+                        <label for="l_u" class="jb-edu-label">E-mail / NIP / Nama Pengguna</label>
+                        <div class="jb-edu-input-wrap">
+                            <input id="l_u" name="username" type="text" class="jb-edu-input" placeholder="nama@sman1rejoso.sch.id / NIP" value="{{ old('username') }}" autocomplete="username" required autofocus>
+                            <span class="jb-edu-input-icon">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                            </span>
+                        </div>
                     </div>
 
-                    <label for="l_p">Kata Sandi</label>
-                    <div class="wf">
-                        <input id="l_p" name="password" type="password" placeholder="Masukkan kata sandi Anda" autocomplete="current-password" required>
-                        <span class="eye" onclick="togglePassword('l_p')">👁</span>
+                    <!-- Field 2: Password -->
+                    <div class="jb-edu-field-group">
+                        <label for="l_p" class="jb-edu-label">Kata Sandi</label>
+                        <div class="jb-edu-input-wrap">
+                            <input id="l_p" name="password" type="password" class="jb-edu-input" placeholder="••••••••••••" autocomplete="current-password" required>
+                            <span class="jb-edu-input-icon clickable" onclick="togglePassword('l_p')" title="Tampilkan / Sembunyikan Sandi">
+                                <svg id="eye-icon-l_p" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                            </span>
+                        </div>
                     </div>
 
-                    <div class="jrow">
-                        <label style="display:flex;gap:6px;margin:0;align-items:center;cursor:pointer">
-                            <input type="checkbox" name="remember" {{ old('remember') ? 'checked' : '' }}> Ingat saya
+                    <!-- Row: Remember Session & Forgot Password -->
+                    <div class="jb-edu-row">
+                        <label class="jb-edu-checkbox-label">
+                            <input type="checkbox" name="remember" {{ old('remember') ? 'checked' : '' }}>
+                            <span>Ingat sesi masuk</span>
                         </label>
-                        <a href="{{ route('reset-sandi') }}">Lupa Kata Sandi?</a>
+                        <a href="{{ route('reset-sandi') }}" class="jb-edu-forgot-link">Lupa kata sandi?</a>
                     </div>
 
-                    <button type="submit" class="jbtn">Masuk →</button>
+                    <!-- Primary Pill Action Button (Vibrant Cyan / Sky Blue Pill) -->
+                    <button type="submit" class="jb-edu-btn">
+                        <span>Masuk ke Akun</span>
+                    </button>
                 </form>
 
-                <p class="jfoot">Belum punya akun? <a href="{{ route('daftar') }}">Daftar akun</a></p>
+                <!-- New User Link -->
+                <p class="jb-edu-footer-text">
+                    Pengguna baru? <a href="{{ route('daftar') }}">Buat akun di sini</a>
+                </p>
+            </main>
 
+            <!-- Bottom Footer: Accreditation & Copyright -->
+            <footer class="jb-edu-footer">
+                <span>&copy; 2026 SMA Negeri 1 Rejoso Nganjuk &bull; Hak Cipta Dilindungi</span>
+                <div class="jb-edu-footer-badges">
+                    <span class="jb-edu-footer-badge">Terakreditasi A</span>
+                    <span class="jb-edu-footer-badge">Kurikulum Merdeka</span>
+                    <span class="jb-edu-footer-badge">Dapodik Terintegrasi</span>
+                </div>
+            </footer>
 
-            </div>
-
-            <small class="jbt">Memerlukan bantuan akses? Hubungi administrator sekolah</small>
         </div>
     </div>
 
+    <!-- Script Password Toggle -->
     <script>
         function togglePassword(id) {
             const el = document.getElementById(id);
+            const icon = document.getElementById('eye-icon-' + id);
             if (el) {
-                el.type = el.type === 'password' ? 'text' : 'password';
+                if (el.type === 'password') {
+                    el.type = 'text';
+                    if (icon) {
+                        icon.innerHTML = '<path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/>';
+                    }
+                } else {
+                    el.type = 'password';
+                    if (icon) {
+                        icon.innerHTML = '<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>';
+                    }
+                }
             }
         }
     </script>
