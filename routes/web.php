@@ -266,7 +266,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin.only'])->grou
     Route::post('/setting/cadangan/pulihkan', [SettingController::class, 'pulihkanCadangan'])->name('setting.cadangan.pulihkan');
     Route::delete('/setting/tahun-ajaran/hapus-data', [SettingController::class, 'hapusDataTahunAjaran'])->name('setting.tahun-ajaran.hapus-data');
     Route::delete('/setting/akun/{id}', [SettingController::class, 'hapusAkun'])->name('setting.akun.hapus');
-    Route::put('/setting/akun/{id}/nama', [SettingController::class, 'updateNamaAkun'])->name('setting.akun.nama');
+    Route::put('/setting/akun/{id}/profil', [SettingController::class, 'updateProfilAkun'])->name('setting.akun.profil');
     Route::delete('/setting/log', [SettingController::class, 'hapusLog'])->name('setting.log.hapus');
 });
 
@@ -281,16 +281,18 @@ Route::prefix('guru')->name('guru.')->middleware(['auth', 'role.web'])->group(fu
     Route::put('/setting/profil', [SettingGuruController::class, 'updateProfil'])->name('setting.profil');
     Route::put('/setting/password', [SettingGuruController::class, 'updateKataSandi'])->name('setting.password');
 
-    // Data Siswa (data siswa.png - guru)
-    Route::get('/data-siswa', [DataSiswaGuruController::class, 'index'])->name('data-siswa');
-    Route::get('/data-siswa/export', [DataSiswaGuruController::class, 'export'])->name('data-siswa.export');
-    Route::get('/data-siswa/pdf-semua', [DataSiswaGuruController::class, 'pdfAll'])->name('data-siswa.pdf-all');
-    Route::post('/data-siswa/pdf-terpilih', [DataSiswaGuruController::class, 'pdfSelected'])->name('data-siswa.pdf-selected');
-    Route::get('/data-siswa/pdf-batch', [PdfCetakController::class, 'batch'])->name('data-siswa.pdf-batch');
-    Route::get('/data-siswa/{id}/pdf', [PdfCetakController::class, 'single'])->name('data-siswa.pdf');
-    Route::get('/data-siswa/{id}/foto', [DataSiswaController::class, 'foto'])->name('data-siswa.foto');
-    Route::get('/data-siswa/{id}/berkas/{jenis}', [DataSiswaController::class, 'berkas'])->name('data-siswa.berkas');
-    Route::get('/data-siswa/{id}', [DataSiswaGuruController::class, 'show'])->name('data-siswa.show');
+    // Data siswa hanya tersedia setelah admin memberi penugasan.
+    Route::middleware('guru.assigned')->group(function (): void {
+        Route::get('/data-siswa', [DataSiswaGuruController::class, 'index'])->name('data-siswa');
+        Route::get('/data-siswa/export', [DataSiswaGuruController::class, 'export'])->name('data-siswa.export');
+        Route::get('/data-siswa/pdf-semua', [DataSiswaGuruController::class, 'pdfAll'])->name('data-siswa.pdf-all');
+        Route::post('/data-siswa/pdf-terpilih', [DataSiswaGuruController::class, 'pdfSelected'])->name('data-siswa.pdf-selected');
+        Route::get('/data-siswa/pdf-batch', [PdfCetakController::class, 'batch'])->name('data-siswa.pdf-batch');
+        Route::get('/data-siswa/{id}/pdf', [PdfCetakController::class, 'single'])->name('data-siswa.pdf');
+        Route::get('/data-siswa/{id}/foto', [DataSiswaController::class, 'foto'])->name('data-siswa.foto');
+        Route::get('/data-siswa/{id}/berkas/{jenis}', [DataSiswaController::class, 'berkas'])->name('data-siswa.berkas');
+        Route::get('/data-siswa/{id}', [DataSiswaGuruController::class, 'show'])->name('data-siswa.show');
+    });
 
     // Import Fleksibel API (Universal Batch Save - Guru)
     Route::post('/import/preview-match', [ImportBatchController::class, 'previewMatch'])->name('import.preview-match');

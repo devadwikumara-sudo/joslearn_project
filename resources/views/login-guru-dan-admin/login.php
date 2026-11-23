@@ -76,7 +76,7 @@
                         <div class="jb-edu-field-group">
                             <label for="l_u" class="jb-edu-label">E-mail / NIP / Nama Pengguna</label>
                             <div class="jb-edu-input-wrap">
-                                <input id="l_u" name="username" type="text" class="jb-edu-input" placeholder="nama@sman1rejoso.sch.id / NIP" value="{{ old('username') }}" autocomplete="username" required autofocus>
+                                <input id="l_u" name="username" type="text" class="jb-edu-input" placeholder="Masukkan email resmi, NIP, atau nama pengguna" value="{{ old('username') }}" autocomplete="username" required autofocus>
                                 <span class="jb-edu-input-icon">
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                                 </span>
@@ -87,7 +87,7 @@
                         <div class="jb-edu-field-group">
                             <label for="l_p" class="jb-edu-label">Kata Sandi</label>
                             <div class="jb-edu-input-wrap">
-                                <input id="l_p" name="password" type="password" class="jb-edu-input" placeholder="••••••••••••" autocomplete="current-password" required>
+                                <input id="l_p" name="password" type="password" class="jb-edu-input" placeholder="Masukkan kata sandi akun Anda" autocomplete="current-password" required>
                                 <span class="jb-edu-input-icon clickable" onclick="togglePassword('l_p')" title="Tampilkan / Sembunyikan Sandi">
                                     <svg id="eye-icon-l_p" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
                                 </span>

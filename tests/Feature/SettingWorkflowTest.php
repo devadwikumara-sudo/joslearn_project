@@ -227,6 +227,7 @@ class SettingWorkflowTest extends TestCase
             'id' => 2,
             'peran' => 'guru',
             'username' => '198001012010011001',
+            'nama' => 'Nama Pendaftaran Guru',
             'email' => 'guru@example.test',
             'password' => 'hash',
             'aktif' => true,
@@ -249,35 +250,45 @@ class SettingWorkflowTest extends TestCase
         $this->actingAs($this->user('admin', 1))
             ->get(route('admin.setting', ['tab' => 'akun']))
             ->assertOk()
-            ->assertSee('Guru Terdaftar')
+            ->assertSee('Nama Pendaftaran Guru')
             ->assertSee('guru@example.test')
+            ->assertSee('Nama Pengguna *')
+            ->assertSee('Status Akun Guru *')
+            ->assertSee(route('admin.setting.akun.profil', 2), false)
+            ->assertSee('<dialog id="md-edit-akun-2" class="account-edit-dialog">', false)
+            ->assertSee('document.getElementById(\'md-edit-akun-2\').showModal()', false)
             ->assertSee('Akun Siswa Mobile')
             ->assertSee('Siswa Terdaftar')
             ->assertSee('1234567890')
             ->assertSee('siswa@example.test');
     }
 
-    public function test_admin_can_update_display_name_and_profile_menu_hides_password_link(): void
+    public function test_admin_can_update_account_name_and_email_and_profile_menu_hides_password_link(): void
     {
         DB::table('akun_pengguna')->insert([
             'id' => 2,
             'peran' => 'admin',
             'username' => 'admin-kedua',
             'nama' => null,
+            'email' => 'admin-kedua@example.test',
             'password' => 'hash',
             'aktif' => true,
         ]);
 
         $this->actingAs($this->user('admin', 1))
-            ->put(route('admin.setting.akun.nama', 2), ['nama' => 'Nama Admin Baru'])
+            ->put(route('admin.setting.akun.profil', 2), [
+                'nama' => 'Nama Admin Baru',
+                'email' => 'ADMIN-BARU@example.test',
+            ])
             ->assertRedirect();
 
         $this->assertDatabaseHas('akun_pengguna', [
             'id' => 2,
             'nama' => 'Nama Admin Baru',
+            'email' => 'admin-baru@example.test',
         ]);
         $this->assertDatabaseHas('catatan_aktivitas', [
-            'aksi' => 'ubah_nama_akun',
+            'aksi' => 'ubah_profil_akun',
             'objek_tipe' => 'akun_pengguna',
             'objek_id' => 2,
         ]);
@@ -292,10 +303,125 @@ class SettingWorkflowTest extends TestCase
             ->assertDontSee('Ganti password');
     }
 
-    public function test_non_admin_cannot_update_an_admin_display_name(): void
+    public function test_admin_can_update_a_teacher_account_name_email_and_status(): void
+    {
+        DB::table('guru_biodata')->insert([
+            'id' => 31,
+            'nama' => 'Nama Data Guru',
+            'nip' => '198001012010011001',
+        ]);
+        DB::table('akun_pengguna')->insert([
+            'id' => 2,
+            'peran' => 'guru',
+            'username' => '198001012010011001',
+            'nama' => 'Nama Pendaftaran',
+            'email' => 'guru-lama@example.test',
+            'password' => 'hash',
+            'aktif' => true,
+            'guru_id' => 31,
+        ]);
+
+        $this->actingAs($this->user('admin', 1))
+            ->put(route('admin.setting.akun.profil', 2), [
+                'nama' => 'Nama Guru Diperbarui',
+                'email' => 'guru-baru@example.test',
+                'aktif' => '0',
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('akun_pengguna', [
+            'id' => 2,
+            'username' => '198001012010011001',
+            'nama' => 'Nama Guru Diperbarui',
+            'email' => 'guru-baru@example.test',
+            'aktif' => false,
+        ]);
+        $this->assertDatabaseHas('guru_biodata', [
+            'id' => 31,
+            'nama' => 'Nama Guru Diperbarui',
+            'email' => 'guru-baru@example.test',
+        ]);
+        $this->assertSame('Nama Guru Diperbarui', Pengguna::findOrFail(2)->nama);
+    }
+
+    public function test_admin_cannot_change_an_admin_account_status_through_teacher_status_field(): void
+    {
+        DB::table('akun_pengguna')->insert([
+            'id' => 2,
+            'peran' => 'admin',
+            'username' => 'admin-kedua',
+            'nama' => 'Admin Kedua',
+            'email' => 'admin-kedua@example.test',
+            'password' => 'hash',
+            'aktif' => true,
+        ]);
+
+        $this->actingAs($this->user('admin', 1))
+            ->put(route('admin.setting.akun.profil', 2), [
+                'nama' => 'Admin Kedua',
+                'email' => 'admin-kedua@example.test',
+                'aktif' => '0',
+            ])
+            ->assertSessionHasErrors([
+                'aktif' => 'Status akun hanya dapat diubah untuk akun guru.',
+            ]);
+
+        $this->assertDatabaseHas('akun_pengguna', [
+            'id' => 2,
+            'aktif' => true,
+        ]);
+        $this->assertSame(0, DB::table('catatan_aktivitas')->count());
+    }
+
+    public function test_account_profile_update_rejects_an_email_used_by_another_account(): void
+    {
+        DB::table('akun_pengguna')->insert([
+            [
+                'id' => 2,
+                'peran' => 'admin',
+                'username' => 'admin-kedua',
+                'nama' => 'Admin Kedua',
+                'email' => 'admin-kedua@example.test',
+                'password' => 'hash',
+                'aktif' => true,
+            ],
+            [
+                'id' => 3,
+                'peran' => 'admin',
+                'username' => 'admin-ketiga',
+                'nama' => 'Admin Ketiga',
+                'email' => 'admin-ketiga@example.test',
+                'password' => 'hash',
+                'aktif' => true,
+            ],
+        ]);
+
+        $this->actingAs($this->user('admin', 1))
+            ->from(route('admin.setting', ['tab' => 'akun']))
+            ->put(route('admin.setting.akun.profil', 2), [
+                'nama' => 'Nama Tidak Disimpan',
+                'email' => 'admin-ketiga@example.test',
+            ])
+            ->assertRedirect(route('admin.setting', ['tab' => 'akun']))
+            ->assertSessionHasErrors([
+                'email' => 'Email ini sudah digunakan oleh akun lain.',
+            ]);
+
+        $this->assertDatabaseHas('akun_pengguna', [
+            'id' => 2,
+            'nama' => 'Admin Kedua',
+            'email' => 'admin-kedua@example.test',
+        ]);
+        $this->assertSame(0, DB::table('catatan_aktivitas')->count());
+    }
+
+    public function test_non_admin_cannot_update_an_account_name_or_email(): void
     {
         $this->actingAs($this->user('guru', 2))
-            ->put(route('admin.setting.akun.nama', 3), ['nama' => 'Nama Tidak Sah'])
+            ->put(route('admin.setting.akun.profil', 3), [
+                'nama' => 'Nama Tidak Sah',
+                'email' => 'tidak-sah@example.test',
+            ])
             ->assertForbidden();
 
         $this->assertSame(0, DB::table('catatan_aktivitas')->count());
@@ -684,7 +810,7 @@ class SettingWorkflowTest extends TestCase
                 'dipulihkan_at' => 'timestamp',
             ],
             'guru_biodata' => [
-                'nama' => 'string', 'nip' => 'string', 'nuptk' => 'string',
+                'nama' => 'string', 'nip' => 'string', 'nuptk' => 'string', 'email' => 'string',
                 'tempat_sampah_id' => 'integer', 'deleted_at' => 'timestamp',
             ],
             'guru_wali_kelas' => [

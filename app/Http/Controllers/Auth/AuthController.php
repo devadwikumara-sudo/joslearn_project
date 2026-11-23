@@ -144,7 +144,8 @@ class AuthController extends Controller
      */
     public function daftar(Request $request)
     {
-        $identitasRules = ['required', 'string', 'max:50'];
+        $identitasMaxLength = $request->input('peran') === 'guru' ? 30 : 50;
+        $identitasRules = ['required', 'string', 'max:'.$identitasMaxLength];
         if ($request->input('peran') === 'admin') {
             $identitasRules[] = 'unique:akun_pengguna,username';
         }
@@ -194,8 +195,16 @@ class AuthController extends Controller
                 $nip = trim($request->identitas);
                 $guru = GuruBiodata::where('nip', $nip)->lockForUpdate()->first();
                 if (! $guru) {
-                    throw ValidationException::withMessages([
-                        'identitas' => 'NIP belum terdaftar, hubungi admin',
+                    if (Pengguna::query()->where('username', $nip)->exists()) {
+                        throw ValidationException::withMessages([
+                            'identitas' => 'NIP ini sudah memiliki akun.',
+                        ]);
+                    }
+
+                    $guru = GuruBiodata::query()->create([
+                        'nama' => trim($request->nama),
+                        'nip' => $nip,
+                        'email' => $email,
                     ]);
                 }
 
@@ -209,39 +218,64 @@ class AuthController extends Controller
                 }
 
                 $emailResmi = Str::lower(trim((string) $guru->email));
-                if ($emailResmi === '' || filter_var($emailResmi, FILTER_VALIDATE_EMAIL) === false) {
-                    throw ValidationException::withMessages([
-                        'email' => 'Email resmi guru belum tersedia atau tidak valid. Hubungi administrator.',
-                    ]);
+                if ($emailResmi !== '' && filter_var($emailResmi, FILTER_VALIDATE_EMAIL) !== false) {
+                    if (! hash_equals($emailResmi, $email)) {
+                        throw ValidationException::withMessages([
+                            'email' => 'Email harus sesuai dengan email resmi yang tersimpan pada data guru.',
+                        ]);
+                    }
+
+                    $email = $emailResmi;
+                } else {
+                    $guru->email = $email;
+                    $guru->save();
                 }
-                if (! hash_equals($emailResmi, $email)) {
-                    throw ValidationException::withMessages([
-                        'email' => 'Email harus sesuai dengan email resmi yang tersimpan pada data guru.',
-                    ]);
-                }
-                if (Pengguna::query()->whereRaw('LOWER(email) = ?', [$emailResmi])->exists()) {
+
+                if (Pengguna::query()->whereRaw('LOWER(email) = ?', [$email])->exists()) {
                     throw ValidationException::withMessages([
                         'email' => 'Email resmi guru sudah digunakan oleh akun lain.',
                     ]);
                 }
 
-                $email = $emailResmi;
                 $guruId = $guru->id;
             }
 
             // Simpan akun pengguna ke tabel akun_pengguna
-            return Pengguna::create([
+            $pengguna = Pengguna::create([
                 'peran' => $request->peran,
                 'username' => trim($request->identitas),
-                'nama' => $request->peran === 'admin' ? trim($request->nama) : null,
+                'nama' => trim($request->nama),
                 'email' => $email,
                 'password' => Hash::make($request->password),
-                'aktif' => false,
+                'aktif' => $request->peran === 'guru',
                 'guru_id' => $guruId,
                 'wajib_ganti_password' => false,
                 'email_diverifikasi_at' => null,
             ]);
+
+            if ($pengguna->peran === 'guru') {
+                CatatanAktivitas::create([
+                    'pengguna_id' => $pengguna->id,
+                    'peran' => 'guru',
+                    'aksi' => 'daftar_guru_mandiri',
+                    'keterangan' => 'Mendaftarkan akun guru secara mandiri; menunggu penugasan administrator.',
+                    'objek_tipe' => 'akun',
+                    'objek_id' => $pengguna->id,
+                    'alamat_ip' => $request->ip(),
+                ]);
+            }
+
+            return $pengguna;
         });
+
+        if ($pengguna->peran === 'guru') {
+            $this->hapusKonteksOtp();
+
+            return redirect()->route('login')->with(
+                'success',
+                'Pendaftaran berhasil. Akun Anda sudah aktif dan dapat digunakan untuk login. Administrator akan mengatur penugasan Anda.'
+            );
+        }
 
         session([
             'auth_flow' => 'daftar',

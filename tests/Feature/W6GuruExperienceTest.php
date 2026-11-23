@@ -306,9 +306,12 @@ class W6GuruExperienceTest extends TestCase
         $response = $this->actingAs($teacher)
             ->get(route('guru.beranda'))
             ->assertOk()
-            ->assertSee('Belum ada penugasan, hubungi admin')
+            ->assertSee('belum memiliki penugasan mata pelajaran atau perwalian kelas')
+            ->assertDontSee('Daftar Siswa')
             ->assertDontSee('Import Data');
         $this->assertSame(0, substr_count($response->getContent(), 'data-menu="import-data"'));
+        $this->assertSame(0, substr_count($response->getContent(), 'data-menu="siswa"'));
+        $this->get(route('guru.data-siswa'))->assertForbidden();
 
         foreach ([
             'guru.input-nilai-mapel',

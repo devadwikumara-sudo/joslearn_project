@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Models\Auth\Pengguna;
 use App\Models\Guru\GuruBiodata;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Mail\Message;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
@@ -194,7 +193,7 @@ class WebAuthOtpTest extends TestCase
     public function test_teacher_registration_links_existing_biodata_without_creating_another(): void
     {
         $guru = $this->buatBiodataGuru('1987654321', 'Guru Terdaftar', 'guru@example.test');
-        $this->expectOtpEmail('guru@example.test');
+        Mail::shouldReceive('raw')->never();
 
         $this->post(route('daftar.post'), [
             'nama' => 'Nama dari Form',
@@ -203,12 +202,17 @@ class WebAuthOtpTest extends TestCase
             'peran' => 'guru',
             'password' => 'Password123',
             'password_confirmation' => 'Password123',
-        ])->assertRedirect(route('verifikasi-akun'));
+        ])->assertRedirect(route('login'))
+            ->assertSessionHas('success');
 
         $akun = Pengguna::where('username', $guru->nip)->firstOrFail();
         $this->assertSame($guru->id, $akun->guru_id);
+        $this->assertSame('Nama dari Form', $akun->nama);
+        $this->assertSame($guru->nip, $akun->username);
+        $this->assertTrue($akun->aktif);
         $this->assertSame(1, GuruBiodata::count());
         $this->assertSame('Guru Terdaftar', $guru->fresh()->nama);
+        $this->assertSame(0, DB::table('akun_kode_otp')->count());
     }
 
     public function test_teacher_registration_rejects_an_email_different_from_official_biodata(): void
@@ -233,31 +237,40 @@ class WebAuthOtpTest extends TestCase
         $this->assertSame(0, DB::table('akun_kode_otp')->count());
     }
 
-    public function test_teacher_registration_is_rejected_when_official_email_is_missing(): void
+    public function test_teacher_registration_fills_an_email_missing_from_existing_biodata(): void
     {
         $guru = $this->buatBiodataGuru('1987654321', 'Guru Tanpa Email');
         Mail::shouldReceive('raw')->never();
 
-        $this->from(route('daftar'))->post(route('daftar.post'), [
+        $this->post(route('daftar.post'), [
             'nama' => 'Guru Tanpa Email',
-            'email' => 'attacker@example.test',
+            'email' => 'guru-baru@example.test',
             'identitas' => $guru->nip,
             'peran' => 'guru',
             'password' => 'Password123',
             'password_confirmation' => 'Password123',
         ])
-            ->assertRedirect(route('daftar'))
-            ->assertSessionHasErrors([
-                'email' => 'Email resmi guru belum tersedia atau tidak valid. Hubungi administrator.',
-            ]);
+            ->assertRedirect(route('login'))
+            ->assertSessionHas('success');
 
-        $this->assertDatabaseMissing('akun_pengguna', ['username' => $guru->nip]);
+        $this->assertDatabaseHas('guru_biodata', [
+            'id' => $guru->id,
+            'email' => 'guru-baru@example.test',
+        ]);
+        $this->assertDatabaseHas('akun_pengguna', [
+            'username' => $guru->nip,
+            'email' => 'guru-baru@example.test',
+            'guru_id' => $guru->id,
+            'aktif' => true,
+        ]);
         $this->assertSame(0, DB::table('akun_kode_otp')->count());
     }
 
-    public function test_teacher_registration_rejects_an_unknown_nip(): void
+    public function test_teacher_registration_creates_a_biodata_and_account_for_a_new_nip(): void
     {
-        $this->from(route('daftar'))->post(route('daftar.post'), [
+        Mail::shouldReceive('raw')->never();
+
+        $this->post(route('daftar.post'), [
             'nama' => 'Guru Baru',
             'email' => 'guru-baru@example.test',
             'identitas' => '1112223334',
@@ -265,13 +278,71 @@ class WebAuthOtpTest extends TestCase
             'password' => 'Password123',
             'password_confirmation' => 'Password123',
         ])
-            ->assertRedirect(route('daftar'))
-            ->assertSessionHasErrors([
-                'identitas' => 'NIP belum terdaftar, hubungi admin',
-            ]);
+            ->assertRedirect(route('login'))
+            ->assertSessionHas('success');
 
-        $this->assertSame(0, GuruBiodata::count());
-        $this->assertSame(0, Pengguna::count());
+        $guru = GuruBiodata::query()->where('nip', '1112223334')->firstOrFail();
+        $akun = Pengguna::query()->where('username', '1112223334')->firstOrFail();
+
+        $this->assertSame('Guru Baru', $guru->nama);
+        $this->assertSame('guru-baru@example.test', $guru->email);
+        $this->assertSame($guru->id, $akun->guru_id);
+        $this->assertSame('1112223334', $akun->username);
+        $this->assertTrue($akun->aktif);
+        $this->assertSame(0, DB::table('akun_kode_otp')->count());
+        $this->assertDatabaseHas('catatan_aktivitas', [
+            'pengguna_id' => $akun->id,
+            'aksi' => 'daftar_guru_mandiri',
+        ]);
+
+        $this->from(route('login'))->post(route('login.post'), [
+            'username' => '1112223334',
+            'password' => 'Password123',
+        ])->assertRedirect(route('guru.beranda'));
+        $this->assertAuthenticatedAs($akun);
+    }
+
+    public function test_admin_can_disable_a_teacher_account_and_prevent_login(): void
+    {
+        Mail::shouldReceive('raw')->never();
+        $admin = $this->buatAkunReset();
+        $guru = $this->buatBiodataGuru('1987654321', 'Guru Terdaftar', 'guru@example.test');
+        $akunGuru = Pengguna::create([
+            'peran' => 'guru',
+            'username' => $guru->nip,
+            'email' => $guru->email,
+            'password' => Hash::make('PasswordGuru123'),
+            'aktif' => true,
+            'guru_id' => $guru->id,
+        ]);
+
+        $this->actingAs($admin)
+            ->put(route('admin.setting.akun.profil', $akunGuru->id), [
+                'nama' => 'Guru Terdaftar',
+                'email' => 'guru@example.test',
+                'aktif' => '0',
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('akun_pengguna', [
+            'id' => $akunGuru->id,
+            'aktif' => false,
+        ]);
+        $this->assertDatabaseHas('catatan_aktivitas', [
+            'aksi' => 'ubah_profil_akun',
+            'keterangan' => 'Memperbarui nama dan email akun 1987654321. Status akun guru menjadi nonaktif.',
+        ]);
+
+        $this->post(route('logout'))->assertRedirect(route('login'));
+        $this->from(route('login'))->post(route('login.post'), [
+            'username' => $guru->nip,
+            'password' => 'PasswordGuru123',
+        ])
+            ->assertRedirect(route('login'))
+            ->assertSessionHasErrors([
+                'username' => 'Akun Anda dinonaktifkan. Silakan hubungi administrator sekolah.',
+            ]);
+        $this->assertGuest();
     }
 
     public function test_teacher_registration_rejects_a_nip_that_already_has_an_account(): void
@@ -548,20 +619,6 @@ class WebAuthOtpTest extends TestCase
             'email' => $email,
             'status_kepegawaian' => 'Guru',
         ]);
-    }
-
-    private function expectOtpEmail(string $email): void
-    {
-        Mail::shouldReceive('raw')
-            ->once()
-            ->withArgs(function (string $message, callable $callback) use ($email): bool {
-                $mail = \Mockery::mock(Message::class);
-                $mail->shouldReceive('to')->once()->with($email)->andReturnSelf();
-                $mail->shouldReceive('subject')->once()->with('Kode Verifikasi JosBook')->andReturnSelf();
-                $callback($mail);
-
-                return true;
-            });
     }
 
     private function buatOtp(string $email, string $kode = '123456', mixed $berlakuSampai = null): void

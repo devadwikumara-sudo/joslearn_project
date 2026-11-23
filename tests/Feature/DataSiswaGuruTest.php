@@ -31,6 +31,28 @@ class DataSiswaGuruTest extends TestCase
             $table->rememberToken();
             $table->timestamps();
         });
+        Schema::create('guru_biodata', function (Blueprint $table): void {
+            $table->id();
+            $table->string('nama');
+            $table->string('nip')->nullable();
+            $table->softDeletes();
+            $table->timestamps();
+        });
+        Schema::create('guru_mengajar', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('tahun_ajaran_id');
+            $table->unsignedBigInteger('guru_id');
+            $table->unsignedBigInteger('kelas_id');
+            $table->unsignedBigInteger('mapel_id');
+            $table->timestamps();
+        });
+        Schema::create('guru_wali_kelas', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('tahun_ajaran_id');
+            $table->unsignedBigInteger('guru_id');
+            $table->unsignedBigInteger('kelas_id');
+            $table->timestamps();
+        });
         Schema::create('sekolah_tahun_ajaran', function (Blueprint $table): void {
             $table->id();
             $table->string('nama');
@@ -165,6 +187,21 @@ class DataSiswaGuruTest extends TestCase
             ->assertRedirect(route('login'));
     }
 
+    public function test_unassigned_teacher_cannot_access_student_lists_or_details(): void
+    {
+        $teacher = $this->createAccount('guru', false);
+
+        $this->actingAs($teacher)
+            ->get(route('guru.data-siswa'))
+            ->assertForbidden();
+
+        $this->get(route('guru.data-siswa.show', 1))
+            ->assertForbidden();
+
+        $this->get(route('guru.data-siswa.pdf', 1))
+            ->assertForbidden();
+    }
+
     public function test_teacher_cannot_open_student_edit_form(): void
     {
         $this->actingAs($this->createAccount('guru'))
@@ -189,8 +226,16 @@ class DataSiswaGuruTest extends TestCase
         ]);
     }
 
-    private function createAccount(string $role): Pengguna
+    private function createAccount(string $role, bool $assigned = true): Pengguna
     {
+        $guruId = null;
+        if ($role === 'guru') {
+            $guruId = DB::table('guru_biodata')->insertGetId([
+                'nama' => 'Guru Uji',
+                'nip' => 'NIP-'.(DB::table('guru_biodata')->count() + 1),
+            ]);
+        }
+
         $id = DB::table('akun_pengguna')->insertGetId([
             'peran' => $role,
             'username' => $role.'-test',
@@ -198,7 +243,16 @@ class DataSiswaGuruTest extends TestCase
             'password' => 'password',
             'aktif' => true,
             'wajib_ganti_password' => false,
+            'guru_id' => $guruId,
         ]);
+
+        if ($guruId !== null && $assigned) {
+            DB::table('guru_wali_kelas')->insert([
+                'tahun_ajaran_id' => 1,
+                'guru_id' => $guruId,
+                'kelas_id' => 1,
+            ]);
+        }
 
         return Pengguna::findOrFail($id);
     }

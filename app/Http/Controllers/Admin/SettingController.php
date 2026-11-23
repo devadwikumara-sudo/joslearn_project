@@ -15,6 +15,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -372,27 +373,81 @@ class SettingController extends Controller
         return back()->with('success', "Akun {$pengguna->username} berhasil dihapus.");
     }
 
-    public function updateNamaAkun(Request $request, int $id): RedirectResponse
+    public function updateProfilAkun(Request $request, int $id): RedirectResponse
     {
+        $pengguna = Pengguna::query()
+            ->whereIn('peran', ['admin', 'guru'])
+            ->findOrFail($id);
+
+        $email = $request->input('email');
+        if (is_string($email)) {
+            $request->merge(['email' => Str::lower(trim($email))]);
+        }
+
+        if ($request->has('aktif') && $pengguna->peran !== 'guru') {
+            throw ValidationException::withMessages([
+                'aktif' => 'Status akun hanya dapat diubah untuk akun guru.',
+            ]);
+        }
+
         $validated = $request->validate([
             'nama' => ['required', 'string', 'max:150'],
+            'email' => [
+                'required',
+                'string',
+                'email',
+                'max:120',
+                Rule::unique('akun_pengguna', 'email')->ignore($pengguna->id),
+            ],
+            'aktif' => ['sometimes', 'boolean'],
+        ], [
+            'nama.required' => 'Nama pengguna wajib diisi.',
+            'email.required' => 'Email wajib diisi.',
+            'email.email' => 'Format email tidak valid.',
+            'email.unique' => 'Email ini sudah digunakan oleh akun lain.',
         ]);
 
-        $pengguna = Pengguna::query()
-            ->where('peran', 'admin')
-            ->findOrFail($id);
-        $pengguna->nama = trim($validated['nama']);
-        $pengguna->save();
+        $nama = trim($validated['nama']);
+        $statusAkunBaru = $pengguna->peran === 'guru' && array_key_exists('aktif', $validated)
+            ? (bool) $validated['aktif']
+            : $pengguna->aktif;
+        $statusAkunBerubah = $pengguna->peran === 'guru' && $statusAkunBaru !== $pengguna->aktif;
+
+        DB::transaction(function () use ($pengguna, $nama, $validated, $statusAkunBaru): void {
+            $pengguna->nama = $nama;
+            $pengguna->email = $validated['email'];
+            if ($pengguna->peran === 'guru') {
+                $pengguna->aktif = $statusAkunBaru;
+            }
+            $pengguna->save();
+
+            if ($pengguna->peran === 'guru' && $pengguna->guru) {
+                $pengguna->guru->update([
+                    'nama' => $nama,
+                    'email' => $validated['email'],
+                ]);
+            }
+        });
+
+        $keterangan = "Memperbarui nama dan email akun {$pengguna->username}.";
+        if ($statusAkunBerubah) {
+            $keterangan .= ' Status akun guru menjadi '.($statusAkunBaru ? 'aktif' : 'nonaktif').'.';
+        }
 
         $this->catatAktivitas(
             $request,
-            'ubah_nama_akun',
-            "Mengubah nama tampilan akun admin {$pengguna->username}.",
+            'ubah_profil_akun',
+            $keterangan,
             'akun_pengguna',
             $pengguna->id
         );
 
-        return back()->with('success', 'Nama akun berhasil diperbarui.');
+        return back()->with(
+            'success',
+            $request->has('aktif')
+                ? 'Nama, email, dan status akun guru berhasil diperbarui.'
+                : 'Nama dan email akun berhasil diperbarui.'
+        );
     }
 
     public function hapusLog(Request $request): RedirectResponse

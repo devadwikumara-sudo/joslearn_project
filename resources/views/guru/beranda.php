@@ -104,13 +104,15 @@
             </div>
             
             <div style="display:flex;flex-direction:column;gap:10px">
-                <a href="{{ route('guru.data-siswa') }}" class="submetric-pill" style="justify-content:flex-start">
-                    <span class="submetric-pill-icon" style="background:#e0f2fe;color:#0284c7">👥</span>
-                    <div>
-                        <b style="display:block;font-size:13px;color:#0f172a">Daftar Siswa</b>
-                        <small style="color:#64748b">Cari dan lihat profil siswa lengkap</small>
-                    </div>
-                </a>
+                @if($adaPenugasan)
+                    <a href="{{ route('guru.data-siswa') }}" class="submetric-pill" style="justify-content:flex-start">
+                        <span class="submetric-pill-icon" style="background:#e0f2fe;color:#0284c7">👥</span>
+                        <div>
+                            <b style="display:block;font-size:13px;color:#0f172a">Daftar Siswa</b>
+                            <small style="color:#64748b">Cari dan lihat profil siswa lengkap</small>
+                        </div>
+                    </a>
+                @endif
 
                 @if($mapelDiajar->isNotEmpty() || $kelasWali->isNotEmpty())
                     <a href="{{ route('guru.import-data') }}" class="submetric-pill" style="justify-content:flex-start">

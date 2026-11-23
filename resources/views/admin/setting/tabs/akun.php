@@ -1,3 +1,25 @@
+@push('styles')
+<style>
+    .account-edit-dialog {
+        position: fixed;
+        inset: 0;
+        width: calc(100vw - 40px);
+        max-width: 520px;
+        max-height: calc(100vh - 40px);
+        margin: auto;
+        padding: 0;
+        overflow-y: auto;
+        border: 0;
+        background: transparent;
+    }
+
+    .account-edit-dialog::backdrop {
+        background: rgba(9, 24, 43, 0.65);
+        backdrop-filter: blur(6px);
+    }
+</style>
+@endpush
+
 <div class="card">
     <div class="bar" style="margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid #eef2f6">
         <div>
@@ -37,14 +59,6 @@
                                 </div>
                                 <b style="color:var(--admin-text);font-size:13.5px">{{ $p->nama }}</b>
                             </div>
-                            @if($p->peran === 'admin')
-                                <form method="POST" action="{{ route('admin.setting.akun.nama', $p->id) }}" style="display:flex;gap:5px;margin-top:8px">
-                                    @csrf
-                                    @method('PUT')
-                                    <input type="text" name="nama" value="{{ $p->getRawOriginal('nama') }}" maxlength="150" required placeholder="Nama admin" aria-label="Nama admin {{ $p->username }}" style="min-width:120px;padding:4px 7px;font-size:12px">
-                                    <button type="submit" class="btn o" style="padding:4px 7px;font-size:11px">Simpan</button>
-                                </form>
-                            @endif
                         </td>
                         <td>{{ $p->email ?: '-' }}</td>
                         <td>
@@ -57,6 +71,8 @@
                         </td>
                         <td>{{ $p->terakhir_login_at?->format('d/m/Y H:i') ?? 'Belum pernah' }}</td>
                         <td style="text-align:right">
+                            <button type="button" class="btn o" style="padding:4px 8px;font-size:11.5px"
+                                onclick="document.getElementById('md-edit-akun-{{ $p->id }}').showModal()">Edit</button>
                             @if($p->id !== Auth::id())
                                 <form method="POST" action="{{ route('admin.setting.akun.hapus', $p->id) }}" style="display:inline">
                                     @csrf
@@ -80,6 +96,50 @@
         </table>
     </div>
 </div>
+
+@foreach($pengguna as $p)
+    <dialog id="md-edit-akun-{{ $p->id }}" class="account-edit-dialog">
+        <div class="card" style="max-width:520px;width:100%;margin:auto;background:#fff;border-radius:18px;box-shadow:0 20px 40px -10px rgba(9,24,43,0.4);border:1px solid #dce5ef;padding:24px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid #eef2f6">
+                <div>
+                    <h3 style="margin:0;font-size:17px;color:var(--admin-text)">Edit Akun Pengguna</h3>
+                    <p class="sub" style="margin:2px 0 0">Perbarui data akun {{ $p->username }}</p>
+                </div>
+                <button type="button" class="btn x" onclick="document.getElementById('md-edit-akun-{{ $p->id }}').close()" style="padding:4px 8px;font-size:14px">✕</button>
+            </div>
+
+            <form method="POST" action="{{ route('admin.setting.akun.profil', $p->id) }}">
+                @csrf
+                @method('PUT')
+                <div style="display:grid;gap:12px">
+                    <div>
+                        <label for="nama-akun-{{ $p->id }}" style="font-size:11.5px;font-weight:700;color:var(--admin-text-secondary);text-transform:uppercase;letter-spacing:0.04em">Nama Pengguna *</label>
+                        <input id="nama-akun-{{ $p->id }}" type="text" name="nama" value="{{ $p->nama }}" maxlength="150" style="width:100%" required>
+                    </div>
+                    <div>
+                        <label for="email-akun-{{ $p->id }}" style="font-size:11.5px;font-weight:700;color:var(--admin-text-secondary);text-transform:uppercase;letter-spacing:0.04em">Email *</label>
+                        <input id="email-akun-{{ $p->id }}" type="email" name="email" value="{{ $p->email }}" maxlength="120" style="width:100%" required>
+                    </div>
+                    @if($p->peran === 'guru')
+                        <div>
+                            <label for="status-akun-{{ $p->id }}" style="font-size:11.5px;font-weight:700;color:var(--admin-text-secondary);text-transform:uppercase;letter-spacing:0.04em">Status Akun Guru *</label>
+                            <select id="status-akun-{{ $p->id }}" name="aktif" style="width:100%" required>
+                                <option value="1" {{ $p->aktif ? 'selected' : '' }}>Aktif — guru dapat login</option>
+                                <option value="0" {{ ! $p->aktif ? 'selected' : '' }}>Nonaktif — login dinonaktifkan</option>
+                            </select>
+                        </div>
+                    @endif
+                </div>
+
+                <div class="bar" style="margin-top:20px;padding-top:14px;border-top:1px solid #eef2f6">
+                    <span class="sp"></span>
+                    <button type="button" class="btn o" onclick="document.getElementById('md-edit-akun-{{ $p->id }}').close()">Batal</button>
+                    <button type="submit" class="btn a">Simpan Perubahan</button>
+                </div>
+            </form>
+        </div>
+    </dialog>
+@endforeach
 
 <div class="card" style="margin-top:16px">
     <div class="bar" style="margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid #eef2f6">

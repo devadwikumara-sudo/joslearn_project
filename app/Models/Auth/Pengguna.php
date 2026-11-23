@@ -46,14 +46,14 @@ class Pengguna extends Authenticatable
      */
     public function getNamaAttribute(): string
     {
-        if ($this->peran === 'guru' && $this->guru && $this->guru->nama) {
-            return $this->guru->nama;
-        }
-
         $nama = trim((string) ($this->attributes['nama'] ?? ''));
 
         if ($nama !== '') {
             return $nama;
+        }
+
+        if ($this->peran === 'guru' && $this->guru && $this->guru->nama) {
+            return $this->guru->nama;
         }
 
         return $this->peran === 'admin' ? 'Administrator' : ucfirst($this->username);

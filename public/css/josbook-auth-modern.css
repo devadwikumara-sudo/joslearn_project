@@ -353,6 +353,19 @@ body {
     box-shadow: 0 0 0 3.5px rgba(56, 189, 248, 0.38), 0 4px 14px rgba(0, 0, 0, 0.16) inset;
 }
 
+/* Chrome, Edge & Safari Autofill Override — Prevents solid white background */
+.jb-edu-input:-webkit-autofill,
+.jb-edu-input:-webkit-autofill:hover,
+.jb-edu-input:-webkit-autofill:focus,
+.jb-edu-input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 1000px #0c234b inset !important;
+    -webkit-text-fill-color: #ffffff !important;
+    caret-color: #ffffff !important;
+    border: 1.5px solid rgba(255, 255, 255, 0.28) !important;
+    border-radius: 15px !important;
+    transition: background-color 999999s ease-in-out 0s !important;
+}
+
 .jb-edu-input-icon {
     position: absolute;
     right: 16px;

@@ -1,5 +1,8 @@
 <?php
 
+use App\Http\Middleware\EnsureAdminOnly;
+use App\Http\Middleware\EnsureGuruHasAssignment;
+use App\Http\Middleware\EnsureUserIsAdminOrGuru;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -14,8 +17,9 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
-            'role.web'   => \App\Http\Middleware\EnsureUserIsAdminOrGuru::class,
-            'admin.only' => \App\Http\Middleware\EnsureAdminOnly::class,
+            'role.web' => EnsureUserIsAdminOrGuru::class,
+            'admin.only' => EnsureAdminOnly::class,
+            'guru.assigned' => EnsureGuruHasAssignment::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

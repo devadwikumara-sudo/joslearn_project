@@ -16,6 +16,7 @@ class PdfSemesterFilterTest extends TestCase
 
         foreach ([
             'akun_pengguna',
+            'guru_mengajar',
             'guru_wali_kelas',
             'guru_biodata',
             'siswa_ekskul',
@@ -39,6 +40,7 @@ class PdfSemesterFilterTest extends TestCase
             $table->string('username')->unique();
             $table->string('password');
             $table->boolean('aktif')->default(true);
+            $table->unsignedBigInteger('guru_id')->nullable();
             $table->string('remember_token')->nullable();
             $table->timestamps();
         });
@@ -123,6 +125,13 @@ class PdfSemesterFilterTest extends TestCase
             $table->unsignedBigInteger('tahun_ajaran_id');
             $table->unsignedBigInteger('guru_id')->nullable();
         });
+        Schema::create('guru_mengajar', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('kelas_id');
+            $table->unsignedBigInteger('tahun_ajaran_id');
+            $table->unsignedBigInteger('guru_id');
+            $table->unsignedBigInteger('mapel_id');
+        });
         Schema::create('guru_biodata', function (Blueprint $table): void {
             $table->id();
             $table->string('nama');
@@ -171,6 +180,7 @@ class PdfSemesterFilterTest extends TestCase
     {
         foreach ([
             'akun_pengguna',
+            'guru_mengajar',
             'guru_wali_kelas',
             'guru_biodata',
             'siswa_ekskul',
@@ -332,11 +342,21 @@ class PdfSemesterFilterTest extends TestCase
     public function test_teacher_cannot_print_a_student_outside_the_visible_active_scope(): void
     {
         $activeStudentId = $this->createActiveStudent();
+        $guruId = DB::table('guru_biodata')->insertGetId([
+            'nama' => 'Guru PDF',
+            'nip' => 'NIP-GURU-PDF',
+        ]);
         $teacher = Pengguna::query()->create([
             'peran' => 'guru',
             'username' => 'guru-pdf-test',
             'password' => 'test-password',
             'aktif' => true,
+            'guru_id' => $guruId,
+        ]);
+        DB::table('guru_wali_kelas')->insert([
+            'kelas_id' => 3,
+            'tahun_ajaran_id' => 3,
+            'guru_id' => $guruId,
         ]);
 
         $this->actingAs($teacher)
