@@ -58,12 +58,22 @@ class AuthController extends Controller
             ]);
         }
 
-        $pengguna = Pengguna::where('username', $input)
-            ->orWhere('email', $input)
-            ->first();
+        $pengguna = Pengguna::query()->where('username', $input)->first();
+        if (! $pengguna) {
+            $pengguna = Pengguna::query()->where('email', $input)->first();
+        }
 
-        $autentikasiBerhasil = $pengguna
-            && Auth::attempt(['username' => $pengguna->username, 'password' => $password], $remember);
+        $calonPengguna = $pengguna
+            ? collect([$pengguna])
+            : Pengguna::query()->where('nama', $input)->get();
+        $autentikasiBerhasil = false;
+
+        foreach ($calonPengguna as $calon) {
+            if (Auth::attempt(['username' => $calon->username, 'password' => $password], $remember)) {
+                $autentikasiBerhasil = true;
+                break;
+            }
+        }
 
         if (! $autentikasiBerhasil) {
             RateLimiter::hit($rateLimitKey, 60);

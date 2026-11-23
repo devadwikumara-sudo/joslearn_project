@@ -360,13 +360,15 @@ class PdfSemesterFilterTest extends TestCase
         ]);
 
         $this->actingAs($teacher)
-            ->get(route('guru.data-siswa.pdf', 1))
+            ->get(route('guru.data-siswa.pdf', ['id' => 1, 'tab' => 'wali']))
             ->assertForbidden();
 
-        $this->get(route('guru.data-siswa.pdf-batch', ['ids' => '1']))
+        $this->get(route('guru.data-siswa.pdf-batch', ['ids' => '1', 'tab' => 'wali']))
             ->assertForbidden();
 
-        $this->get(route('guru.data-siswa.pdf', $activeStudentId))
+        $this->get(route('guru.data-siswa.pdf', ['id' => $activeStudentId, 'tab' => 'wali']))
+            ->assertOk();
+        $this->get(route('guru.data-siswa.pdf-batch', ['ids' => (string) $activeStudentId, 'tab' => 'wali']))
             ->assertOk();
     }
 

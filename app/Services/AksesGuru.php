@@ -9,6 +9,8 @@ use App\Models\Guru\GuruWaliKelas;
 use App\Models\SekolahKelas;
 use App\Models\SekolahMapel;
 use App\Models\SekolahTahunAjaran;
+use App\Models\SiswaBiodata;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 
 class AksesGuru
@@ -107,6 +109,41 @@ class AksesGuru
             ->values();
 
         return new Collection($kelas->all());
+    }
+
+    /**
+     * @return Collection<int, SekolahKelas>
+     */
+    public function kelasUntukDataSiswa(GuruBiodata|Pengguna|null $subjek, string $lingkup): Collection
+    {
+        return match ($lingkup) {
+            'mapel' => $this->kelasDiajar($subjek),
+            'wali' => $this->kelasWali($subjek),
+            default => new Collection,
+        };
+    }
+
+    public function bolehMelihatSiswa(GuruBiodata|Pengguna|null $subjek, int $siswaId, string $lingkup): bool
+    {
+        if ($this->adalahAdmin($subjek)) {
+            return true;
+        }
+
+        $tahunAjaranId = $this->tahunAjaranBerjalanId();
+        $kelasIds = $this->kelasUntukDataSiswa($subjek, $lingkup)->modelKeys();
+
+        if ($tahunAjaranId === null || $kelasIds === []) {
+            return false;
+        }
+
+        return SiswaBiodata::aktif($tahunAjaranId)
+            ->whereKey($siswaId)
+            ->whereHas('riwayatKelas', function (Builder $query) use ($tahunAjaranId, $kelasIds): void {
+                $query->where('tahun_ajaran_id', $tahunAjaranId)
+                    ->where('status', 'Aktif')
+                    ->whereIn('kelas_id', $kelasIds);
+            })
+            ->exists();
     }
 
     public function bolehIsiNilai(GuruBiodata|Pengguna|null $subjek, int $kelasId, int $mapelId): bool

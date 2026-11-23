@@ -256,7 +256,7 @@ class TeacherClassPromotionTest extends TestCase
             'kelas_id' => $sourceClass,
         ]);
         $this->actingAs($user)
-            ->get(route('guru.data-siswa'))
+            ->get(route('guru.data-siswa.wali'))
             ->assertOk()
             ->assertViewHas('filters', fn (array $filters): bool => $filters['tahun_ajaran'] === $nextYear)
             ->assertViewHas('siswa', fn ($students): bool => $students->contains(
@@ -264,14 +264,14 @@ class TeacherClassPromotionTest extends TestCase
                     && $record->riwayatKelas->first()?->kelas?->nama === 'XI-1'
             ));
         $this->actingAs($user)
-            ->get(route('guru.data-siswa', ['tahun_ajaran' => $nextYear]))
+            ->get(route('guru.data-siswa.wali', ['tahun_ajaran' => $nextYear]))
             ->assertOk()
             ->assertViewHas('siswa', fn ($students): bool => $students->contains(
                 fn (SiswaBiodata $record): bool => $record->id === $student
                     && $record->riwayatKelas->first()?->kelas?->nama === 'XI-1'
             ));
         $this->actingAs($user)
-            ->get(route('guru.data-siswa'))
+            ->get(route('guru.data-siswa.wali'))
             ->assertOk()
             ->assertViewHas('filters', fn (array $filters): bool => $filters['tahun_ajaran'] === $nextYear)
             ->assertViewHas('siswa', fn ($students): bool => $students->contains(
@@ -312,7 +312,7 @@ class TeacherClassPromotionTest extends TestCase
             ->assertOk()
             ->assertSee('name="keputusan['.$student.']"', false)
             ->assertViewHas('riwayatKenaikanSiswa', fn ($histories): bool => $histories->isEmpty());
-        $this->actingAs($user)->get(route('guru.data-siswa'))
+        $this->actingAs($user)->get(route('guru.data-siswa.wali'))
             ->assertOk()
             ->assertViewHas('filters', fn (array $filters): bool => $filters['tahun_ajaran'] === $year)
             ->assertViewHas('siswa', fn ($students): bool => $students->contains(

@@ -4,18 +4,33 @@
 
 @section('content')
 @php
-    $queryFilters = array_merge(request()->query(), ['tahun_ajaran' => $filters['tahun_ajaran']]);
+    $queryFilters = array_merge(request()->query(), [
+        'tahun_ajaran' => $filters['tahun_ajaran'],
+        'tab' => $filters['tab'],
+    ]);
+    $listRoute = $lingkup === 'wali' ? 'guru.data-siswa.wali' : 'guru.data-siswa';
     $bookPdfFilters = [
         'target_kelas' => $filters['kelas'] !== '' ? $filters['kelas'] : '*',
         'target_ta' => (string) $filters['tahun_ajaran'],
         'q' => $filters['q'],
         'st' => $filters['st'],
+        'tab' => $filters['tab'],
     ];
 @endphp
 
+<div class="bar" style="margin-bottom:14px">
+    <div>
+        <h2 style="margin:0">{{ $lingkup === 'wali' ? 'Data Siswa Kelas Wali' : 'Data Siswa Kelas Mapel' }}</h2>
+        <p class="sub" style="margin:4px 0 0">
+            {{ $lingkup === 'wali' ? 'Menampilkan siswa dari kelas perwalian Anda.' : 'Menampilkan siswa dari kelas yang Anda ajar.' }}
+        </p>
+    </div>
+</div>
+
 <div class="student-toolbar">
-    <form method="GET" action="{{ route('guru.data-siswa') }}" class="student-filters">
+    <form method="GET" action="{{ route($listRoute) }}" class="student-filters">
         <input type="hidden" name="tahun_ajaran" value="{{ $filters['tahun_ajaran'] }}">
+        <input type="hidden" name="tab" value="{{ $filters['tab'] }}">
         <select name="kelas" aria-label="Pilih kelas">
             <option value="">Semua kelas</option>
             @foreach($kelasList as $kelas)
@@ -36,6 +51,11 @@
     </form>
 
     <div class="student-page-actions">
+        @if($lingkup === 'mapel' && $adaKelasWali)
+            <a href="{{ route('guru.data-siswa.wali') }}" class="btn o">👥 Data Siswa Kelas Wali</a>
+        @elseif($lingkup === 'wali' && $adaKelasMapel)
+            <a href="{{ route('guru.data-siswa') }}" class="btn o">📚 Kelas Mapel</a>
+        @endif
         <a href="{{ route('guru.data-siswa.export', $queryFilters) }}" class="btn o">📊 Ekspor Excel</a>
     </div>
 </div>
@@ -55,8 +75,9 @@
                 'target_ta' => (string) $filters['tahun_ajaran'],
                 'q' => $filters['q'],
                 'st' => $filters['st'],
+                'tab' => $filters['tab'],
             ]) }}" class="btn o">📖 Buku induk filter</a>
-            <a href="{{ route('guru.data-siswa.pdf-batch', ['target_kelas' => '*', 'target_ta' => (string) $filters['tahun_ajaran']]) }}" class="btn o">📚 Semua siswa</a>
+            <a href="{{ route('guru.data-siswa.pdf-batch', ['target_kelas' => '*', 'target_ta' => (string) $filters['tahun_ajaran'], 'tab' => $filters['tab']]) }}" class="btn o">📚 Semua siswa</a>
         </div>
     </div>
 
@@ -105,7 +126,7 @@
                             <td>{{ $murid->nama_ayah ?? $murid->nama_ibu ?? '-' }}</td>
                             <td><span class="bd {{ $badgeClass }}">{{ $statusNama }}</span></td>
                             <td style="white-space:nowrap">
-                                <a href="{{ route('guru.data-siswa.show', $murid->id) }}" class="btn o" style="padding:4px 9px;font-size:12px">👁 Lihat</a>
+                                <a href="{{ route('guru.data-siswa.show', array_merge(['id' => $murid->id], $queryFilters)) }}" class="btn o" style="padding:4px 9px;font-size:12px">👁 Lihat</a>
                                 <a href="{{ route('guru.data-siswa.pdf', array_merge(['id' => $murid->id], $studentFilters)) }}" class="btn a" style="padding:4px 9px;font-size:12px">⬇ PDF</a>
                             </td>
                         </tr>

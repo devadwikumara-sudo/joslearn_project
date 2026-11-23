@@ -10,6 +10,7 @@ use App\Models\SekolahMapel;
 use App\Models\SekolahTahunAjaran;
 use App\Models\SiswaBiodata;
 use App\Models\SiswaRiwayatKelas;
+use App\Services\AksesGuru;
 use App\Support\Semester;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Builder;
@@ -220,8 +221,9 @@ class DataSiswaController extends Controller
             ->stream('daftar-siswa-'.now()->format('Ymd-His').'.pdf');
     }
 
-    public function foto(int $id): BinaryFileResponse
+    public function foto(Request $request, int $id, AksesGuru $aksesGuru): BinaryFileResponse
     {
+        $this->authorizeGuruStudent($request, $aksesGuru, $id);
         $siswa = SiswaBiodata::findOrFail($id);
         $path = $siswa->foto;
         abort_if(! $path, 404);
@@ -264,8 +266,9 @@ class DataSiswaController extends Controller
         abort(404);
     }
 
-    public function berkas(int $id, string $jenis): StreamedResponse
+    public function berkas(Request $request, int $id, string $jenis, AksesGuru $aksesGuru): StreamedResponse
     {
+        $this->authorizeGuruStudent($request, $aksesGuru, $id);
         abort_unless(in_array($jenis, ['kk', 'akta', 'ijazah_smp', 'surat_pindah'], true), 404);
 
         $berkas = SiswaBiodata::findOrFail($id)
@@ -318,6 +321,14 @@ class DataSiswaController extends Controller
         }
 
         return $query;
+    }
+
+    private function authorizeGuruStudent(Request $request, AksesGuru $aksesGuru, int $siswaId): void
+    {
+        if ($request->routeIs('guru.*')) {
+            $lingkup = $request->input('tab', 'mapel');
+            abort_unless($aksesGuru->bolehMelihatSiswa($request->user(), $siswaId, $lingkup), 403);
+        }
     }
 
     private function applyHistoryFilters(Builder|Relation $query, ?int $tahunAjaranId, string $kelas, string $status): void

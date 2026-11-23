@@ -53,7 +53,8 @@
     .alumni-row{cursor:pointer}
     .alumni-row:hover{background:#f3f7fc}
     .alumni-side-backdrop{position:fixed;inset:0;z-index:1100;background:rgba(9,24,43,.42)}
-    .alumni-side-panel{position:fixed;top:50%;left:50%;right:auto;z-index:1101;display:flex;flex-direction:column;width:min(760px,calc(100vw - 32px));height:min(88dvh,900px);max-height:calc(100dvh - 32px);transform:translate(-50%,-50%);border:1px solid #dce5ef;border-radius:20px;background:#f5f8fc;box-shadow:0 24px 80px #06172f55}
+    .alumni-side-panel{position:fixed;top:50%;left:50%;right:auto;z-index:1101;display:flex;flex-direction:column;width:min(760px,calc(100vw - 32px));height:min(88dvh,900px);max-height:calc(100dvh - 32px);transform:translate(-50%,-50%);border:1px solid #dce5ef;border-radius:20px;background:#f5f8fc;box-shadow:0 24px 80px #06172f55;animation:alumniSidePanelIn .3s cubic-bezier(.16,1,.3,1)!important}
+    @keyframes alumniSidePanelIn{from{opacity:0;transform:translate(-50%,-50%) scale(.95) translateY(10px)}to{opacity:1;transform:translate(-50%,-50%) scale(1) translateY(0)}}
     .alumni-side-head{display:flex;align-items:flex-start;gap:12px;padding:18px;border-bottom:1px solid var(--ln);background:#fff}
     .alumni-side-head h3{margin:0;color:var(--p);font-size:17px}
     .alumni-side-head p{margin:4px 0 0;color:var(--mu);font-size:12px}
@@ -268,7 +269,7 @@
                     </td>
                     <td><span class="bd {{ $s->pelacakan_count ? 'ok' : 'w' }}">{{ $s->status_pelacakan }}</span></td>
                     <td style="white-space:nowrap">
-                        <a href="{{ $panelUrl }}" class="btn" onclick="event.stopPropagation()">Lihat</a>
+                        <a href="{{ $panelUrl }}" class="btn">Lihat</a>
                         <button id="alumni-edit-{{ $s->id }}" type="button" class="btn a" data-alumni="{{ $studentJson }}" onclick="event.stopPropagation();openAlumniEdit(this)">✏ Edit</button>
                         <button type="button" class="btn o" data-alumni="{{ $studentJson }}" onclick="event.stopPropagation();openAlumniPdf(this)">⬇ PDF</button>
                         @if($isGraduated)
@@ -465,6 +466,14 @@
 
 @push('scripts')
 <script>
+let alumniPanelRequestId = 0;
+
+const initialAlumniSideBackdrop = document.querySelector('.alumni-side-backdrop');
+const initialAlumniSidePanel = document.getElementById('alumni-side-panel');
+if (initialAlumniSideBackdrop && initialAlumniSidePanel) {
+    document.body.append(initialAlumniSideBackdrop, initialAlumniSidePanel);
+}
+
 function alumniData(button) {
     try {
         return JSON.parse(button.dataset.alumni);
@@ -483,6 +492,7 @@ async function openAlumniEdit(button, initialTab = 'control', oldValues = null) 
     const rowData = alumniData(button);
     if (!rowData) return;
 
+    alumniPanelRequestId += 1;
     const panel = document.getElementById('alumni-side-panel');
     const backdrop = document.querySelector('.alumni-side-backdrop');
     if (panel && backdrop) {
@@ -675,6 +685,7 @@ function closeAlumniSidePanel(event) {
     if (!panel || !backdrop) return true;
 
     event.preventDefault();
+    alumniPanelRequestId += 1;
     const destination = new URL(event.currentTarget.href, window.location.href);
     panel.remove();
     backdrop.remove();
@@ -687,8 +698,46 @@ function closeAlumniSidePanel(event) {
     return false;
 }
 
+async function loadAlumniSidePanel(url, updateHistory = true) {
+    const requestId = ++alumniPanelRequestId;
+
+    try {
+        const response = await fetch(url, {
+            headers: { Accept: 'text/html' },
+            credentials: 'same-origin',
+        });
+        if (!response.ok) {
+            throw new Error(`Permintaan panel alumni gagal (${response.status}).`);
+        }
+
+        const page = new DOMParser().parseFromString(await response.text(), 'text/html');
+        const backdrop = page.querySelector('.alumni-side-backdrop');
+        const panel = page.getElementById('alumni-side-panel');
+        if (!backdrop || !panel) {
+            throw new Error('Panel alumni tidak ditemukan pada respons.');
+        }
+        if (requestId !== alumniPanelRequestId) return;
+
+        document.querySelector('.alumni-side-backdrop')?.remove();
+        document.getElementById('alumni-side-panel')?.remove();
+        document.body.append(backdrop, panel);
+
+        if (updateHistory) {
+            const currentState = window.history.state;
+            const nextState = currentState && typeof currentState === 'object'
+                ? { ...currentState, alumniPanel: true }
+                : { alumniPanel: true };
+            window.history.pushState(nextState, '', url);
+        }
+    } catch (error) {
+        if (requestId !== alumniPanelRequestId) return;
+        console.error('Gagal memuat panel alumni.', error);
+        window.location.assign(url);
+    }
+}
+
 document.querySelectorAll('.alumni-row').forEach((row) => {
-    const openPanel = () => window.location.assign(row.dataset.panelUrl);
+    const openPanel = () => loadAlumniSidePanel(row.dataset.panelUrl);
     row.addEventListener('click', (event) => {
         if (event.target.closest('a,button,form,input,select')) return;
         openPanel();
@@ -699,6 +748,35 @@ document.querySelectorAll('.alumni-row').forEach((row) => {
             openPanel();
         }
     });
+});
+
+document.addEventListener('click', (event) => {
+    const link = event.target.closest('a[href]');
+    if (!link) return;
+
+    if (link.closest('.alumni-side-tabs')) {
+        event.preventDefault();
+        loadAlumniSidePanel(link.href);
+        return;
+    }
+
+    const row = link.closest('.alumni-row');
+    if (row && link.href === new URL(row.dataset.panelUrl, window.location.href).href) {
+        event.preventDefault();
+        loadAlumniSidePanel(row.dataset.panelUrl);
+    }
+});
+
+window.addEventListener('popstate', () => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.has('siswa')) {
+        loadAlumniSidePanel(url.href, false);
+        return;
+    }
+
+    alumniPanelRequestId += 1;
+    document.querySelector('.alumni-side-backdrop')?.remove();
+    document.getElementById('alumni-side-panel')?.remove();
 });
 
 document.querySelectorAll('[data-edit-tab]').forEach((button) => {

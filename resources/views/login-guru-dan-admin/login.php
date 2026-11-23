@@ -72,11 +72,11 @@
                     <form class="jb-edu-form" method="POST" action="{{ route('login.post') }}">
                         @csrf
 
-                        <!-- Field 1: E-mail / NIP / Username -->
+                        <!-- Field 1: E-mail / NIP / Username / Nama -->
                         <div class="jb-edu-field-group">
-                            <label for="l_u" class="jb-edu-label">E-mail / NIP / Nama Pengguna</label>
+                            <label for="l_u" class="jb-edu-label">E-mail / NIP / Username / Nama</label>
                             <div class="jb-edu-input-wrap">
-                                <input id="l_u" name="username" type="text" class="jb-edu-input" placeholder="Masukkan email resmi, NIP, atau nama pengguna" value="{{ old('username') }}" autocomplete="username" required autofocus>
+                                <input id="l_u" name="username" type="text" class="jb-edu-input" placeholder="Masukkan email, NIP, username, atau nama lengkap" value="{{ old('username') }}" autocomplete="username" required autofocus>
                                 <span class="jb-edu-input-icon">
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                                 </span>

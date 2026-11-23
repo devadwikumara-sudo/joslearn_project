@@ -87,7 +87,7 @@
 
                 <div style="display:flex;gap:10px;flex-wrap:wrap">
                     <a href="{{ route('guru.kenaikan-mutasi', ['tab' => 'kenaikan', 'kelas' => $kelas->nama]) }}" class="btn a">↗ Kenaikan Kelas</a>
-                    <a href="{{ route('guru.data-siswa', ['kelas' => $kelas->nama]) }}" class="btn o">👥 Lihat Siswa Kelas</a>
+                    <a href="{{ route('guru.data-siswa.wali', ['kelas' => $kelas->nama]) }}" class="btn o">👥 Lihat Siswa Kelas</a>
                 </div>
             </div>
         @endforeach
@@ -105,7 +105,7 @@
             
             <div style="display:flex;flex-direction:column;gap:10px">
                 @if($adaPenugasan)
-                    <a href="{{ route('guru.data-siswa') }}" class="submetric-pill" style="justify-content:flex-start">
+                    <a href="{{ route($kelasDiajar->isNotEmpty() ? 'guru.data-siswa' : 'guru.data-siswa.wali') }}" class="submetric-pill" style="justify-content:flex-start">
                         <span class="submetric-pill-icon" style="background:#e0f2fe;color:#0284c7">👥</span>
                         <div>
                             <b style="display:block;font-size:13px;color:#0f172a">Daftar Siswa</b>

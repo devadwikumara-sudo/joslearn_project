@@ -4,16 +4,17 @@ namespace App\Http\Controllers\Guru;
 
 use App\Exports\FormattedTableExport;
 use App\Http\Controllers\Controller;
-use App\Models\SekolahKelas;
 use App\Models\SekolahTahunAjaran;
 use App\Models\SiswaBiodata;
 use App\Services\AcademicRecordAccess;
+use App\Services\AksesGuru;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Maatwebsite\Excel\Excel as ExcelWriter;
 use Maatwebsite\Excel\Facades\Excel;
@@ -21,27 +22,43 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class DataSiswaGuruController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request, AksesGuru $aksesGuru): View
     {
-        $filters = $this->validatedFilters($request);
-        $siswa = $this->filteredStudents($filters)
+        $lingkup = $this->lingkupDataSiswa($request);
+        $kelasAkses = $aksesGuru->kelasUntukDataSiswa($request->user(), $lingkup);
+        abort_if($kelasAkses->isEmpty(), 403);
+
+        $kelasList = $kelasAkses->pluck('nama')->all();
+        sort($kelasList, SORT_NATURAL);
+        $kelasIds = $kelasAkses->modelKeys();
+        $filters = $this->validatedFilters($request, $kelasList, $lingkup);
+        $siswa = $this->filteredStudents($filters, $kelasIds)
             ->paginate(25)
             ->withQueryString();
-
-        $kelasList = SekolahKelas::orderBy('nama')->pluck('nama')->all();
-        sort($kelasList, SORT_NATURAL);
+        $adaKelasWali = $aksesGuru->kelasWali($request->user())->isNotEmpty();
+        $adaKelasMapel = $aksesGuru->kelasDiajar($request->user())->isNotEmpty();
 
         return view('guru.data-siswa', compact(
             'siswa',
             'kelasList',
-            'filters'
+            'filters',
+            'lingkup',
+            'adaKelasWali',
+            'adaKelasMapel'
         ));
     }
 
-    public function export(Request $request): BinaryFileResponse
+    public function wali(Request $request, AksesGuru $aksesGuru): View
     {
-        $filters = $this->validatedFilters($request);
-        $siswa = $this->filteredStudents($filters)->get();
+        $request->query->set('tab', 'wali');
+
+        return $this->index($request, $aksesGuru);
+    }
+
+    public function export(Request $request, AksesGuru $aksesGuru): BinaryFileResponse
+    {
+        [$filters, $kelasIds] = $this->scopedFilters($request, $aksesGuru);
+        $siswa = $this->filteredStudents($filters, $kelasIds)->get();
 
         $rows = $siswa->map(function (SiswaBiodata $murid): array {
             $riwayat = $murid->riwayatKelas->first();
@@ -72,22 +89,22 @@ class DataSiswaGuruController extends Controller
         );
     }
 
-    public function pdfAll(Request $request): Response
+    public function pdfAll(Request $request, AksesGuru $aksesGuru): Response
     {
-        $filters = $this->validatedFilters($request);
-        $siswaList = $this->filteredStudents($filters)->get();
+        [$filters, $kelasIds] = $this->scopedFilters($request, $aksesGuru);
+        $siswaList = $this->filteredStudents($filters, $kelasIds)->get();
 
         return $this->renderListPdf($siswaList, $filters);
     }
 
-    public function pdfSelected(Request $request): Response
+    public function pdfSelected(Request $request, AksesGuru $aksesGuru): Response
     {
-        $filters = $this->validatedFilters($request);
+        [$filters, $kelasIds] = $this->scopedFilters($request, $aksesGuru);
         $selection = $request->validate([
             'siswa_ids' => ['required', 'array', 'min:1'],
             'siswa_ids.*' => ['required', 'integer', 'distinct', 'exists:siswa_biodata,id'],
         ]);
-        $siswaList = $this->filteredStudents($filters)
+        $siswaList = $this->filteredStudents($filters, $kelasIds)
             ->whereIn('id', $selection['siswa_ids'])
             ->get();
 
@@ -96,8 +113,11 @@ class DataSiswaGuruController extends Controller
         return $this->renderListPdf($siswaList, $filters);
     }
 
-    public function show(int $id, Request $request, AcademicRecordAccess $access): View
+    public function show(int $id, Request $request, AcademicRecordAccess $access, AksesGuru $aksesGuru): View
     {
+        $lingkup = $this->lingkupDataSiswa($request);
+        abort_unless($aksesGuru->bolehMelihatSiswa($request->user(), $id, $lingkup), 403);
+
         $siswa = SiswaBiodata::aktif()->with(['riwayatKelas' => function ($query): void {
             $query->with(['kelas', 'tahunAjaran', 'nilai.mapel', 'kehadiran', 'ekskul'])->orderByDesc('tahun_ajaran_id');
         }])->findOrFail($id);
@@ -106,13 +126,24 @@ class DataSiswaGuruController extends Controller
             $academicManagePermissions[$history->id] = $access->permissionsFor($request->user(), $history);
         }
 
-        return view('guru.data-siswa-detail', compact('siswa', 'academicManagePermissions'));
+        return view('guru.data-siswa-detail', compact('siswa', 'academicManagePermissions', 'lingkup'));
     }
 
-    /** @param array{tahun_ajaran?: int|null, kelas?: string, q?: string, st?: string} $filters */
-    private function filteredStudents(array $filters): Builder
+    /**
+     * @param  array{tahun_ajaran?: int|null, kelas?: string, q?: string, st?: string, tab?: string}  $filters
+     * @param  array<int, int>  $kelasIds
+     */
+    private function filteredStudents(array $filters, array $kelasIds): Builder
     {
-        $query = SiswaBiodata::aktif();
+        $tahunBerjalanId = SekolahTahunAjaran::query()->where('sedang_berjalan', true)->value('id');
+        abort_if($tahunBerjalanId === null, 403);
+
+        $query = SiswaBiodata::aktif((int) $tahunBerjalanId)
+            ->whereHas('riwayatKelas', function (Builder $historyQuery) use ($tahunBerjalanId, $kelasIds): void {
+                $historyQuery->where('tahun_ajaran_id', $tahunBerjalanId)
+                    ->where('status', 'Aktif')
+                    ->whereIn('kelas_id', $kelasIds);
+            });
         $historyFilters = $filters;
 
         if ($historyFilters['tahun_ajaran'] !== null || $historyFilters['kelas'] !== '' || $historyFilters['st'] !== '') {
@@ -154,14 +185,18 @@ class DataSiswaGuruController extends Controller
         }
     }
 
-    /** @return array{tahun_ajaran: int|null, kelas: string, q: string, st: string} */
-    private function validatedFilters(Request $request): array
+    /**
+     * @param  array<int, string>  $kelasList
+     * @return array{tahun_ajaran: int|null, kelas: string, q: string, st: string, tab: string}
+     */
+    private function validatedFilters(Request $request, array $kelasList, string $lingkup): array
     {
         $filters = $request->validate([
             'tahun_ajaran' => ['nullable', 'integer', 'exists:sekolah_tahun_ajaran,id'],
-            'kelas' => ['nullable', 'string', 'exists:sekolah_kelas,nama'],
+            'kelas' => ['nullable', 'string', Rule::in($kelasList)],
             'q' => ['nullable', 'string', 'max:150'],
             'st' => ['nullable', 'in:Aktif'],
+            'tab' => ['nullable', 'in:mapel,wali'],
         ]);
 
         if ($request->hasSession() && $request->filled('tahun_ajaran')) {
@@ -186,11 +221,38 @@ class DataSiswaGuruController extends Controller
             'kelas' => $filters['kelas'] ?? '',
             'q' => trim($filters['q'] ?? ''),
             'st' => $filters['st'] ?? '',
+            'tab' => $lingkup,
         ];
     }
 
+    /**
+     * @return array{0: array{tahun_ajaran: int|null, kelas: string, q: string, st: string, tab: string}, 1: array<int, int>}
+     */
+    private function scopedFilters(Request $request, AksesGuru $aksesGuru): array
+    {
+        $lingkup = $this->lingkupDataSiswa($request);
+        $kelasAkses = $aksesGuru->kelasUntukDataSiswa($request->user(), $lingkup);
+        abort_if($kelasAkses->isEmpty(), 403);
+
+        $kelasList = $kelasAkses->pluck('nama')->all();
+        sort($kelasList, SORT_NATURAL);
+
+        return [
+            $this->validatedFilters($request, $kelasList, $lingkup),
+            $kelasAkses->modelKeys(),
+        ];
+    }
+
+    private function lingkupDataSiswa(Request $request): string
+    {
+        $lingkup = $request->input('tab', 'mapel');
+        abort_unless(in_array($lingkup, ['mapel', 'wali'], true), 422);
+
+        return $lingkup;
+    }
+
     /** @param Collection<int, SiswaBiodata> $siswaList
-     * @param  array{tahun_ajaran: int|null, kelas: string, q: string, st: string}  $filters
+     * @param  array{tahun_ajaran: int|null, kelas: string, q: string, st: string, tab: string}  $filters
      */
     private function renderListPdf($siswaList, array $filters): Response
     {

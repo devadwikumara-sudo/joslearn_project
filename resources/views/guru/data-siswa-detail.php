@@ -3,14 +3,17 @@
 @section('title', 'Detail Siswa — JosBook Guru')
 
 @section('content')
+@php
+    $listRoute = $lingkup === 'wali' ? 'guru.data-siswa.wali' : 'guru.data-siswa';
+@endphp
 <div class="bar" style="margin-bottom:16px">
     <div>
         <h2 style="margin:0">Detail Siswa</h2>
         <p class="sub" style="margin:4px 0 0">{{ $siswa->nama_lengkap }} · NISN {{ $siswa->nisn }}</p>
     </div>
     <span class="sp"></span>
-    <a href="{{ route('guru.data-siswa') }}" class="btn o">← Kembali</a>
-    <a href="{{ route('guru.data-siswa.pdf', $siswa->id) }}" target="_blank" rel="noopener" class="btn a">⬇ Unduh PDF</a>
+    <a href="{{ route($listRoute) }}" class="btn o">← Kembali</a>
+    <a href="{{ route('guru.data-siswa.pdf', ['id' => $siswa->id, 'tab' => $lingkup]) }}" target="_blank" rel="noopener" class="btn a">⬇ Unduh PDF</a>
 </div>
 
 <div class="student-profile" style="display:grid;gap:16px">
@@ -19,7 +22,7 @@
         <div style="position:absolute;top:-40px;right:-40px;width:160px;height:160px;background:radial-gradient(circle,rgba(255,255,255,0.18) 0%,rgba(255,255,255,0) 70%);border-radius:50%;pointer-events:none"></div>
         
         @if($siswa->foto)
-            <img src="{{ route('admin.data-siswa.foto', $siswa->id) }}" alt="Foto {{ $siswa->nama_lengkap }}" style="width:72px;height:72px;border-radius:18px;object-fit:cover;border:3px solid rgba(255,255,255,0.35);box-shadow:0 4px 12px rgba(0,0,0,0.2);flex-shrink:0">
+            <img src="{{ route('guru.data-siswa.foto', ['id' => $siswa->id, 'tab' => $lingkup]) }}" alt="Foto {{ $siswa->nama_lengkap }}" style="width:72px;height:72px;border-radius:18px;object-fit:cover;border:3px solid rgba(255,255,255,0.35);box-shadow:0 4px 12px rgba(0,0,0,0.2);flex-shrink:0">
         @else
             <div style="width:72px;height:72px;border-radius:18px;background:rgba(255,255,255,0.18);border:2px solid rgba(255,255,255,0.35);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:800;color:#fff;box-shadow:0 4px 12px rgba(0,0,0,0.15);flex-shrink:0">
                 {{ mb_strtoupper(mb_substr($siswa->nama_lengkap ?: 'S', 0, 1)) }}

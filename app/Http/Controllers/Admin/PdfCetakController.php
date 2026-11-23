@@ -12,6 +12,7 @@ use App\Models\SiswaEkskul;
 use App\Models\SiswaKehadiran;
 use App\Models\SiswaNilai;
 use App\Models\SiswaRiwayatKelas;
+use App\Services\AksesGuru;
 use App\Support\Semester;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
@@ -33,13 +34,13 @@ class PdfCetakController extends Controller
     /**
      * Cetak dokumen PDF satu siswa (Register, Nilai, Hadir, Ekskul, Kenaikan).
      */
-    public function single(Request $request, int|string $id): View
+    public function single(Request $request, int|string $id, AksesGuru $aksesGuru): View
     {
         $siswa = SiswaBiodata::where('id', $id)
             ->orWhere('nisn', $id)
             ->firstOrFail();
 
-        $this->authorizeTeacherStudents($request, [$siswa->id]);
+        $this->authorizeTeacherStudents($request, [$siswa->id], $aksesGuru);
 
         return $this->renderDocumentView($request, [$siswa->id], false);
     }
@@ -47,7 +48,7 @@ class PdfCetakController extends Controller
     /**
      * Cetak dokumen PDF batch banyak siswa atau satu kelas penuh.
      */
-    public function batch(Request $request): View
+    public function batch(Request $request, AksesGuru $aksesGuru): View
     {
         $idsInput = $request->input('ids', []);
         if (is_string($idsInput)) {
@@ -64,6 +65,7 @@ class PdfCetakController extends Controller
             'ta' => ['sometimes', 'nullable', 'string', 'max:30'],
             'q' => ['sometimes', 'nullable', 'string', 'max:150'],
             'st' => ['sometimes', 'nullable', 'in:Aktif'],
+            'tab' => ['sometimes', 'in:mapel,wali'],
         ]);
         $ids = array_map('intval', $selection['ids'] ?? []);
 
@@ -74,10 +76,10 @@ class PdfCetakController extends Controller
         }
 
         if ($ids === [] && $kelas !== '') {
-            $ids = $this->studentIdsForTarget($request, $kelas, $ta);
+            $ids = $this->studentIdsForTarget($request, $kelas, $ta, $aksesGuru);
         }
 
-        $this->authorizeTeacherStudents($request, $ids);
+        $this->authorizeTeacherStudents($request, $ids, $aksesGuru);
 
         return $this->renderDocumentView($request, $ids, true);
     }
@@ -85,13 +87,14 @@ class PdfCetakController extends Controller
     /**
      * @return array<int, int>
      */
-    private function studentIdsForTarget(Request $request, string $kelas, mixed $tahunAjaran): array
+    private function studentIdsForTarget(Request $request, string $kelas, mixed $tahunAjaran, AksesGuru $aksesGuru): array
     {
         abort_unless(
             $kelas === '*' || SekolahKelas::query()->where('nama', $kelas)->exists(),
             422,
             'Kelas cetak tidak ditemukan.'
         );
+        $this->authorizeTeacherClassFilter($request, $aksesGuru, $kelas);
 
         $allYears = in_array($tahunAjaran, ['*', 'Semua', null, ''], true);
         if (! $allYears) {
@@ -108,8 +111,13 @@ class PdfCetakController extends Controller
             ? (int) $tahunAjaran
             : null;
         $query = $request->user()?->peran === 'guru'
-            ? SiswaBiodata::aktif($yearId)
+            ? $this->teacherStudentsQuery($request, $aksesGuru)
             : SiswaBiodata::query();
+        if ($request->user()?->peran === 'guru' && $yearId !== null) {
+            $query->whereHas('riwayatKelas', fn (Builder $historyQuery) => $historyQuery
+                ->where('tahun_ajaran_id', $yearId)
+                ->where('status', 'Aktif'));
+        }
         if ($hasHistoryFilter) {
             $query->whereHas('riwayatKelas', function (Builder $historyQuery) use ($kelas, $tahunAjaran, $allYears, $status): void {
                 if ($kelas !== '*') {
@@ -147,22 +155,24 @@ class PdfCetakController extends Controller
     /**
      * @param  array<int, int>  $studentIds
      */
-    private function authorizeTeacherStudents(Request $request, array $studentIds): void
+    private function authorizeTeacherStudents(Request $request, array $studentIds, AksesGuru $aksesGuru): void
     {
         if ($request->user()?->peran !== 'guru' || $studentIds === []) {
             return;
         }
 
+        $query = $this->teacherStudentsQuery($request, $aksesGuru);
         $requestedYear = $request->input('tahun_ajaran', $request->input('target_ta'));
-        $yearId = is_numeric($requestedYear) && (int) $requestedYear > 0
-            ? (int) $requestedYear
-            : null;
-        $query = SiswaBiodata::aktif($yearId);
+        $yearId = is_numeric($requestedYear) && (int) $requestedYear > 0 ? (int) $requestedYear : null;
 
         $kelas = (string) $request->input('target_kelas', $request->input('kelas', ''));
-        if ($kelas !== '' && $kelas !== '*') {
+        $this->authorizeTeacherClassFilter($request, $aksesGuru, $kelas);
+        if (($kelas !== '' && $kelas !== '*') || $yearId !== null) {
             $query->whereHas('riwayatKelas', function (Builder $historyQuery) use ($kelas, $yearId): void {
-                $historyQuery->whereHas('kelas', fn (Builder $classQuery) => $classQuery->where('nama', $kelas));
+                if ($kelas !== '' && $kelas !== '*') {
+                    $historyQuery->whereHas('kelas', fn (Builder $classQuery) => $classQuery->where('nama', $kelas));
+                }
+
                 if ($yearId !== null) {
                     $historyQuery->where('tahun_ajaran_id', $yearId);
                 }
@@ -171,6 +181,38 @@ class PdfCetakController extends Controller
 
         $visibleCount = $query->whereIn('id', $studentIds)->distinct()->count('siswa_biodata.id');
         abort_unless($visibleCount === count(array_unique($studentIds)), 403);
+    }
+
+    private function authorizeTeacherClassFilter(Request $request, AksesGuru $aksesGuru, string $kelas): void
+    {
+        if ($request->user()?->peran !== 'guru' || $kelas === '' || $kelas === '*') {
+            return;
+        }
+
+        $lingkup = $request->input('tab', 'mapel');
+        abort_unless(in_array($lingkup, ['mapel', 'wali'], true), 422);
+        $kelasDiizinkan = $aksesGuru->kelasUntukDataSiswa($request->user(), $lingkup)
+            ->pluck('nama')
+            ->all();
+
+        abort_unless(in_array($kelas, $kelasDiizinkan, true), 403);
+    }
+
+    private function teacherStudentsQuery(Request $request, AksesGuru $aksesGuru): Builder
+    {
+        $lingkup = $request->input('tab', 'mapel');
+        abort_unless(in_array($lingkup, ['mapel', 'wali'], true), 422);
+
+        $kelasIds = $aksesGuru->kelasUntukDataSiswa($request->user(), $lingkup)->modelKeys();
+        $tahunAjaranId = SekolahTahunAjaran::query()->where('sedang_berjalan', true)->value('id');
+        abort_if($kelasIds === [] || $tahunAjaranId === null, 403);
+
+        return SiswaBiodata::aktif((int) $tahunAjaranId)
+            ->whereHas('riwayatKelas', function (Builder $historyQuery) use ($kelasIds, $tahunAjaranId): void {
+                $historyQuery->where('tahun_ajaran_id', $tahunAjaranId)
+                    ->where('status', 'Aktif')
+                    ->whereIn('kelas_id', $kelasIds);
+            });
     }
 
     /**
@@ -194,6 +236,7 @@ class PdfCetakController extends Controller
             'target_ta' => ['sometimes', 'nullable', 'string', 'max:30'],
             'q' => ['sometimes', 'nullable', 'string', 'max:150'],
             'st' => ['sometimes', 'nullable', 'in:Aktif'],
+            'tab' => ['sometimes', 'in:mapel,wali'],
             'slots_present' => ['sometimes', 'boolean'],
             'slots' => ['sometimes', 'array'],
             'slots.*' => ['string', 'in:X-1,X-2,XI-1,XI-2,XII-1,XII-2'],

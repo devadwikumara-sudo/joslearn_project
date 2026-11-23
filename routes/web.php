@@ -288,6 +288,7 @@ Route::prefix('guru')->name('guru.')->middleware(['auth', 'role.web'])->group(fu
         Route::get('/data-siswa/pdf-semua', [DataSiswaGuruController::class, 'pdfAll'])->name('data-siswa.pdf-all');
         Route::post('/data-siswa/pdf-terpilih', [DataSiswaGuruController::class, 'pdfSelected'])->name('data-siswa.pdf-selected');
         Route::get('/data-siswa/pdf-batch', [PdfCetakController::class, 'batch'])->name('data-siswa.pdf-batch');
+        Route::get('/data-siswa/wali', [DataSiswaGuruController::class, 'wali'])->name('data-siswa.wali');
         Route::get('/data-siswa/{id}/pdf', [PdfCetakController::class, 'single'])->name('data-siswa.pdf');
         Route::get('/data-siswa/{id}/foto', [DataSiswaController::class, 'foto'])->name('data-siswa.foto');
         Route::get('/data-siswa/{id}/berkas/{jenis}', [DataSiswaController::class, 'berkas'])->name('data-siswa.berkas');

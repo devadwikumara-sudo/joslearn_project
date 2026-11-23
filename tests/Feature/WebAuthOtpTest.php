@@ -165,6 +165,22 @@ class WebAuthOtpTest extends TestCase
         $this->assertGuest();
     }
 
+    public function test_web_login_accepts_username_name_and_email(): void
+    {
+        $pengguna = $this->buatAkunReset();
+        $pengguna->nama = 'Admin Uji';
+        $pengguna->save();
+
+        foreach ([$pengguna->username, $pengguna->nama, $pengguna->email] as $identitas) {
+            $this->post(route('login.post'), [
+                'username' => $identitas,
+                'password' => 'PasswordLama123',
+            ])->assertRedirect(route('admin.dashboard'));
+
+            $this->post(route('logout'))->assertRedirect(route('login'));
+        }
+    }
+
     public function test_inactive_admin_is_rejected_from_admin_routes(): void
     {
         $pengguna = $this->buatAkunReset();

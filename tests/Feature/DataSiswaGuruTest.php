@@ -147,12 +147,51 @@ class DataSiswaGuruTest extends TestCase
             ->get(route('guru.data-siswa'))
             ->assertOk()
             ->assertSee('Siswa Satu')
-            ->assertSee('Siswa Dua')
+            ->assertDontSee('Siswa Dua')
             ->assertDontSee('Siswa Lulus')
             ->assertDontSee('Siswa Pindah')
+            ->assertSee('<option value="X-1"', false)
+            ->assertDontSee('<option value="X-2"', false)
             ->assertDontSee('<option value="Lulus"', false)
             ->assertDontSee('<option value="Pindah keluar"', false)
             ->assertDontSee('<option value="Keluar"', false);
+    }
+
+    public function test_teacher_and_homeroom_views_only_show_their_separately_assigned_classes(): void
+    {
+        $teacher = $this->createAccount('guru', true, 'both');
+
+        $this->actingAs($teacher)
+            ->get(route('guru.data-siswa'))
+            ->assertOk()
+            ->assertSee('Siswa Satu')
+            ->assertDontSee('Siswa Dua')
+            ->assertSee('<option value="X-1"', false)
+            ->assertDontSee('<option value="X-2"', false);
+
+        $this->get(route('guru.data-siswa.wali'))
+            ->assertOk()
+            ->assertSee('Siswa Dua')
+            ->assertDontSee('Siswa Satu')
+            ->assertSee('<option value="X-2"', false)
+            ->assertDontSee('<option value="X-1"', false);
+
+        $this->get(route('guru.data-siswa.show', ['id' => 2]))
+            ->assertForbidden();
+        $this->get(route('guru.data-siswa.show', ['id' => 1, 'tab' => 'wali']))
+            ->assertForbidden();
+        $this->get(route('guru.data-siswa.pdf', ['id' => 2]))
+            ->assertForbidden();
+        $this->get(route('guru.data-siswa.pdf-batch', ['ids' => '2']))
+            ->assertForbidden();
+        $this->get(route('guru.data-siswa.pdf-batch', [
+            'target_kelas' => 'X-2',
+            'target_ta' => '1',
+        ]))->assertForbidden();
+        $this->get(route('guru.data-siswa.foto', ['id' => 2]))
+            ->assertForbidden();
+        $this->getJson(route('guru.data-siswa.export', ['kelas' => 'X-2']))
+            ->assertUnprocessable();
     }
 
     public function test_selected_pdf_only_contains_selected_students_matching_current_filters(): void
@@ -202,6 +241,21 @@ class DataSiswaGuruTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_homeroom_only_teacher_uses_the_dedicated_student_page(): void
+    {
+        $wali = $this->createAccount('guru', true, 'wali');
+
+        $this->actingAs($wali)
+            ->get(route('guru.data-siswa'))
+            ->assertForbidden();
+
+        $this->get(route('guru.data-siswa.wali'))
+            ->assertOk()
+            ->assertSee('Data Siswa Kelas Wali')
+            ->assertSee('Siswa Satu')
+            ->assertDontSee('Siswa Dua');
+    }
+
     public function test_teacher_cannot_open_student_edit_form(): void
     {
         $this->actingAs($this->createAccount('guru'))
@@ -226,7 +280,7 @@ class DataSiswaGuruTest extends TestCase
         ]);
     }
 
-    private function createAccount(string $role, bool $assigned = true): Pengguna
+    private function createAccount(string $role, bool $assigned = true, string $assignment = 'mapel'): Pengguna
     {
         $guruId = null;
         if ($role === 'guru') {
@@ -246,11 +300,20 @@ class DataSiswaGuruTest extends TestCase
             'guru_id' => $guruId,
         ]);
 
-        if ($guruId !== null && $assigned) {
-            DB::table('guru_wali_kelas')->insert([
+        if ($guruId !== null && $assigned && in_array($assignment, ['mapel', 'both'], true)) {
+            DB::table('guru_mengajar')->insert([
                 'tahun_ajaran_id' => 1,
                 'guru_id' => $guruId,
                 'kelas_id' => 1,
+                'mapel_id' => 1,
+            ]);
+        }
+
+        if ($guruId !== null && $assigned && in_array($assignment, ['wali', 'both'], true)) {
+            DB::table('guru_wali_kelas')->insert([
+                'tahun_ajaran_id' => 1,
+                'guru_id' => $guruId,
+                'kelas_id' => $assignment === 'both' ? 2 : 1,
             ]);
         }
 
