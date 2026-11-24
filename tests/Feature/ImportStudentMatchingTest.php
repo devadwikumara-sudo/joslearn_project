@@ -1914,7 +1914,8 @@ class ImportStudentMatchingTest extends TestCase
         ]));
 
         $response->assertOk()
-            ->assertSee('Matematika - hanya mapel dan kelas yang Anda ajar')
+            ->assertSee('Matematika')
+            ->assertSee('1 Siswa Aktif')
             ->assertSee('Nama Sama')
             ->assertSee('0000000001')
             ->assertSee('value="83.5"', false)

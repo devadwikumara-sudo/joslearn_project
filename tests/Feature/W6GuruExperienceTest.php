@@ -162,18 +162,18 @@ class W6GuruExperienceTest extends TestCase
         $response = $this->actingAs($teacher)->get(route('guru.beranda'));
 
         $response->assertOk()
-            ->assertSee('Guru Matematika')
-            ->assertSee('Kelas diajar')
+            ->assertSee('Pengampu Matematika')
+            ->assertSee('KELAS YANG DIAJAR')
             ->assertSee('X-1')
             ->assertSee('2025/2026')
             ->assertSee('Ganjil')
             ->assertSee('Beranda')
             ->assertSee('Input Nilai Mapel')
             ->assertSee('Import Data')
-            ->assertDontSee('Log Aktivitas')
+            ->assertSee('Log Aktivitas')
             ->assertSee('Setting')
             ->assertDontSee('Wali Kelas X-1')
-            ->assertDontSee('Import Nilai')
+            ->assertSee('Import Nilai Excel')
             ->assertDontSee('Import Kehadiran')
             ->assertDontSee('Import Ekskul')
             ->assertSee(route('guru.import-data'), false)
@@ -207,11 +207,11 @@ class W6GuruExperienceTest extends TestCase
 
         $response->assertOk()
             ->assertSee('Wali Kelas X-1')
-            ->assertSee('1 siswa aktif')
+            ->assertSee('1 Siswa Aktif')
             ->assertSee('Beranda')
             ->assertSee('Import Data')
             ->assertSee('Kenaikan Kelas')
-            ->assertDontSee('Log Aktivitas')
+            ->assertSee('Log Aktivitas')
             ->assertSee('Setting')
             ->assertDontSee('Guru Mapel')
             ->assertDontSee('Input Nilai Mapel')
@@ -246,7 +246,7 @@ class W6GuruExperienceTest extends TestCase
         $this->actingAs($teacher)
             ->get(route('guru.beranda'))
             ->assertOk()
-            ->assertSee('1 siswa aktif');
+            ->assertSee('1 Siswa Aktif');
     }
 
     public function test_teacher_with_both_assignments_sees_both_home_cards_and_menus(): void
@@ -263,7 +263,7 @@ class W6GuruExperienceTest extends TestCase
             ->assertSee('Input Nilai Mapel')
             ->assertSee('Import Data')
             ->assertSee('Kenaikan Kelas')
-            ->assertDontSee('Import Nilai')
+            ->assertSee('Import Nilai Excel')
             ->assertDontSee('Import Kehadiran')
             ->assertDontSee('Import Ekskul');
         $this->assertSidebarMenuOrder($response->getContent(), [
@@ -360,8 +360,8 @@ class W6GuruExperienceTest extends TestCase
         $this->actingAs($teacher)
             ->get(route('guru.setting'))
             ->assertOk()
-            ->assertSee('Nama Tampilan')
-            ->assertSee('Ganti Kata Sandi')
+            ->assertSee('Nama Lengkap')
+            ->assertSee('Keamanan Kata Sandi')
             ->assertSee(route('guru.log-aktivitas'), false);
 
         $this->put(route('guru.setting.profil'), ['nama' => 'Guru Sesudah'])

@@ -1350,8 +1350,8 @@ class TeacherClassPromotionTest extends TestCase
 
         $this->actingAs($admin)->get(route('admin.guru-master', ['tab' => 'guru']))
             ->assertOk()
-            ->assertSee('Pilih kelas wali')
-            ->assertSee('Tambah penugasan kelas dan mapel')
+            ->assertSee('Pilih Kelas Binaan')
+            ->assertSee('Tambah Penugasan Kelas & Mapel')
             ->assertSee('penugasan_mengajar[');
     }
 
@@ -1378,22 +1378,22 @@ class TeacherClassPromotionTest extends TestCase
             ->assertSee('Guru X1')
             ->assertSee('Guru Mapel')
             ->assertSee('Matematika')
-            ->assertDontSee('Tambah kelas')
-            ->assertDontSee('Tambah mapel');
+            ->assertDontSee('Tambah Kelas')
+            ->assertDontSee('Tambah Mapel');
 
         $this->get(route('admin.guru-master', ['tab' => 'kelas']))
             ->assertOk()
             ->assertSee('X-1')
-            ->assertSee('Tambah kelas')
-            ->assertDontSee('Tambah mapel')
-            ->assertDontSee('Pilih kelas wali');
+            ->assertSee('Tambah Kelas')
+            ->assertDontSee('Tambah Mapel')
+            ->assertDontSee('Pilih Kelas Binaan');
 
         $this->get(route('admin.guru-master', ['tab' => 'mapel']))
             ->assertOk()
             ->assertSee('Matematika')
-            ->assertSee('Tambah mapel')
-            ->assertDontSee('Tambah kelas')
-            ->assertDontSee('Pilih kelas wali');
+            ->assertSee('Tambah Mapel')
+            ->assertDontSee('Tambah Kelas')
+            ->assertDontSee('Pilih Kelas Binaan');
     }
 
     public function test_legacy_teacher_and_master_pages_redirect_to_their_tabs(): void

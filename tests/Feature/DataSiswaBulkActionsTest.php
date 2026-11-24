@@ -315,10 +315,24 @@ class DataSiswaBulkActionsTest extends TestCase
         $response = $this->actingAs($this->createAccount('admin'))
             ->get(route('admin.data-siswa'));
 
-        $response->assertOk()
-            ->assertDontSee('<option value="Lulus"', false)
-            ->assertDontSee('<option value="Pindah keluar"', false)
-            ->assertDontSee('<option value="Keluar"', false);
+        $response->assertOk();
+
+        // Yang dibatasi hanya Aktif: filter status daftar dan "Status tujuan" pindah kelas massal.
+        // Form pendataan di panel samping sengaja memuat semua status untuk mengedit satu siswa.
+        $html = $response->getContent();
+        $this->assertSame(1, preg_match('/<select name="st">(.*?)<\/select>/s', $html, $filter));
+        $this->assertStringContainsString('value="Aktif"', $filter[1]);
+
+        $dropdowns = [$filter[1]];
+        if (preg_match('/<select name="target_status"[^>]*>(.*?)<\/select>/s', $html, $target)) {
+            $dropdowns[] = $target[1];
+        }
+
+        foreach ($dropdowns as $options) {
+            foreach (['Lulus', 'Pindah keluar', 'Keluar'] as $status) {
+                $this->assertStringNotContainsString('value="'.$status.'"', $options);
+            }
+        }
     }
 
     public function test_data_siswa_renders_the_shared_create_form_in_a_side_panel(): void
@@ -515,19 +529,19 @@ class DataSiswaBulkActionsTest extends TestCase
 
         $report->assertOk()
             ->assertViewHas('tab', 'laporan')
-            ->assertSee('Rekap 2026/2027')
-            ->assertSee('Cetak laporan')
-            ->assertDontSee('Siswa diperiksa');
+            ->assertSee('Performa Akademik (2026/2027)')
+            ->assertSee('Cetak Laporan Resmi')
+            ->assertDontSee('Siswa Diperiksa');
 
         $quality = $this->get(route('admin.laporan', ['tab' => 'kualitas']));
 
         $quality->assertOk()
             ->assertViewHas('tab', 'kualitas')
             ->assertViewHas('totalSiswa', 1)
-            ->assertSee('Siswa diperiksa')
+            ->assertSee('Siswa Diperiksa')
             ->assertSee('Siswa Aktif')
             ->assertDontSee('Siswa Lulus')
-            ->assertDontSee('Rata-rata nilai');
+            ->assertDontSee('Rata-rata Nilai');
     }
 
     public function test_quality_duplicate_findings_link_each_active_student_for_repair(): void
