@@ -20,12 +20,9 @@ Route::prefix('v1')->group(function () {
     // ─── PUBLIK (tanpa token) — batas umum per IP untuk jaringan sekolah bersama.
     Route::middleware('throttle:60,1')->group(function () {
         Route::post('/login', [AuthApiController::class, 'login']);
-        Route::middleware('throttle:mobile-auth-otp')->group(function () {
+        Route::middleware('throttle:mobile-auth')->group(function () {
             Route::post('/daftar', [AuthApiController::class, 'daftar']);
-            Route::post('/verifikasi-otp', [AuthApiController::class, 'verifikasiOtp']);
-            Route::post('/kirim-ulang-otp', [AuthApiController::class, 'kirimUlangOtp']);
             Route::post('/lupa-password', [AuthApiController::class, 'lupaPassword']);
-            Route::post('/reset-password', [AuthApiController::class, 'resetPassword']);
         });
     });
 
@@ -49,9 +46,11 @@ Route::prefix('v1')->group(function () {
         Route::put('/profil', [ProfilApiController::class, 'update']);
         Route::put('/ganti-password', [ProfilApiController::class, 'gantiPassword']);
         Route::get('/profil/foto', [ProfilApiController::class, 'foto']);
+        Route::post('/profil/foto', [ProfilApiController::class, 'simpanFoto'])->middleware('throttle:10,1');
 
         // Notifikasi
         Route::get('/notifikasi', [NotifikasiApiController::class, 'index']);
         Route::post('/notifikasi/baca', [NotifikasiApiController::class, 'baca']);
+        Route::post('/notifikasi/{id}/baca', [NotifikasiApiController::class, 'bacaSatu'])->whereNumber('id');
     });
 });

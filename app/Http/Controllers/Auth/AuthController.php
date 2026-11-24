@@ -150,7 +150,8 @@ class AuthController extends Controller
     }
 
     /**
-     * Proses pendaftaran akun langsung ke database dan diarahkan sesuai peran.
+     * Proses pendaftaran akun (guru atau admin). Akun langsung aktif tanpa OTP;
+     * OTP email hanya dipakai pada alur lupa kata sandi.
      */
     public function daftar(Request $request)
     {
@@ -257,65 +258,45 @@ class AuthController extends Controller
                 'nama' => trim($request->nama),
                 'email' => $email,
                 'password' => Hash::make($request->password),
-                'aktif' => $request->peran === 'guru',
+                'aktif' => true,
                 'guru_id' => $guruId,
                 'wajib_ganti_password' => false,
                 'email_diverifikasi_at' => null,
             ]);
 
-            if ($pengguna->peran === 'guru') {
-                CatatanAktivitas::create([
-                    'pengguna_id' => $pengguna->id,
-                    'peran' => 'guru',
-                    'aksi' => 'daftar_guru_mandiri',
-                    'keterangan' => 'Mendaftarkan akun guru secara mandiri; menunggu penugasan administrator.',
-                    'objek_tipe' => 'akun',
-                    'objek_id' => $pengguna->id,
-                    'alamat_ip' => $request->ip(),
-                ]);
-            }
+            CatatanAktivitas::create([
+                'pengguna_id' => $pengguna->id,
+                'peran' => $pengguna->peran,
+                'aksi' => $pengguna->peran === 'guru' ? 'daftar_guru_mandiri' : 'daftar_admin_mandiri',
+                'keterangan' => $pengguna->peran === 'guru'
+                    ? 'Mendaftarkan akun guru secara mandiri; menunggu penugasan administrator.'
+                    : 'Mendaftarkan akun administrator dengan kode pendaftaran.',
+                'objek_tipe' => 'akun',
+                'objek_id' => $pengguna->id,
+                'alamat_ip' => $request->ip(),
+            ]);
 
             return $pengguna;
         });
 
-        if ($pengguna->peran === 'guru') {
-            $this->hapusKonteksOtp();
+        $this->hapusKonteksOtp();
 
-            return redirect()->route('login')->with(
-                'success',
-                'Pendaftaran berhasil. Akun Anda sudah aktif dan dapat digunakan untuk login. Administrator akan mengatur penugasan Anda.'
-            );
-        }
-
-        session([
-            'auth_flow' => 'daftar',
-            'auth_user_id' => $pengguna->id,
-            'masked_email' => $this->maskEmail($pengguna->email),
-            'identitas_nama' => $pengguna->nama,
-            'identitas_id' => 'Akun: '.$pengguna->username,
-        ]);
-
-        try {
-            $this->otpService->buatDanKirim($pengguna->email, 'daftar');
-        } catch (\Throwable $e) {
-            Log::error('Gagal mengirim OTP pendaftaran web: '.$e->getMessage());
-
-            return redirect()->route('verifikasi-akun')->withErrors([
-                'kode' => 'Gagal mengirim email verifikasi. Tunggu sebentar lalu kirim ulang kode.',
-            ]);
-        }
-
-        return redirect()->route('verifikasi-akun');
+        return redirect()->route('login')->with(
+            'success',
+            $pengguna->peran === 'admin'
+                ? 'Pendaftaran berhasil. Akun administrator sudah aktif dan dapat digunakan untuk login.'
+                : 'Pendaftaran berhasil. Akun Anda sudah aktif dan dapat digunakan untuk login. Administrator akan mengatur penugasan Anda.'
+        );
     }
 
     /**
-     * Tampilkan halaman verifikasi OTP (Verifikasi akun.png).
+     * Tampilkan halaman verifikasi OTP lupa kata sandi (Verifikasi akun.png).
      */
     public function showVerifikasi()
     {
         $pengguna = $this->penggunaDalamAlur();
         if (! $pengguna) {
-            return redirect()->route('daftar')->withErrors([
+            return redirect()->route('reset-sandi')->withErrors([
                 'email' => 'Sesi verifikasi tidak valid. Silakan mulai kembali.',
             ]);
         }
@@ -367,40 +348,13 @@ class AuthController extends Controller
             return back()->withErrors(['kode' => 'Kode verifikasi salah.']);
         }
 
-        if (session('auth_flow') === 'reset') {
-            session([
-                'auth_reset_verified' => true,
-                'auth_reset_user_id' => $pengguna->id,
-                'auth_reset_verified_until' => now()->addMinutes(15)->timestamp,
-            ]);
+        session([
+            'auth_reset_verified' => true,
+            'auth_reset_user_id' => $pengguna->id,
+            'auth_reset_verified_until' => now()->addMinutes(15)->timestamp,
+        ]);
 
-            return redirect()->route('buat-kata-sandi-baru');
-        }
-
-        DB::transaction(function () use ($pengguna, $request): void {
-            $pengguna->email_diverifikasi_at = now();
-            $pengguna->aktif = true;
-            $pengguna->terakhir_login_at = now();
-            $pengguna->save();
-
-            CatatanAktivitas::create([
-                'pengguna_id' => $pengguna->id,
-                'peran' => $pengguna->peran,
-                'aksi' => 'verifikasi_pendaftaran',
-                'keterangan' => 'Memverifikasi pendaftaran akun melalui OTP email.',
-                'objek_tipe' => 'akun',
-                'objek_id' => $pengguna->id,
-                'alamat_ip' => $request->ip(),
-            ]);
-        });
-
-        Auth::login($pengguna);
-        $request->session()->regenerate();
-        $this->hapusKonteksOtp();
-
-        return $pengguna->peran === 'admin'
-            ? redirect()->route('admin.dashboard')->with('success', 'Akun Administrator berhasil diverifikasi. Selamat datang di JosBook.')
-            : redirect()->route('guru.beranda')->with('success', 'Akun Guru berhasil diverifikasi. Selamat datang di JosBook.');
+        return redirect()->route('buat-kata-sandi-baru');
     }
 
     /**
@@ -597,7 +551,7 @@ class AuthController extends Controller
 
     private function tujuanOtp(): string
     {
-        return session('auth_flow') === 'reset' ? 'lupa_password' : 'daftar';
+        return 'lupa_password';
     }
 
     private function penggunaDalamAlur(): ?Pengguna
@@ -607,13 +561,9 @@ class AuthController extends Controller
             return null;
         }
 
-        if (session('auth_flow') === 'reset') {
-            return $pengguna->aktif && in_array($pengguna->peran, ['admin', 'guru'], true)
-                ? $pengguna
-                : null;
-        }
-
-        return session('auth_flow') === 'daftar' && ! $pengguna->aktif
+        return session('auth_flow') === 'reset'
+            && $pengguna->aktif
+            && in_array($pengguna->peran, ['admin', 'guru'], true)
             ? $pengguna
             : null;
     }

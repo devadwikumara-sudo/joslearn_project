@@ -313,18 +313,9 @@ class ApiSiswaAksesTest extends TestCase
         ])->assertStatus(429);
     }
 
-    public function test_mobile_registration_creates_account_only_in_student_account_table(): void
+    public function test_mobile_registration_activates_account_only_in_student_account_table_without_otp(): void
     {
-        Mail::shouldReceive('raw')
-            ->once()
-            ->withArgs(function (string $content, callable $callback): bool {
-                $message = Mockery::mock(Message::class);
-                $message->shouldReceive('to')->once()->with('siswa@example.test')->andReturnSelf();
-                $message->shouldReceive('subject')->once()->with('Kode Verifikasi JosBook')->andReturnSelf();
-                $callback($message);
-
-                return true;
-            });
+        Mail::shouldReceive('raw')->never();
 
         $this->createStudent('Siswa Pendaftar', '1234567890');
 
@@ -333,16 +324,14 @@ class ApiSiswaAksesTest extends TestCase
             'nisn' => '1234567890',
             'email' => 'siswa@example.test',
             'password' => 'password-rahasia',
-        ])->assertCreated();
+        ])->assertCreated()
+            ->assertJsonPath('data.nisn', '1234567890');
 
         $this->assertSame(
             1,
-            DB::table('akun_siswa')->where('username', '1234567890')->count()
+            DB::table('akun_siswa')->where('username', '1234567890')->where('aktif', true)->count()
         );
-        $this->assertSame(
-            1,
-            DB::table('akun_kode_otp')->where('email', 'siswa@example.test')->count()
-        );
+        $this->assertSame(0, DB::table('akun_kode_otp')->count());
         $this->assertDatabaseMissing('akun_pengguna', ['username' => '1234567890']);
     }
 

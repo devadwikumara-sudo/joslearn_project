@@ -36,11 +36,10 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute($attempts)->by($path.'|'.$request->ip());
         });
 
-        RateLimiter::for('mobile-auth-otp', function (Request $request): Limit {
+        RateLimiter::for('mobile-auth', function (Request $request): Limit {
             $path = $request->path();
             $attempts = match ($path) {
-                'api/v1/verifikasi-otp' => 6,
-                'api/v1/kirim-ulang-otp', 'api/v1/lupa-password' => 3,
+                'api/v1/lupa-password' => 3,
                 default => 5,
             };
 

@@ -77,4 +77,23 @@ class NotifikasiApiController extends Controller
 
         return response()->json(['pesan' => 'Semua notifikasi ditandai sudah dibaca.']);
     }
+
+    /**
+     * POST /api/v1/notifikasi/{id}/baca  — tandai satu notifikasi milik pengguna.
+     * Notifikasi milik akun lain dijawab 404 agar keberadaannya tidak terbaca.
+     */
+    public function bacaSatu(Request $request, int $id): JsonResponse
+    {
+        $milikPengguna = fn () => DB::table('akun_notifikasi')
+            ->where('id', $id)
+            ->where('akun_siswa_id', $request->user()->id);
+
+        if (! $milikPengguna()->exists()) {
+            return response()->json(['pesan' => 'Notifikasi tidak ditemukan.'], 404);
+        }
+
+        $milikPengguna()->whereNull('dibaca_at')->update(['dibaca_at' => now()]);
+
+        return response()->json(['pesan' => 'Notifikasi ditandai sudah dibaca.']);
+    }
 }

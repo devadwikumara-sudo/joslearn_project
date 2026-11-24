@@ -5,11 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Auth\AkunSiswa;
 use App\Models\SiswaBiodata;
-use App\Services\OtpService;
-use Illuminate\Contracts\Encryption\DecryptException;
+use App\Services\ResetSandiSiswaService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -17,16 +15,12 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 
 /**
- * Autentikasi aplikasi mobile siswa:
- * login, daftar, verifikasi OTP, lupa password, reset password, logout.
+ * Autentikasi aplikasi mobile siswa (tanpa OTP):
+ * login, daftar (langsung aktif), lupa password (tautan email), logout.
  */
 class AuthApiController extends Controller
 {
-    private const OTP_JEDA_KIRIM_ULANG_DETIK = 60;
-
-    private const RESET_TOKEN_BERLAKU_MENIT = 15;
-
-    public function __construct(private OtpService $otpService) {}
+    public function __construct(private ResetSandiSiswaService $resetSandi) {}
 
     /**
      * POST /api/v1/login  (layar Login)
@@ -67,9 +61,7 @@ class AuthApiController extends Controller
         RateLimiter::clear($kunci);
 
         if (! $pengguna->aktif) {
-            return $pengguna->email_diverifikasi_at
-                ? $this->gagal('Akun Anda dinonaktifkan. Silakan hubungi administrator sekolah.', 403, 'akun_nonaktif')
-                : $this->gagal('Akun belum diverifikasi. Selesaikan verifikasi kode OTP yang dikirim ke email Anda.', 403, 'belum_verifikasi');
+            return $this->gagal('Akun Anda dinonaktifkan. Silakan hubungi administrator sekolah.', 403, 'akun_nonaktif');
         }
 
         $token = $pengguna->createToken($data['nama_perangkat'] ?? 'Perangkat tidak dikenal', ['siswa']);
@@ -104,8 +96,9 @@ class AuthApiController extends Controller
 
     /**
      * POST /api/v1/daftar  (layar Daftar)
-     * Nama + NISN harus cocok dengan data siswa di sekolah. Akun dibuat
-     * dalam keadaan belum aktif, lalu diaktifkan setelah OTP email benar.
+     * Nama + NISN harus cocok dengan data siswa di sekolah. Akun langsung aktif
+     * (tanpa OTP). NISN yang sudah memiliki akun, aktif maupun dinonaktifkan
+     * administrator, tidak dapat didaftarkan ulang.
      */
     public function daftar(Request $request): JsonResponse
     {
@@ -135,157 +128,40 @@ class AuthApiController extends Controller
 
         $akun = AkunSiswa::where('siswa_id', $siswa->id)->orWhere('username', $nisn)->first();
 
-        // Akun yang sudah aktif tidak boleh didaftarkan ulang
-        if ($akun && $akun->aktif) {
-            return $this->gagal('Akun untuk NISN ini sudah terdaftar. Silakan login.', 422, 'register_gagal');
+        if ($akun) {
+            return $akun->aktif
+                ? $this->gagal('Akun untuk NISN ini sudah terdaftar. Silakan login.', 422, 'register_gagal')
+                : $this->gagal('Akun untuk NISN ini dinonaktifkan. Silakan hubungi administrator sekolah.', 422, 'register_gagal');
         }
 
-        $emailDipakai = AkunSiswa::where('email', $email)
-            ->when($akun, fn ($q) => $q->where('id', '!=', $akun->id))
-            ->exists();
-
-        if ($emailDipakai) {
+        if (AkunSiswa::where('email', $email)->exists()) {
             return $this->gagal('Email ini sudah dipakai oleh akun lain.', 422, 'register_gagal');
         }
 
-        DB::transaction(function () use ($akun, $siswa, $nisn, $email, $data) {
-            if ($akun) {
-                // Pendaftaran yang belum diverifikasi: perbarui isiannya
-                $akun->email = $email;
-                $akun->password = Hash::make($data['password']);
-                $akun->email_diverifikasi_at = null;
-                $akun->save();
+        $akun = AkunSiswa::create([
+            'username' => $nisn,
+            'email' => $email,
+            'password' => Hash::make($data['password']),
+            'aktif' => true,
+            'siswa_id' => $siswa->id,
+            'wajib_ganti_password' => false,
+        ]);
 
-                return;
-            }
-
-            AkunSiswa::create([
-                'username' => $nisn,
-                'email' => $email,
-                'password' => Hash::make($data['password']),
-                'aktif' => false,
-                'siswa_id' => $siswa->id,
-                'wajib_ganti_password' => false,
-            ]);
-        });
-
-        try {
-            $kode = $this->buatDanKirimOtp($email, 'daftar');
-        } catch (\Throwable $e) {
-            Log::error('Gagal mengirim OTP daftar: '.$e->getMessage());
-
-            return $this->gagal('Gagal mengirim email verifikasi. Coba lagi beberapa saat.', 503);
-        }
+        NotifikasiApiController::buat($akun->id, 'Akun berhasil dibuat', 'Selamat datang di JosBook. Akun Anda sudah aktif.');
 
         return response()->json([
-            'pesan' => 'Kode verifikasi telah dikirim ke email Anda.',
-            'data' => $this->dataOtp($email, $kode),
+            'pesan' => 'Pendaftaran berhasil. Silakan login.',
+            'data' => [
+                'nama' => $akun->nama,
+                'nisn' => $akun->username,
+            ],
         ], 201);
     }
 
     /**
-     * POST /api/v1/verifikasi-otp  (layar Verifikasi Email)
-     * tujuan: daftar (default) atau lupa_password.
-     */
-    public function verifikasiOtp(Request $request): JsonResponse
-    {
-        $data = $request->validate([
-            'email' => ['required', 'email'],
-            'kode' => ['required', 'digits:6'],
-            'tujuan' => ['nullable', 'in:daftar,lupa_password'],
-        ], [
-            'kode.required' => 'Masukkan 6 digit kode verifikasi.',
-            'kode.digits' => 'Kode verifikasi harus 6 digit angka.',
-        ]);
-
-        $email = Str::lower(trim($data['email']));
-        $tujuan = $data['tujuan'] ?? 'daftar';
-
-        $hasil = $this->otpService->verifikasi($email, $tujuan, $data['kode']);
-
-        if ($hasil === OtpService::TIDAK_VALID) {
-            return $this->gagal('Kode verifikasi tidak valid atau sudah kedaluwarsa. Silakan kirim ulang kode.', 422, 'otp_salah');
-        }
-
-        if ($hasil === OtpService::TERLALU_BANYAK) {
-            return $this->gagal('Terlalu banyak percobaan. Silakan kirim ulang kode baru.', 429, 'otp_terlalu_banyak');
-        }
-
-        if ($hasil === OtpService::SALAH) {
-            return $this->gagal('Kode verifikasi salah.', 422, 'otp_salah');
-        }
-
-        $pengguna = AkunSiswa::where('email', $email)->first();
-
-        if (! $pengguna) {
-            return $this->gagal('Akun tidak ditemukan.', 404);
-        }
-
-        if ($tujuan === 'daftar') {
-            $pengguna->aktif = true;
-            $pengguna->email_diverifikasi_at = now();
-            $pengguna->save();
-
-            NotifikasiApiController::buat($pengguna->id, 'Akun berhasil dibuat', 'Selamat datang di JosBook. Akun Anda sudah aktif.');
-
-            return response()->json([
-                'pesan' => 'Register berhasil. Silakan login.',
-                'data' => [
-                    'nama' => $pengguna->nama,
-                    'nisn' => $pengguna->username,
-                ],
-            ]);
-        }
-
-        // lupa_password: beri token singkat untuk langkah "buat kata sandi baru"
-        return response()->json([
-            'pesan' => 'Kode benar. Silakan buat kata sandi baru.',
-            'data' => ['reset_token' => $this->buatResetToken($pengguna)],
-        ]);
-    }
-
-    /**
-     * POST /api/v1/kirim-ulang-otp  (tombol "Kirim ulang")
-     */
-    public function kirimUlangOtp(Request $request): JsonResponse
-    {
-        $data = $request->validate([
-            'email' => ['required', 'email'],
-            'tujuan' => ['nullable', 'in:daftar,lupa_password'],
-        ]);
-
-        $email = Str::lower(trim($data['email']));
-        $tujuan = $data['tujuan'] ?? 'daftar';
-
-        $sisa = $this->otpService->detikSampaiKirimUlang($email, $tujuan, self::OTP_JEDA_KIRIM_ULANG_DETIK);
-        if ($sisa > 0) {
-            return response()->json([
-                'pesan' => 'Tunggu sebentar sebelum mengirim ulang kode.',
-                'kode' => 'tunggu',
-                'data' => ['sisa_detik' => $sisa],
-            ], 429);
-        }
-
-        // Jawaban selalu sama agar email yang terdaftar tidak bisa ditebak
-        $kode = null;
-        if (AkunSiswa::where('email', $email)->exists()) {
-            try {
-                $kode = $this->buatDanKirimOtp($email, $tujuan);
-            } catch (\Throwable $e) {
-                Log::error('Gagal mengirim ulang OTP: '.$e->getMessage());
-
-                return $this->gagal('Gagal mengirim email verifikasi. Coba lagi beberapa saat.', 503);
-            }
-        }
-
-        return response()->json([
-            'pesan' => 'Jika email terdaftar, kode verifikasi baru telah dikirim.',
-            'data' => $this->dataOtp($email, $kode),
-        ]);
-    }
-
-    /**
-     * POST /api/v1/lupa-password  (layar Lupa Kata Sandi langkah 1)
+     * POST /api/v1/lupa-password  (layar Lupa Kata Sandi)
+     * Mengirim tautan email; kata sandi baru dibuat di halaman web tautan tersebut
+     * (GET /siswa/reset-sandi). Tanpa OTP.
      */
     public function lupaPassword(Request $request): JsonResponse
     {
@@ -302,55 +178,29 @@ class AuthApiController extends Controller
             ->where('aktif', true)
             ->first();
 
-        $kode = null;
+        $tautan = null;
         if ($pengguna) {
             try {
-                $kode = $this->buatDanKirimOtp($email, 'lupa_password');
+                $tautan = $this->resetSandi->kirimTautan($pengguna);
             } catch (\Throwable $e) {
-                Log::error('Gagal mengirim OTP lupa password: '.$e->getMessage());
+                Log::error('Gagal mengirim tautan reset kata sandi siswa: '.$e->getMessage());
 
-                return $this->gagal('Gagal mengirim email verifikasi. Coba lagi beberapa saat.', 503);
+                return $this->gagal('Gagal mengirim email. Coba lagi beberapa saat.', 503);
             }
+        }
+
+        $hasil = ['email' => $this->maskEmail($email)];
+
+        // Hanya untuk pengembangan lokal (mailer "log"), TIDAK muncul di produksi
+        if ($tautan && app()->environment('local') && config('app.debug')) {
+            $hasil['tautan_debug'] = $tautan;
         }
 
         // Jawaban selalu sama agar email yang terdaftar tidak bisa ditebak
         return response()->json([
-            'pesan' => 'Jika email terdaftar, kode verifikasi telah dikirim.',
-            'data' => $this->dataOtp($email, $kode),
+            'pesan' => 'Jika email terdaftar, tautan untuk membuat kata sandi baru telah dikirim.',
+            'data' => $hasil,
         ]);
-    }
-
-    /**
-     * POST /api/v1/reset-password  (layar Buat Kata Sandi Baru)
-     */
-    public function resetPassword(Request $request): JsonResponse
-    {
-        $data = $request->validate([
-            'reset_token' => ['required', 'string'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
-        ], [
-            'password.required' => 'Kata sandi baru wajib diisi.',
-            'password.min' => 'Kata sandi minimal 8 karakter.',
-            'password.confirmed' => 'Konfirmasi kata sandi tidak cocok.',
-        ]);
-
-        $pengguna = $this->bacaResetToken($data['reset_token']);
-
-        if (! $pengguna) {
-            return $this->gagal('Sesi reset kata sandi tidak valid atau sudah kedaluwarsa. Ulangi dari awal.', 422, 'reset_kedaluwarsa');
-        }
-
-        $pengguna->password = Hash::make($data['password']);
-        $pengguna->wajib_ganti_password = false;
-        $pengguna->save();
-
-        // Keluarkan semua perangkat yang sedang login
-        $pengguna->tokens()->delete();
-        DB::table('akun_perangkat_login')->where('akun_siswa_id', $pengguna->id)->delete();
-
-        NotifikasiApiController::buat($pengguna->id, 'Password berhasil diganti', 'Password akun Anda telah diperbarui.');
-
-        return response()->json(['pesan' => 'Kata sandi berhasil diganti. Silakan login.']);
     }
 
     /**
@@ -381,65 +231,6 @@ class AuthApiController extends Controller
         $normal = fn (?string $x) => Str::lower(preg_replace('/\s+/', ' ', trim((string) $x)));
 
         return $normal($a) !== '' && $normal($a) === $normal($b);
-    }
-
-    /**
-     * Buat kode 6 digit, simpan hash-nya, lalu kirim lewat email.
-     * Kode lama untuk email + tujuan yang sama dinyatakan tidak berlaku.
-     */
-    private function buatDanKirimOtp(string $email, string $tujuan): string
-    {
-        return $this->otpService->buatDanKirim($email, $tujuan);
-    }
-
-    private function dataOtp(string $email, ?string $kode): array
-    {
-        $data = [
-            'email' => $this->maskEmail($email),
-            'berlaku_menit' => OtpService::BERLAKU_MENIT,
-            'jeda_kirim_ulang_detik' => self::OTP_JEDA_KIRIM_ULANG_DETIK,
-        ];
-
-        // Hanya untuk pengembangan lokal (mailer "log"), TIDAK muncul di produksi
-        if ($kode && app()->environment('local') && config('app.debug')) {
-            $data['kode_debug'] = $kode;
-        }
-
-        return $data;
-    }
-
-    /**
-     * Token reset tanpa tabel: terenkripsi dengan APP_KEY, berisi id, masa berlaku,
-     * dan sidik password lama sehingga otomatis tidak berlaku setelah password diganti.
-     */
-    private function buatResetToken(AkunSiswa $pengguna): string
-    {
-        return Crypt::encryptString(json_encode([
-            'id' => $pengguna->id,
-            'exp' => now()->addMinutes(self::RESET_TOKEN_BERLAKU_MENIT)->timestamp,
-            'sidik' => hash('sha256', $pengguna->password),
-        ]));
-    }
-
-    private function bacaResetToken(string $token): ?AkunSiswa
-    {
-        try {
-            $isi = json_decode(Crypt::decryptString($token), true);
-        } catch (DecryptException) {
-            return null;
-        }
-
-        if (! is_array($isi) || ($isi['exp'] ?? 0) < now()->timestamp) {
-            return null;
-        }
-
-        $pengguna = AkunSiswa::where('id', $isi['id'] ?? 0)->where('aktif', true)->first();
-
-        if (! $pengguna || ! hash_equals($isi['sidik'] ?? '', hash('sha256', $pengguna->password))) {
-            return null;
-        }
-
-        return $pengguna;
     }
 
     private function maskEmail(string $email): string

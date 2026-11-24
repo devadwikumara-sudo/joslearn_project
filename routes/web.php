@@ -19,6 +19,7 @@ use App\Http\Controllers\Admin\PdfCetakController;
 use App\Http\Controllers\Admin\PelacakanAlumniController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\Auth\ResetSandiSiswaController;
 use App\Http\Controllers\Auth\GantiPasswordController;
 use App\Http\Controllers\Guru\BerandaGuruController;
 use App\Http\Controllers\Guru\DataSiswaGuruController;
@@ -54,6 +55,10 @@ Route::post('/buat-kata-sandi-baru', [AuthController::class, 'simpanKataSandiBar
 
 // 6. Halaman Selesai Kata Sandi (selesai kata sandi.png)
 Route::get('/selesai-kata-sandi', [AuthController::class, 'showSelesaiKataSandi'])->name('selesai-kata-sandi');
+
+// Reset kata sandi siswa dari tautan email (diminta lewat aplikasi mobile; tanpa OTP).
+Route::get('/siswa/reset-sandi', [ResetSandiSiswaController::class, 'show'])->name('siswa.reset-sandi')->middleware('throttle:30,1');
+Route::post('/siswa/reset-sandi', [ResetSandiSiswaController::class, 'simpan'])->name('siswa.reset-sandi.simpan')->middleware('throttle:30,1');
 
 // Ganti password (wajib ganti pertama login)
 Route::middleware(['auth'])->group(function () {

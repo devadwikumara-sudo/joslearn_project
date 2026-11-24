@@ -10,7 +10,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Throwable;
 
 /**
  * Layar Profil: Data Diri, Edit Profil, Ganti Password, foto.
@@ -157,6 +159,82 @@ class ProfilApiController extends Controller
         }
 
         return response()->json(['pesan' => 'Foto tidak ditemukan.'], 404);
+    }
+
+    /**
+     * POST /api/v1/profil/foto  — unggah pas foto (multipart, field foto_file).
+     * Aturan berkas sama dengan form pendataan web: JPG/PNG/WEBP, maksimal 2 MB,
+     * disimpan di disk privat `local` pada siswa/foto dan dibaca lewat GET /profil/foto.
+     */
+    public function simpanFoto(Request $request): JsonResponse
+    {
+        $pengguna = $request->user();
+        $siswa = $pengguna->siswa;
+
+        if (! $siswa) {
+            return response()->json(['pesan' => 'Data siswa tidak ditemukan.'], 404);
+        }
+
+        $request->validate([
+            'foto_file' => ['required', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+        ], [
+            'foto_file.required' => 'Pilih foto terlebih dahulu.',
+            'foto_file.file' => 'Foto gagal diunggah. Coba lagi.',
+            'foto_file.uploaded' => 'Foto gagal diunggah. Ukuran foto maksimal 2 MB.',
+            'foto_file.image' => 'File harus berupa gambar.',
+            'foto_file.mimes' => 'Foto harus berformat JPG, PNG, atau WEBP.',
+            'foto_file.max' => 'Ukuran foto maksimal 2 MB.',
+        ]);
+
+        $berkas = $request->file('foto_file');
+        $nama = 'foto_'.($siswa->nisn ?: $siswa->id).'_'.Str::uuid().'.'.$berkas->extension();
+        $pathBaru = $berkas->storeAs('siswa/foto', $nama, 'local');
+
+        if ($pathBaru === false) {
+            return response()->json(['pesan' => 'Foto gagal disimpan. Coba lagi.'], 500);
+        }
+
+        $pathLama = $siswa->foto;
+
+        try {
+            $siswa->foto = $pathBaru;
+            $siswa->foto_ada = true;
+            $siswa->save();
+        } catch (Throwable $e) {
+            Storage::disk('local')->delete($pathBaru);
+
+            throw $e;
+        }
+
+        $this->hapusFotoLama($pathLama);
+
+        NotifikasiApiController::buat($pengguna->id, 'Foto profil berhasil diperbarui', 'Foto profil Anda telah tersimpan.');
+
+        return response()->json([
+            'pesan' => 'Foto profil berhasil diperbarui.',
+            'data' => ['foto_url' => url('/api/v1/profil/foto')],
+        ]);
+    }
+
+    /**
+     * Hapus berkas foto sebelumnya. Hanya jalur siswa/foto/ di disk privat yang
+     * disentuh; foto lama dari jalur lain (uploads/foto/) dibiarkan apa adanya.
+     */
+    private function hapusFotoLama(?string $path): void
+    {
+        $awalan = 'siswa/foto/';
+
+        if (! $path || ! str_starts_with($path, $awalan)) {
+            return;
+        }
+
+        $nama = substr($path, strlen($awalan));
+
+        if ($nama === '' || basename($nama) !== $nama) {
+            return;
+        }
+
+        Storage::disk('local')->delete($path);
     }
 
     private function dataProfil($pengguna): array

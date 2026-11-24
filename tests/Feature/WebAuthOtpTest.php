@@ -69,24 +69,12 @@ class WebAuthOtpTest extends TestCase
         });
     }
 
-    public function test_registration_sends_hashed_otp_and_keeps_account_inactive_until_verification(): void
+    public function test_admin_registration_activates_the_account_without_sending_otp(): void
     {
         config(['auth.admin_registration_code' => 'dummy-admin-code']);
+        Mail::shouldReceive('raw')->never();
 
-        $isiEmail = null;
-        Mail::shouldReceive('raw')
-            ->once()
-            ->withArgs(function (string $message, callable $callback) use (&$isiEmail): bool {
-                $isiEmail = $message;
-                $mail = \Mockery::mock(Message::class);
-                $mail->shouldReceive('to')->once()->with('admin@example.test')->andReturnSelf();
-                $mail->shouldReceive('subject')->once()->with('Kode Verifikasi JosBook')->andReturnSelf();
-                $callback($mail);
-
-                return true;
-            });
-
-        $response = $this->post(route('daftar.post'), [
+        $this->post(route('daftar.post'), [
             'nama' => 'Admin Contoh',
             'email' => 'admin@example.test',
             'identitas' => 'admin-test',
@@ -94,28 +82,12 @@ class WebAuthOtpTest extends TestCase
             'admin_registration_code' => 'dummy-admin-code',
             'password' => 'Password123',
             'password_confirmation' => 'Password123',
-        ]);
+        ])->assertRedirect(route('login'));
 
-        $response->assertRedirect(route('verifikasi-akun'));
         $pengguna = Pengguna::where('email', 'admin@example.test')->firstOrFail();
-        $this->assertFalse($pengguna->aktif);
-        $this->assertNull($pengguna->email_diverifikasi_at);
-
-        $otp = DB::table('akun_kode_otp')->where('email', $pengguna->email)->first();
-        $this->assertNotNull($otp);
-        $this->assertSame(0, $otp->percobaan);
-        $this->assertStringContainsString('Kode verifikasi pendaftaran akun', (string) $isiEmail);
-        preg_match('/Anda: (\d{6})/', (string) $isiEmail, $cocok);
-        $this->assertCount(2, $cocok);
-        $this->assertTrue(Hash::check($cocok[1], $otp->kode_hash));
-        $this->assertNotSame($cocok[1], $otp->kode_hash);
-
-        $this->post(route('verifikasi-akun.post'), ['kode' => $cocok[1]])
-            ->assertRedirect(route('admin.dashboard'));
-        $this->assertTrue($pengguna->fresh()->aktif);
-        $this->assertNotNull($pengguna->fresh()->email_diverifikasi_at);
-        $this->assertNotNull($pengguna->fresh()->terakhir_login_at);
-        $this->assertSame('verifikasi_pendaftaran', DB::table('catatan_aktivitas')->value('aksi'));
+        $this->assertTrue($pengguna->aktif);
+        $this->assertSame(0, DB::table('akun_kode_otp')->count());
+        $this->assertSame('daftar_admin_mandiri', DB::table('catatan_aktivitas')->value('aksi'));
     }
 
     public function test_admin_registration_is_rejected_without_the_secret_code(): void
@@ -603,16 +575,16 @@ class WebAuthOtpTest extends TestCase
             ->assertStatus(429);
     }
 
-    public function test_mobile_otp_resend_is_rate_limited_per_ip(): void
+    public function test_mobile_forgot_password_is_rate_limited_per_ip(): void
     {
         $this->withServerVariables(['REMOTE_ADDR' => '198.51.100.32']);
 
         for ($percobaan = 1; $percobaan <= 3; $percobaan++) {
-            $this->postJson('/api/v1/kirim-ulang-otp', [])
+            $this->postJson('/api/v1/lupa-password', [])
                 ->assertStatus(422);
         }
 
-        $this->postJson('/api/v1/kirim-ulang-otp', [])
+        $this->postJson('/api/v1/lupa-password', [])
             ->assertStatus(429);
     }
 
