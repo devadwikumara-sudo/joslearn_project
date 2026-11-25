@@ -15,7 +15,11 @@
         return $val . $suffix;
     };
     $namaSekolah = strtoupper($sekolah->nama ?? 'SMA NEGERI 1 REJOSO NGANJUK');
-    $fotoSrc = $siswa->foto ? (str_starts_with($siswa->foto, 'data:') ? $siswa->foto : asset('storage/' . $siswa->foto)) : null;
+    $fotoSrc = $siswa->foto
+        ? (str_starts_with($siswa->foto, 'data:')
+            ? $siswa->foto
+            : route(request()->routeIs('guru.*') ? 'guru.data-siswa.foto' : 'admin.data-siswa.foto', ['id' => $siswa->id]))
+        : null;
 
     $jkLabel = ($siswa->jenis_kelamin === 'L' || strtolower($siswa->jenis_kelamin) === 'laki-laki')
         ? 'Laki-laki'
