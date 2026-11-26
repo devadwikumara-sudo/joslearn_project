@@ -408,6 +408,21 @@
                         <button type="button" class="btn o" disabled>Batalkan kelulusan</button>
                         <p class="sub">Tidak dapat dibatalkan karena belum ada riwayat pada tahun ajaran aktif.</p>
                     @endif
+                @elseif($selectedAlumni->status_alumni === 'Pindah keluar')
+                    @if($canCancelTransfer)
+                        <form class="alumni-side-form" method="POST" action="{{ route('admin.alumni.cancel-transfer', $selectedAlumni->id) }}" onsubmit="return confirm('Batalkan pindah keluar dan kembalikan siswa ke Data Siswa aktif?')">
+                            @csrf
+                            <input type="hidden" name="aj" value="{{ $aj }}">
+                            <input type="hidden" name="ay" value="{{ $ay }}">
+                            <input type="hidden" name="kelas" value="{{ $kelas }}">
+                            <input type="hidden" name="aq" value="{{ $aq }}">
+                            <input type="hidden" name="page" value="{{ $alumni->currentPage() }}">
+                            <button type="submit" class="btn o">Batalkan pindah keluar</button>
+                        </form>
+                    @else
+                        <button type="button" class="btn o" disabled>Batalkan pindah keluar</button>
+                        <p class="sub">Tidak dapat dibatalkan karena tidak ada riwayat pindah keluar pada tahun ajaran aktif.</p>
+                    @endif
                 @endif
             @endif
         </div>

@@ -493,7 +493,7 @@
     </div>
 
     {{-- Form Wrapping Header, Tabs, Body, and Sticky Footer --}}
-    <form action="{{ $formAction }}" method="POST" enctype="multipart/form-data" id="form-pendataan-siswa" style="display:flex;flex-direction:column;flex:1;min-height:0;margin:0">
+    <form action="{{ $formAction }}" method="POST" enctype="multipart/form-data" id="form-pendataan-siswa" novalidate style="display:flex;flex-direction:column;flex:1;min-height:0;margin:0">
         @csrf
         <input type="hidden" name="_form_panel" value="1">
         <input type="hidden" name="_form_mode" value="{{ $edit ? 'edit' : 'create' }}">
@@ -1353,6 +1353,23 @@
 
 @push('scripts')
 <script>
+function setupStudentFormValidation(form, panes, showTab) {
+    form.addEventListener('submit', function(event) {
+        var invalidField = Array.from(form.elements).find(function(field) {
+            return !field.disabled
+                && typeof field.checkValidity === 'function'
+                && !field.checkValidity();
+        });
+        if (!invalidField) return;
+
+        event.preventDefault();
+        var invalidPane = invalidField.closest('.tab-pane');
+        var invalidPaneIndex = Array.from(panes).indexOf(invalidPane);
+        if (invalidPaneIndex >= 0) showTab(invalidPaneIndex);
+        invalidField.reportValidity();
+    });
+}
+
 function openStudentCreateModal() {
     var modal = document.getElementById('student-form-modal');
     if (!modal) return;
@@ -1405,8 +1422,9 @@ function closeStudentForm(event, modalEl) {
     var formPanel = document.getElementById('student-form-panel');
     if (!formPanel) return;
 
-    var tabs = document.querySelectorAll('.tab-btn');
-    var panes = document.querySelectorAll('.tab-pane');
+    var studentForm = document.getElementById('form-pendataan-siswa');
+    var tabs = formPanel.querySelectorAll('.tab-btn');
+    var panes = formPanel.querySelectorAll('.tab-pane');
     var btnPrev = document.getElementById('btn-prev');
     var btnNext = document.getElementById('btn-next');
     var stepLabel = document.getElementById('sf-step-label');
@@ -1453,6 +1471,7 @@ function closeStudentForm(event, modalEl) {
     }
 
     window.sfShowTab = showTab;
+    if (studentForm) setupStudentFormValidation(studentForm, panes, showTab);
 
     var failedFields = {!! json_encode(array_keys($errors->getMessages()), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!};
     var failedInput = Array.from(formPanel.querySelectorAll('[name]')).find(function(input) {

@@ -3360,6 +3360,108 @@ class ImportStudentMatchingTest extends TestCase
             ->assertSee('Tidak dapat dibatalkan karena belum ada riwayat pada tahun ajaran aktif.');
     }
 
+    public function test_cancelling_transfer_restores_student_to_active_data_and_records_activity(): void
+    {
+        DB::table('siswa_biodata')->where('id', 2)->update([
+            'alasan_keluar' => 'Pindah keluar',
+            'tanggal_keluar' => '2025-10-01',
+            'kelas_keluar' => 'X-1',
+            'sekolah_tujuan' => 'SMA Tujuan',
+        ]);
+        DB::table('siswa_riwayat_kelas')->where('siswa_id', 2)->update(['status' => 'Pindah keluar']);
+        $alumniUrl = route('admin.alumni', [
+            'aj' => 'Pindah / Keluar',
+            'siswa' => 2,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get($alumniUrl)
+            ->assertOk()
+            ->assertSee('Batalkan pindah keluar')
+            ->assertSee('action="'.e(route('admin.alumni.cancel-transfer', 2)).'"', false);
+
+        $this->from($alumniUrl)
+            ->actingAs($this->admin)
+            ->post(route('admin.alumni.cancel-transfer', 2), [
+                'aj' => 'Pindah / Keluar',
+            ])
+            ->assertRedirect(route('admin.alumni', [
+                'tab' => 'kontrol-induk',
+                'aj' => 'Pindah / Keluar',
+            ]));
+
+        $this->assertDatabaseHas('siswa_biodata', [
+            'id' => 2,
+            'alasan_keluar' => null,
+            'tanggal_keluar' => null,
+            'kelas_keluar' => null,
+            'sekolah_tujuan' => null,
+        ]);
+        $this->assertDatabaseHas('siswa_riwayat_kelas', [
+            'siswa_id' => 2,
+            'tahun_ajaran_id' => 1,
+            'status' => 'Aktif',
+        ]);
+        $this->assertDatabaseHas('catatan_aktivitas', [
+            'pengguna_id' => $this->admin->id,
+            'aksi' => 'batalkan_mutasi_siswa',
+            'objek_id' => 2,
+        ]);
+        $this->actingAs($this->admin)
+            ->get(route('admin.data-siswa'))
+            ->assertOk()
+            ->assertViewHas('siswaList', fn ($students): bool => $students->getCollection()->contains('id', 2));
+    }
+
+    public function test_transfer_cancellation_is_unavailable_without_an_active_year_transfer_history(): void
+    {
+        DB::table('siswa_biodata')->where('id', 2)->update([
+            'alasan_keluar' => 'Pindah keluar',
+            'tanggal_keluar' => '2025-10-01',
+        ]);
+        DB::table('siswa_riwayat_kelas')->where('siswa_id', 2)->update(['status' => 'Aktif']);
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.alumni', [
+                'aj' => 'Pindah / Keluar',
+                'siswa' => 2,
+            ]))
+            ->assertOk()
+            ->assertSee('disabled>Batalkan pindah keluar', false)
+            ->assertSee('Tidak dapat dibatalkan karena tidak ada riwayat pindah keluar pada tahun ajaran aktif.');
+    }
+
+    public function test_transfer_cancellation_rejects_students_without_an_active_year_transfer_history(): void
+    {
+        DB::table('siswa_biodata')->where('id', 2)->update([
+            'alasan_keluar' => 'Pindah keluar',
+            'tanggal_keluar' => '2025-10-01',
+        ]);
+        DB::table('siswa_riwayat_kelas')->where('siswa_id', 2)->update(['status' => 'Aktif']);
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.alumni.cancel-transfer', 2), [
+                'aj' => 'Pindah / Keluar',
+            ])
+            ->assertRedirect()
+            ->assertSessionHasErrors('mutasi');
+
+        $this->assertDatabaseHas('siswa_biodata', [
+            'id' => 2,
+            'alasan_keluar' => 'Pindah keluar',
+            'tanggal_keluar' => '2025-10-01',
+        ]);
+        $this->assertDatabaseHas('siswa_riwayat_kelas', [
+            'siswa_id' => 2,
+            'tahun_ajaran_id' => 1,
+            'status' => 'Aktif',
+        ]);
+        $this->assertDatabaseMissing('catatan_aktivitas', [
+            'aksi' => 'batalkan_mutasi_siswa',
+            'objek_id' => 2,
+        ]);
+    }
+
     public function test_legacy_tracking_page_redirects_to_alumni_with_tracking_context(): void
     {
         $this->actingAs($this->admin)

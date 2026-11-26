@@ -71,6 +71,7 @@ class HakAksesTest extends TestCase
             ['post', '/admin/kenaikan-kelas/1/batalkan'],
             ['get', '/admin/alumni'],
             ['get', '/admin/alumni/export'],
+            ['post', '/admin/alumni/1/batalkan-pindah-keluar'],
             ['post', '/admin/setting/cadangan/unduh'],
         ];
 

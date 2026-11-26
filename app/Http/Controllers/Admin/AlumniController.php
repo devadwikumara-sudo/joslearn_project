@@ -155,6 +155,12 @@ class AlumniController extends Controller
             && $selectedAlumni->riwayatKelas->contains(
                 static fn ($history): bool => (int) $history->tahun_ajaran_id === (int) $activeAcademicYearId
             );
+        $canCancelTransfer = $activeAcademicYearId !== null
+            && ! ($selectedAlumni?->isGraduated() ?? true)
+            && $selectedAlumni->riwayatKelas->contains(
+                static fn ($history): bool => (int) $history->tahun_ajaran_id === (int) $activeAcademicYearId
+                    && $history->status === 'Pindah keluar'
+            );
 
         return view('admin.alumni', [
             'aj' => $aj,
@@ -171,6 +177,7 @@ class AlumniController extends Controller
             'selectedStudentId' => $selectedStudentId,
             'selectedAlumni' => $selectedAlumni,
             'canCancelGraduation' => $canCancelGraduation,
+            'canCancelTransfer' => $canCancelTransfer,
             'panelQuery' => $panelQuery,
         ]);
     }
@@ -441,6 +448,60 @@ class AlumniController extends Controller
             'page' => $request->integer('page') ?: null,
         ], static fn ($value): bool => $value !== null && $value !== ''))
             ->with('success', "Kelulusan {$siswa->nama_lengkap} berhasil dibatalkan.");
+    }
+
+    public function cancelTransfer(Request $request, int $id): RedirectResponse
+    {
+        $siswa = SiswaBiodata::with('riwayatKelas')->findOrFail($id);
+        abort_unless(! $siswa->isGraduated(), 404);
+
+        $tahunAjaranAktif = SekolahTahunAjaran::query()
+            ->where('sedang_berjalan', true)
+            ->first();
+        $riwayatPindah = $tahunAjaranAktif
+            ? $siswa->riwayatKelas()
+                ->where('tahun_ajaran_id', $tahunAjaranAktif->id)
+                ->where('status', 'Pindah keluar')
+                ->whereNull('deleted_at')
+                ->latest('id')
+                ->first()
+            : null;
+
+        if (! $riwayatPindah) {
+            return back()->withErrors([
+                'mutasi' => 'Pindah keluar tidak dapat dibatalkan karena siswa belum memiliki riwayat pindah keluar pada tahun ajaran aktif.',
+            ]);
+        }
+
+        DB::transaction(function () use ($request, $siswa, $riwayatPindah): void {
+            $riwayatPindah->update(['status' => 'Aktif']);
+            $siswa->update([
+                'alasan_keluar' => null,
+                'tanggal_keluar' => null,
+                'kelas_keluar' => null,
+                'sekolah_tujuan' => null,
+            ]);
+
+            CatatanAktivitas::create([
+                'pengguna_id' => auth()->id(),
+                'peran' => auth()->user()->peran ?? 'admin',
+                'aksi' => 'batalkan_mutasi_siswa',
+                'keterangan' => "Membatalkan pindah keluar siswa: {$siswa->nama_lengkap} ({$siswa->nisn})",
+                'objek_tipe' => 'siswa',
+                'objek_id' => $siswa->id,
+                'alamat_ip' => $request->ip(),
+            ]);
+        });
+
+        return redirect()->route('admin.alumni', array_filter([
+            'tab' => 'kontrol-induk',
+            'aj' => $this->selectedType($request),
+            'ay' => $request->input('ay'),
+            'aq' => $request->input('aq'),
+            'kelas' => $request->input('kelas'),
+            'page' => $request->integer('page') ?: null,
+        ], static fn ($value): bool => $value !== null && $value !== ''))
+            ->with('success', "Pindah keluar {$siswa->nama_lengkap} berhasil dibatalkan. Siswa kembali ke Data Siswa aktif.");
     }
 
     public function export(Request $request): BinaryFileResponse

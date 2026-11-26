@@ -200,6 +200,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin.only'])->grou
     Route::get('/alumni/{id}', [AlumniController::class, 'show'])->name('alumni.show');
     Route::put('/alumni/{id}', [AlumniController::class, 'update'])->name('alumni.update');
     Route::post('/alumni/{id}/batalkan-kelulusan', [AlumniController::class, 'cancelGraduation'])->name('alumni.cancel-graduation');
+    Route::post('/alumni/{id}/batalkan-pindah-keluar', [AlumniController::class, 'cancelTransfer'])->name('alumni.cancel-transfer');
 
     // URL halaman lama mengarah ke panel Pelacakan pada halaman Alumni gabungan.
     Route::get('/pelacakan-alumni', function (Request $request) {

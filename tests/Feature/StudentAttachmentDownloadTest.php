@@ -128,6 +128,45 @@ class StudentAttachmentDownloadTest extends TestCase
             ->assertNotFound();
     }
 
+    public function test_student_creation_persists_biodata_class_history_and_activity(): void
+    {
+        DB::table('sekolah_tahun_ajaran')->insert([
+            'nama' => '2025/2026',
+            'sedang_berjalan' => true,
+        ]);
+        DB::table('sekolah_kelas')->insert(['nama' => 'X-1']);
+
+        $response = $this->withoutMiddleware()->post(route('admin.data-siswa.store'), [
+            'nama_lengkap' => 'Siswa Uji',
+            'nisn' => '1234567890',
+            'kelas' => 'X-1',
+            'tahun_ajaran' => '2025/2026',
+        ]);
+
+        $response->assertRedirect(route('admin.data-siswa', [
+            'kelas' => 'X-1',
+            'tahun_ajaran' => 1,
+        ]))
+            ->assertSessionHas('success', 'Data siswa berhasil disimpan.');
+
+        $studentId = DB::table('siswa_biodata')->where('nisn', '1234567890')->value('id');
+        $this->assertNotNull($studentId);
+        $this->assertDatabaseHas('siswa_biodata', [
+            'id' => $studentId,
+            'nama_lengkap' => 'Siswa Uji',
+        ]);
+        $this->assertDatabaseHas('siswa_riwayat_kelas', [
+            'siswa_id' => $studentId,
+            'tahun_ajaran_id' => 1,
+            'kelas_id' => 1,
+            'status' => 'Aktif',
+        ]);
+        $this->assertDatabaseHas('catatan_aktivitas', [
+            'aksi' => 'tambah_siswa',
+            'objek_id' => $studentId,
+        ]);
+    }
+
     public function test_student_form_uploads_and_records_a_document(): void
     {
         Storage::fake('local');
