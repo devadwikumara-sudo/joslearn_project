@@ -31,20 +31,31 @@
         {{-- Set Tahun Berjalan --}}
         <div style="background:#f8fafc;padding:16px;border-radius:12px;border:1px solid #e2e8f0">
             <h4 style="margin:0 0 6px;font-size:14px;color:var(--admin-text)">Pilih Tahun Ajaran Berjalan</h4>
-            <p class="sub" style="margin:0 0 12px;font-size:12px">Mengubah tahun ajaran berjalan akan memindahkan fokus dashboard dan input nilai.</p>
+            <p class="sub" style="margin:0 0 12px;font-size:12px">Pilih tahun dan semester aktif untuk menyelaraskan input web dengan periode yang dapat dibuka di aplikasi mobile.</p>
             
             <form method="POST" action="{{ route('admin.setting.tahun-ajaran.aktif') }}">
                 @csrf
                 <div style="display:grid;gap:10px">
-                    <select name="ta_id" required style="width:100%;font-weight:700">
-                        <option value="">— Pilih Tahun Ajaran —</option>
-                        @foreach($tahunAjaranList as $tahunAjaran)
-                            <option value="{{ $tahunAjaran->id }}" {{ (string) old('ta_id', $tahunAjaran->sedang_berjalan ? $tahunAjaran->id : '') === (string) $tahunAjaran->id ? 'selected' : '' }}>
-                                {{ $tahunAjaran->nama }} {{ $tahunAjaran->sedang_berjalan ? '★ (Sedang Berjalan)' : '' }}
-                            </option>
-                        @endforeach
-                    </select>
-                    <button type="submit" class="btn a" style="justify-content:center">★ Jadikan Tahun Berjalan</button>
+                    <div>
+                        <label for="active-academic-year" style="font-size:12px;font-weight:700;color:var(--admin-text-secondary)">Tahun Ajaran Berjalan</label>
+                        <select id="active-academic-year" name="ta_id" required style="width:100%;font-weight:700">
+                            <option value="">— Pilih Tahun Ajaran —</option>
+                            @foreach($tahunAjaranList as $tahunAjaran)
+                                <option value="{{ $tahunAjaran->id }}" {{ (string) old('ta_id', $tahunAjaran->sedang_berjalan ? $tahunAjaran->id : '') === (string) $tahunAjaran->id ? 'selected' : '' }}>
+                                    {{ $tahunAjaran->nama }} {{ $tahunAjaran->sedang_berjalan ? '★ (Sedang Berjalan)' : '' }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label for="active-semester" style="font-size:12px;font-weight:700;color:var(--admin-text-secondary)">Semester Berjalan</label>
+                        <select id="active-semester" name="semester_berjalan" required style="width:100%">
+                            <option value="Ganjil" {{ old('semester_berjalan', $semesterBerjalan) === 'Ganjil' ? 'selected' : '' }}>Semester Ganjil</option>
+                            <option value="Genap" {{ old('semester_berjalan', $semesterBerjalan) === 'Genap' ? 'selected' : '' }}>Semester Genap</option>
+                        </select>
+                        <small class="sub" style="font-size:11px;display:block;margin-top:3px">Semester yang dibuka untuk tahun ajaran berjalan di web dan mobile.</small>
+                    </div>
+                    <button type="submit" class="btn a" style="justify-content:center">★ Simpan Tahun &amp; Semester Berjalan</button>
                 </div>
             </form>
         </div>

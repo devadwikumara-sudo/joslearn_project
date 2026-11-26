@@ -7,7 +7,6 @@ use App\Models\Auth\Pengguna;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Barryvdh\DomPDF\PDF as DomPdf;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Mail\Message;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -281,6 +280,31 @@ class ApiSiswaAksesTest extends TestCase
         $this->withHeader('Authorization', 'Bearer '.$token)
             ->getJson('/api/v1/nilai?ta=2&semester=Ganjil')
             ->assertForbidden();
+    }
+
+    public function test_student_can_read_genap_after_the_active_semester_is_opened(): void
+    {
+        $ownStudentId = $this->createStudent('Siswa Milik Akun', '1234567890');
+        $otherStudentId = $this->createStudent('Siswa Lain', '1234567891');
+        $this->createAcademicRecords($ownStudentId, $otherStudentId);
+        DB::table('sekolah_pengaturan')
+            ->where('kunci', 'semester_berjalan')
+            ->update(['isi' => 'Genap']);
+        $token = $this->createStudentAccount('siswa-genap', $ownStudentId)
+            ->createToken('uji')->plainTextToken;
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/v1/nilai?ta=1&semester=Genap')
+            ->assertOk()
+            ->assertJsonPath('data.terpilih.semester', 'Genap')
+            ->assertJsonCount(1, 'data.nilai')
+            ->assertJsonPath('data.nilai.0.nilai', 91);
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/v1/nilai')
+            ->assertOk()
+            ->assertJsonPath('data.terpilih.semester', 'Genap')
+            ->assertJsonPath('data.nilai.0.nilai', 91);
     }
 
     public function test_downloaded_biodata_pdf_uses_the_web_document_for_only_the_authenticated_student(): void

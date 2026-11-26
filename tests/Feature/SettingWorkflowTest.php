@@ -100,8 +100,8 @@ class SettingWorkflowTest extends TestCase
     public static function settingTabs(): array
     {
         return [
-            'profil' => ['profil', 'name="nama_kepala_sekolah"', 'name="backup_file"'],
-            'tahun ajaran' => ['tahun-ajaran', 'name="nama_ta"', 'name="nama_kepala_sekolah"'],
+            'profil' => ['profil', 'name="nama_kepala_sekolah"', 'name="semester_berjalan"'],
+            'tahun ajaran' => ['tahun-ajaran', 'name="semester_berjalan"', 'name="nama_kepala_sekolah"'],
             'cadangan' => ['cadangan', 'name="backup_file"', 'name="nama_ta"'],
             'tempat sampah' => ['sampah', 'Tempat sampah kosong.', 'name="backup_file"'],
             'log aktivitas' => ['log', 'placeholder="Cari aktivitas"', 'name="backup_file"'],
@@ -427,7 +427,7 @@ class SettingWorkflowTest extends TestCase
         $this->assertSame(0, DB::table('catatan_aktivitas')->count());
     }
 
-    public function test_year_tab_changes_the_active_year(): void
+    public function test_year_tab_changes_the_active_year_and_semester(): void
     {
         DB::table('sekolah_tahun_ajaran')->insert([
             ['id' => 1, 'nama' => '2024/2025', 'sedang_berjalan' => true],
@@ -438,13 +438,45 @@ class SettingWorkflowTest extends TestCase
             ->get(route('admin.setting', ['tab' => 'tahun-ajaran']))
             ->assertOk()
             ->assertSee('name="ta_id"', false)
+            ->assertSee('name="semester_berjalan"', false)
             ->assertSee(route('admin.setting.tahun-ajaran.aktif'), false);
 
-        $this->post(route('admin.setting.tahun-ajaran.aktif'), ['ta_id' => 2])
+        $this->post(route('admin.setting.tahun-ajaran.aktif'), [
+            'ta_id' => 2,
+            'semester_berjalan' => 'Genap',
+        ])
             ->assertRedirect();
 
         $this->assertDatabaseHas('sekolah_tahun_ajaran', ['id' => 1, 'sedang_berjalan' => false]);
         $this->assertDatabaseHas('sekolah_tahun_ajaran', ['id' => 2, 'sedang_berjalan' => true]);
+        $this->assertDatabaseHas('sekolah_pengaturan', [
+            'kunci' => 'semester_berjalan',
+            'isi' => 'Genap',
+        ]);
+        $this->assertDatabaseHas('catatan_aktivitas', [
+            'aksi' => 'ubah_tahun_ajaran_berjalan',
+            'keterangan' => 'Menetapkan 2025/2026 sebagai tahun ajaran berjalan dengan semester Genap.',
+        ]);
+    }
+
+    public function test_year_tab_rejects_an_invalid_semester_without_changing_the_active_year(): void
+    {
+        DB::table('sekolah_tahun_ajaran')->insert([
+            ['id' => 1, 'nama' => '2024/2025', 'sedang_berjalan' => true],
+            ['id' => 2, 'nama' => '2025/2026', 'sedang_berjalan' => false],
+        ]);
+
+        $this->actingAs($this->user('admin', 1))
+            ->from(route('admin.setting', ['tab' => 'tahun-ajaran']))
+            ->post(route('admin.setting.tahun-ajaran.aktif'), [
+                'ta_id' => 2,
+                'semester_berjalan' => 'Semester 3',
+            ])
+            ->assertSessionHasErrors('semester_berjalan');
+
+        $this->assertDatabaseHas('sekolah_tahun_ajaran', ['id' => 1, 'sedang_berjalan' => true]);
+        $this->assertDatabaseHas('sekolah_tahun_ajaran', ['id' => 2, 'sedang_berjalan' => false]);
+        $this->assertSame(0, DB::table('catatan_aktivitas')->count());
     }
 
     public function test_trash_tab_lists_records_and_keeps_restore_and_permanent_delete_actions(): void

@@ -42,14 +42,17 @@ class SettingController extends Controller
         if ($tab === 'profil') {
             $setting = DB::table('sekolah_identitas')->where('id', 1)->first();
             $pengaturan = DB::table('sekolah_pengaturan')->pluck('isi', 'kunci');
-            $semesterBerjalan = in_array($pengaturan->get('semester_berjalan'), ['Ganjil', 'Genap'], true)
-                ? $pengaturan->get('semester_berjalan')
-                : 'Ganjil';
             $kktp = $pengaturan->get('kktp', '75');
-            $data = compact('setting', 'semesterBerjalan', 'kktp');
+            $data = compact('setting', 'kktp');
         } elseif ($tab === 'tahun-ajaran') {
             $tahunAjaranList = SekolahTahunAjaran::query()->orderByDesc('id')->get();
-            $data = compact('tahunAjaranList');
+            $semesterBerjalan = DB::table('sekolah_pengaturan')
+                ->where('kunci', 'semester_berjalan')
+                ->value('isi');
+            $semesterBerjalan = in_array($semesterBerjalan, ['Ganjil', 'Genap'], true)
+                ? $semesterBerjalan
+                : 'Ganjil';
+            $data = compact('tahunAjaranList', 'semesterBerjalan');
         } elseif ($tab === 'cadangan') {
             $cadanganList = CatatanCadangan::query()->latest('id')->limit(5)->get();
             $data = compact('cadanganList');
@@ -154,7 +157,7 @@ class SettingController extends Controller
                 'integer',
                 Rule::exists('sekolah_tahun_ajaran', 'id'),
             ],
-            'semester_berjalan' => ['required', Rule::in(['Ganjil', 'Genap'])],
+            'semester_berjalan' => ['sometimes', 'required', Rule::in(['Ganjil', 'Genap'])],
             'kktp' => ['required', 'numeric', 'between:0,100'],
         ]);
 
@@ -186,10 +189,12 @@ class SettingController extends Controller
                 $this->jadikanTahunBerjalan((int) $validated['tahun_ajaran_aktif_id']);
             }
 
-            foreach ([
-                'semester_berjalan' => $validated['semester_berjalan'],
-                'kktp' => (string) $validated['kktp'],
-            ] as $key => $value) {
+            $pengaturan = ['kktp' => (string) $validated['kktp']];
+            if (isset($validated['semester_berjalan'])) {
+                $pengaturan['semester_berjalan'] = $validated['semester_berjalan'];
+            }
+
+            foreach ($pengaturan as $key => $value) {
                 DB::table('sekolah_pengaturan')->updateOrInsert(
                     ['kunci' => $key],
                     ['isi' => $value, 'updated_at' => now()]
@@ -245,20 +250,25 @@ class SettingController extends Controller
     {
         $validated = $request->validate([
             'ta_id' => ['required', 'integer', Rule::exists('sekolah_tahun_ajaran', 'id')],
+            'semester_berjalan' => ['required', Rule::in(['Ganjil', 'Genap'])],
         ]);
 
         DB::transaction(function () use ($request, $validated): void {
             $tahunAjaran = $this->jadikanTahunBerjalan((int) $validated['ta_id']);
+            DB::table('sekolah_pengaturan')->updateOrInsert(
+                ['kunci' => 'semester_berjalan'],
+                ['isi' => $validated['semester_berjalan'], 'updated_at' => now()]
+            );
             $this->catatAktivitas(
                 $request,
                 'ubah_tahun_ajaran_berjalan',
-                "Menetapkan {$tahunAjaran->nama} sebagai tahun ajaran berjalan.",
+                "Menetapkan {$tahunAjaran->nama} sebagai tahun ajaran berjalan dengan semester {$validated['semester_berjalan']}.",
                 'tahun_ajaran',
                 $tahunAjaran->id
             );
         });
 
-        return back()->with('success', 'Tahun ajaran aktif berhasil diubah.');
+        return back()->with('success', 'Tahun ajaran aktif dan semester berjalan berhasil diperbarui.');
     }
 
     public function unduhCadangan(Request $request, CadanganDataSekolah $cadangan): Response

@@ -55,9 +55,9 @@
             </div>
         </div>
 
-        {{-- Section 3: Pimpinan & Konfigurasi Akademik --}}
+        {{-- Section 3: Pimpinan Sekolah --}}
         <div style="margin-bottom:20px;padding-top:16px;border-top:1px solid #f1f5f9">
-            <h4 style="margin:0 0 12px;font-size:13px;color:var(--admin-primary);text-transform:uppercase;letter-spacing:0.04em">3. Pimpinan &amp; Pengaturan Akademik</h4>
+            <h4 style="margin:0 0 12px;font-size:13px;color:var(--admin-primary);text-transform:uppercase;letter-spacing:0.04em">3. Pimpinan Sekolah</h4>
             <div class="fl" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px">
                 <div>
                     <label style="font-size:11.5px;font-weight:700;color:var(--admin-text-secondary);text-transform:uppercase;letter-spacing:0.04em">Nama Kepala Sekolah</label>
@@ -66,14 +66,6 @@
                 <div>
                     <label style="font-size:11.5px;font-weight:700;color:var(--admin-text-secondary);text-transform:uppercase;letter-spacing:0.04em">NIP Kepala Sekolah</label>
                     <input type="text" name="nip_kepala_sekolah" maxlength="30" style="width:100%" value="{{ old('nip_kepala_sekolah', $setting->nip_kepala_sekolah ?? '') }}" placeholder="19xxxxxxxxxxxxxxxx">
-                </div>
-                <div>
-                    <label style="font-size:11.5px;font-weight:700;color:var(--admin-text-secondary);text-transform:uppercase;letter-spacing:0.04em">Semester Berjalan *</label>
-                    <select name="semester_berjalan" style="width:100%" required>
-                        <option value="Ganjil" {{ old('semester_berjalan', $semesterBerjalan) === 'Ganjil' ? 'selected' : '' }}>Semester Ganjil</option>
-                        <option value="Genap" {{ old('semester_berjalan', $semesterBerjalan) === 'Genap' ? 'selected' : '' }}>Semester Genap</option>
-                    </select>
-                    <small class="sub" style="font-size:11px;display:block;margin-top:3px">Menentukan semester aktif untuk sinkronisasi mobile dan rapor.</small>
                 </div>
                 <div>
                     <label style="font-size:11.5px;font-weight:700;color:var(--admin-text-secondary);text-transform:uppercase;letter-spacing:0.04em">Nilai Standar KKTP *</label>
