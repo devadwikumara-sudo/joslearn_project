@@ -85,6 +85,20 @@ class PdfCetakController extends Controller
     }
 
     /**
+     * Data dokumen cetak yang sama persis dengan halaman cetak web (register biodata, capaian
+     * nilai, kokurikuler, ekskul, kehadiran, kenaikan kelas), dipakai ulang oleh PDF aplikasi
+     * mobile agar isinya identik. Pemeriksaan hak akses menjadi tanggung jawab pemanggil:
+     * hanya kirim id siswa yang memang boleh dibaca.
+     *
+     * @param  array<int, int>  $siswaIds
+     * @return array<string, mixed>
+     */
+    public function dataDokumen(Request $request, array $siswaIds): array
+    {
+        return $this->renderDocumentView($request, $siswaIds, false)->getData();
+    }
+
+    /**
      * @return array<int, int>
      */
     private function studentIdsForTarget(Request $request, string $kelas, mixed $tahunAjaran, AksesGuru $aksesGuru): array

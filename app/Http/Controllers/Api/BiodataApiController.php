@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\SiswaBiodata;
 use App\Models\SiswaRiwayatKelas;
-use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\DokumenSiswaPdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -32,9 +32,11 @@ class BiodataApiController extends Controller
     /**
      * GET /api/v1/unduh/{jenis}?ta=&semester=
      * jenis: bio | nilai | hadir | ekskul | all
-     * Mengembalikan file PDF (Flutter menyimpan / membukanya).
+     * Mengembalikan file PDF (Flutter menyimpan / membukanya). Isinya sama dengan
+     * cetak PDF di web (lihat App\Services\DokumenSiswaPdf), dibatasi pada data
+     * milik siswa yang login dan pada periode yang sudah terbuka.
      */
-    public function unduh(Request $request, string $jenis)
+    public function unduh(Request $request, string $jenis, DokumenSiswaPdf $dokumen)
     {
         if (! in_array($jenis, self::JENIS_UNDUH, true)) {
             return response()->json(['pesan' => 'Jenis dokumen tidak dikenal.'], 404);
@@ -50,7 +52,6 @@ class BiodataApiController extends Controller
         $periodeSiswa = NilaiApiController::periodeTersedia($siswa);
         $riwayat  = null;
         $semester = null;
-        $dataSemester = [];
 
         // Biodata tidak butuh semester; dokumen lain butuh tahun ajaran + semester
         if ($jenis !== 'bio') {
@@ -61,12 +62,6 @@ class BiodataApiController extends Controller
             }
 
             $riwayat = SiswaRiwayatKelas::with(['kelas', 'tahunAjaran'])->find($terpilih['riwayat_id']);
-            $dataSemester = NilaiApiController::ambilDataSemester(
-                $terpilih['riwayat_id'], (string) $terpilih['tingkat'], $semester
-            );
-        } else {
-            $riwayat = SiswaRiwayatKelas::with(['kelas', 'tahunAjaran'])
-                ->where('siswa_id', $siswa->id)->orderByDesc('tahun_ajaran_id')->first();
         }
 
         $judul = [
@@ -77,15 +72,7 @@ class BiodataApiController extends Controller
             'all'    => 'Dokumen Lengkap',
         ][$jenis];
 
-        $pdf = Pdf::loadView('siswa-mobile.dokumen-pdf', [
-            'jenis'    => $jenis,
-            'judul'    => $judul,
-            'siswa'    => $siswa,
-            'riwayat'  => $riwayat,
-            'semester' => $semester,
-            'biodata'  => self::ringkasanBiodata($siswa),
-            'data'     => $dataSemester,
-        ])->setPaper('a4');
+        $pdf = $dokumen->buat($siswa, $jenis, $riwayat, $semester);
 
         NotifikasiApiController::buat(
             $pengguna->id,

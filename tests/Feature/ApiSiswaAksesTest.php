@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Mockery;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Tests\TestCase;
@@ -21,6 +22,9 @@ use Tests\TestCase;
 class ApiSiswaAksesTest extends TestCase
 {
     private const MAIN_TABLES = [
+        'guru_wali_kelas',
+        'guru_biodata',
+        'sekolah_identitas',
         'siswa_ekskul',
         'siswa_kehadiran',
         'siswa_nilai',
@@ -83,11 +87,34 @@ class ApiSiswaAksesTest extends TestCase
                 'jenis_kelamin', 'agama', 'alamat_jalan', 'alamat_rt_rw', 'alamat_desa',
                 'alamat_kecamatan', 'alamat_kabupaten', 'alamat_provinsi', 'alamat_kode_pos',
                 'nama_ayah', 'nama_ibu', 'nama_wali', 'sekolah_asal', 'tanggal_diterima',
-                'tinggi_badan_cm', 'berat_badan_kg',
+                'tinggi_badan_cm', 'berat_badan_kg', 'foto',
             ] as $column) {
                 $table->string($column)->nullable();
             }
             $table->softDeletes();
+            $table->timestamps();
+        });
+
+        // Dipakai data builder dokumen cetak (sama dengan PDF di web).
+        Schema::create('sekolah_identitas', function (Blueprint $table): void {
+            $table->id();
+            $table->string('nama')->nullable();
+            $table->timestamps();
+        });
+
+        Schema::create('guru_biodata', function (Blueprint $table): void {
+            $table->id();
+            $table->string('nama');
+            $table->string('nip')->nullable();
+            $table->softDeletes();
+            $table->timestamps();
+        });
+
+        Schema::create('guru_wali_kelas', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('kelas_id');
+            $table->unsignedBigInteger('tahun_ajaran_id');
+            $table->unsignedBigInteger('guru_id');
             $table->timestamps();
         });
 
@@ -111,6 +138,11 @@ class ApiSiswaAksesTest extends TestCase
             $table->unsignedBigInteger('tahun_ajaran_id');
             $table->unsignedBigInteger('kelas_id');
             $table->string('status');
+            $table->string('keputusan_kenaikan')->nullable();
+            $table->date('tanggal_keputusan_kenaikan')->nullable();
+            $table->string('nama_wali_kelas')->nullable();
+            $table->string('nip_wali_kelas')->nullable();
+            $table->unsignedBigInteger('kelas_tujuan_id')->nullable();
             $table->softDeletes();
             $table->timestamps();
         });
@@ -251,31 +283,137 @@ class ApiSiswaAksesTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_downloaded_biodata_pdf_is_built_from_only_the_authenticated_student(): void
+    public function test_downloaded_biodata_pdf_uses_the_web_document_for_only_the_authenticated_student(): void
     {
         $ownStudentId = $this->createStudent('Siswa Milik Akun', '1234567890');
         $this->createStudent('Siswa Lain', '1234567891');
-        $user = $this->createStudentAccount('siswa-unduh', $ownStudentId);
-        $token = $user->createToken('uji')->plainTextToken;
+        $token = $this->createStudentAccount('siswa-unduh', $ownStudentId)->createToken('uji')->plainTextToken;
 
-        $pdf = Mockery::mock(DomPdf::class);
-        $pdf->shouldReceive('setPaper')->once()->with('a4')->andReturnSelf();
-        $pdf->shouldReceive('download')->once()->with('biodata-1234567890.pdf')->andReturn(response('PDF'));
-        Pdf::shouldReceive('loadView')
-            ->once()
-            ->withArgs(function (string $view, array $data) use ($ownStudentId): bool {
-                $this->assertSame('siswa-mobile.dokumen-pdf', $view);
-                $this->assertSame($ownStudentId, $data['siswa']->id);
-                $this->assertSame('Siswa Milik Akun', $data['siswa']->nama_lengkap);
-
-                return true;
-            })
-            ->andReturn($pdf);
+        $this->expectPdf('biodata-1234567890.pdf', function (string $html): void {
+            $this->assertStringContainsStringIgnoringCase('Siswa Milik Akun', $html);
+            $this->assertStringNotContainsStringIgnoringCase('Siswa Lain', $html);
+            $this->assertStringNotContainsString('1234567891', $html);
+            // Variabel CSS layout web diganti warna sebenarnya karena DomPDF tidak mengenalnya
+            $this->assertStringNotContainsString('var(--', $html);
+        });
 
         $this->withHeader('Authorization', 'Bearer '.$token)
             ->get('/api/v1/unduh/bio')
             ->assertOk()
             ->assertSeeText('PDF');
+    }
+
+    public function test_downloaded_grade_pdf_contains_only_the_selected_open_period(): void
+    {
+        $ownStudentId = $this->createStudent('Siswa Milik Akun', '1234567890');
+        $otherStudentId = $this->createStudent('Siswa Lain', '1234567891');
+        $this->createAcademicRecords($ownStudentId, $otherStudentId);
+        // Nilai khas agar mudah dibedakan dari angka lain di dokumen
+        DB::table('siswa_nilai')->where('riwayat_kelas_id', 1)->where('semester', 'Ganjil')->update(['nilai_angka' => 87]);
+        DB::table('siswa_nilai')->where('riwayat_kelas_id', 1)->where('semester', 'Genap')->update(['nilai_angka' => 93]);
+        DB::table('siswa_nilai')->where('riwayat_kelas_id', 2)->update(['nilai_angka' => 71]);
+        DB::table('siswa_nilai')->where('riwayat_kelas_id', 3)->update(['nilai_angka' => 62]);
+        $token = $this->createStudentAccount('siswa-nilai', $ownStudentId)->createToken('uji')->plainTextToken;
+
+        $this->expectPdf('nilai-1234567890.pdf', function (string $html): void {
+            $this->assertStringContainsStringIgnoringCase('Siswa Milik Akun', $html);
+            $this->assertStringContainsString('Matematika', $html);
+            $this->assertGradeCell($html, 87, true);
+            // Semester Genap yang belum terbuka, tahun ajaran berikutnya, dan siswa lain tidak boleh ikut
+            foreach ([93, 71, 62] as $nilaiTerlarang) {
+                $this->assertGradeCell($html, $nilaiTerlarang, false);
+            }
+            $this->assertStringNotContainsStringIgnoringCase('Siswa Lain', $html);
+        });
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->get('/api/v1/unduh/nilai?ta=1&semester=Ganjil')
+            ->assertOk();
+    }
+
+    public function test_complete_pdf_omits_the_promotion_decision_until_it_is_recorded(): void
+    {
+        $ownStudentId = $this->createStudent('Siswa Milik Akun', '1234567890');
+        $this->createAcademicRecords($ownStudentId, $this->createStudent('Siswa Lain', '1234567891'));
+        $token = $this->createStudentAccount('siswa-lengkap', $ownStudentId)->createToken('uji')->plainTextToken;
+
+        $this->expectPdf('dokumen-lengkap-1234567890.pdf', function (string $html): void {
+            $this->assertStringContainsStringIgnoringCase('Siswa Milik Akun', $html);
+            $this->assertStringContainsString('Matematika', $html);
+            $this->assertStringNotContainsString('KENAIKAN KELAS', $html);
+        });
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->get('/api/v1/unduh/all?ta=1&semester=Ganjil')
+            ->assertOk();
+    }
+
+    public function test_complete_pdf_includes_the_promotion_decision_once_it_is_recorded(): void
+    {
+        $ownStudentId = $this->createStudent('Siswa Milik Akun', '1234567890');
+        $this->createAcademicRecords($ownStudentId, $this->createStudent('Siswa Lain', '1234567891'));
+        DB::table('siswa_riwayat_kelas')->where('id', 1)->update([
+            'keputusan_kenaikan' => 'NAIK',
+            'tanggal_keputusan_kenaikan' => '2027-06-20',
+        ]);
+        $token = $this->createStudentAccount('siswa-lengkap', $ownStudentId)->createToken('uji')->plainTextToken;
+
+        $this->expectPdf('dokumen-lengkap-1234567890.pdf', function (string $html): void {
+            $this->assertStringContainsString('KENAIKAN KELAS', $html);
+        });
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->get('/api/v1/unduh/all?ta=1&semester=Ganjil')
+            ->assertOk();
+    }
+
+    public function test_pdf_download_is_forbidden_for_unopened_periods_without_building_a_document(): void
+    {
+        $ownStudentId = $this->createStudent('Siswa Milik Akun', '1234567890');
+        $this->createAcademicRecords($ownStudentId, $this->createStudent('Siswa Lain', '1234567891'));
+        $token = $this->createStudentAccount('siswa-terkunci', $ownStudentId)->createToken('uji')->plainTextToken;
+
+        Pdf::shouldReceive('loadHTML')->never();
+
+        foreach (['/api/v1/unduh/nilai?ta=1&semester=Genap', '/api/v1/unduh/all?ta=2&semester=Ganjil'] as $url) {
+            $this->withHeader('Authorization', 'Bearer '.$token)
+                ->get($url)
+                ->assertForbidden();
+        }
+    }
+
+    public function test_pdf_embeds_the_students_photo_from_the_private_folder(): void
+    {
+        Storage::fake('local');
+        $ownStudentId = $this->createStudent('Siswa Milik Akun', '1234567890');
+        Storage::disk('local')->put('siswa/foto/foto_uji.jpg', 'ISI-FOTO-UJI');
+        DB::table('siswa_biodata')->where('id', $ownStudentId)->update(['foto' => 'siswa/foto/foto_uji.jpg']);
+        $token = $this->createStudentAccount('siswa-foto', $ownStudentId)->createToken('uji')->plainTextToken;
+
+        $this->expectPdf('biodata-1234567890.pdf', function (string $html): void {
+            $this->assertStringContainsString('data:image/jpeg;base64,'.base64_encode('ISI-FOTO-UJI'), $html);
+        });
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->get('/api/v1/unduh/bio')
+            ->assertOk();
+    }
+
+    public function test_pdf_never_embeds_files_outside_the_photo_folder(): void
+    {
+        Storage::fake('local');
+        $ownStudentId = $this->createStudent('Siswa Milik Akun', '1234567890');
+        Storage::disk('local')->put('rahasia.jpg', 'ISI-RAHASIA');
+        DB::table('siswa_biodata')->where('id', $ownStudentId)->update(['foto' => 'siswa/foto/../rahasia.jpg']);
+        $token = $this->createStudentAccount('siswa-foto', $ownStudentId)->createToken('uji')->plainTextToken;
+
+        $this->expectPdf('biodata-1234567890.pdf', function (string $html): void {
+            $this->assertStringNotContainsString(base64_encode('ISI-RAHASIA'), $html);
+        });
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->get('/api/v1/unduh/bio')
+            ->assertOk();
     }
 
     public function test_revoked_sanctum_token_returns_401(): void
@@ -349,6 +487,37 @@ class ApiSiswaAksesTest extends TestCase
             'username' => 'admin-web',
             'password' => 'password-rahasia',
         ])->assertUnauthorized();
+    }
+
+    /**
+     * Pasang harapan: PDF dibuat sekali dari HTML dokumen web, berkertas F4, lalu diunduh
+     * dengan nama file yang diharapkan. $periksaHtml memeriksa HTML yang dikirim ke DomPDF.
+     */
+    private function expectPdf(string $namaFile, callable $periksaHtml): void
+    {
+        $pdf = Mockery::mock(DomPdf::class);
+        $pdf->shouldReceive('setPaper')->once()->with([0, 0, 609.45, 935.43])->andReturnSelf();
+        $pdf->shouldReceive('download')->once()->with($namaFile)->andReturn(response('PDF'));
+
+        Pdf::shouldReceive('loadHTML')
+            ->once()
+            ->withArgs(function (string $html) use ($periksaHtml): bool {
+                $periksaHtml($html);
+
+                return true;
+            })
+            ->andReturn($pdf);
+    }
+
+    /**
+     * Sel nilai dicari berdasarkan batas tag, bukan sekadar angka, karena angka yang sama
+     * bisa muncul di stylesheet (mis. warna #1e293b memuat "93").
+     */
+    private function assertGradeCell(string $html, int $nilai, bool $diharapkan): void
+    {
+        $ada = preg_match('/<td[^>]*>\s*'.$nilai.'(?:[.,]\d+)?\s*<\/td>/', $html) === 1;
+
+        $this->assertSame($diharapkan, $ada, 'Sel nilai '.$nilai.($diharapkan ? ' seharusnya ada.' : ' tidak boleh ada.'));
     }
 
     private function createStudent(string $name, string $nisn): int
