@@ -6,6 +6,7 @@ use App\Models\Auth\Pengguna;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class PdfSemesterFilterTest extends TestCase
@@ -49,6 +50,7 @@ class PdfSemesterFilterTest extends TestCase
             $table->string('nama_lengkap');
             $table->string('nisn')->nullable();
             $table->string('nomor_induk')->nullable();
+            $table->string('foto')->nullable();
             $table->string('tahun_lulus')->nullable();
             $table->string('alasan_keluar')->nullable();
             $table->date('tanggal_keluar')->nullable();
@@ -202,6 +204,12 @@ class PdfSemesterFilterTest extends TestCase
 
     public function test_admin_can_render_single_and_batch_student_pdfs(): void
     {
+        Storage::fake('local');
+        Storage::disk('local')->put('siswa/foto/foto_siswa.jpg', 'foto-uji');
+        DB::table('siswa_biodata')->where('id', 1)->update([
+            'foto' => 'siswa/foto/foto_siswa.jpg',
+        ]);
+
         $admin = Pengguna::query()->create([
             'peran' => 'admin',
             'username' => 'admin-test',
@@ -213,7 +221,8 @@ class PdfSemesterFilterTest extends TestCase
 
         $singleResponse->assertOk()
             ->assertSee('I. BUKU INDUK REGISTER PESERTA DIDIK')
-            ->assertSee('Siswa Enam Semester');
+            ->assertSee('Siswa Enam Semester')
+            ->assertSee(route('admin.data-siswa.foto', 1), false);
 
         $batchResponse = $this->get(route('admin.pdf.batch', ['ids' => '1']));
 
@@ -342,6 +351,12 @@ class PdfSemesterFilterTest extends TestCase
     public function test_teacher_cannot_print_a_student_outside_the_visible_active_scope(): void
     {
         $activeStudentId = $this->createActiveStudent();
+        Storage::fake('local');
+        Storage::disk('local')->put('siswa/foto/foto_siswa_aktif.jpg', 'foto-uji');
+        DB::table('siswa_biodata')->where('id', $activeStudentId)->update([
+            'foto' => 'siswa/foto/foto_siswa_aktif.jpg',
+        ]);
+
         $guruId = DB::table('guru_biodata')->insertGetId([
             'nama' => 'Guru PDF',
             'nip' => 'NIP-GURU-PDF',
@@ -367,7 +382,8 @@ class PdfSemesterFilterTest extends TestCase
             ->assertForbidden();
 
         $this->get(route('guru.data-siswa.pdf', ['id' => $activeStudentId, 'tab' => 'wali']))
-            ->assertOk();
+            ->assertOk()
+            ->assertSee(route('guru.data-siswa.foto', $activeStudentId), false);
         $this->get(route('guru.data-siswa.pdf-batch', ['ids' => (string) $activeStudentId, 'tab' => 'wali']))
             ->assertOk();
     }
