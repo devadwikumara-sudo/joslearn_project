@@ -18,7 +18,7 @@
             @endforeach
         </select>
         <input type="text" name="lq" placeholder="Cari aktivitas" value="{{ $lq }}" style="min-width:240px;padding:7px 12px;font-size:13px">
-        <button type="submit" class="btn" style="display:none"></button>
+        <button type="submit" class="btn">🔍 Cari</button>
     </div>
     <span class="sp"></span>
     <a href="{{ route('admin.log-aktivitas.export', ['lf' => $lf, 'lq' => $lq]) }}" class="btn o">⬇ Ekspor Excel Log</a>
