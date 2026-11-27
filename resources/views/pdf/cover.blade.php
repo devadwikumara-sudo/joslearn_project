@@ -1,5 +1,5 @@
 @php
-    $npsn = (string) ($sekolah->npsn ?: '20538396');
+    $npsn = (string) (($sekolah->npsn ?? null) ?: '20538396');
     $npsnChars = str_split($npsn);
     $angkatan = (int) ($angkatan ?: 2023);
     $tahunLulus = $angkatan + 3;

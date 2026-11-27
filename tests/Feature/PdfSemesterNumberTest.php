@@ -9,6 +9,60 @@ use Tests\TestCase;
 
 class PdfSemesterNumberTest extends TestCase
 {
+    public function test_active_history_is_used_for_cover_instead_of_latest_old_grade(): void
+    {
+        $kelasX = new SekolahKelas(['nama' => 'X-1', 'tingkat' => 'X']);
+        $kelasXII = new SekolahKelas(['nama' => 'XII-1', 'tingkat' => 'XII']);
+
+        $historyX = new SiswaRiwayatKelas([
+            'status' => 'Aktif',
+        ]);
+        $historyX->setRelation('kelas', $kelasX);
+
+        $historyXII = new SiswaRiwayatKelas([
+            'status' => 'Tidak Aktif',
+        ]);
+        $historyXII->setRelation('kelas', $kelasXII);
+
+        $historyList = collect([$historyXII, $historyX])
+            ->filter(fn (SiswaRiwayatKelas $history): bool => $history->status === 'Aktif')
+            ->last();
+
+        $this->assertSame('X-1', $historyList?->kelas?->nama);
+    }
+
+    public function test_document_cover_data_contains_only_one_cover_entry(): void
+    {
+        $siswa = new SiswaBiodata([
+            'nama_lengkap' => 'Siswa X XI XII',
+            'nisn' => '1234567890',
+            'nomor_induk' => '1234',
+        ]);
+
+        $kelasX = new SekolahKelas(['nama' => 'X-1', 'tingkat' => 'X']);
+        $kelasXI = new SekolahKelas(['nama' => 'XI-1', 'tingkat' => 'XI']);
+        $kelasXII = new SekolahKelas(['nama' => 'XII-1', 'tingkat' => 'XII']);
+
+        $html = view('pdf.dokumen', [
+            'sekolah' => (object) [],
+            'kktp' => 75,
+            'optBio' => false,
+            'optNilai' => false,
+            'optHadir' => false,
+            'optEkskul' => false,
+            'optNaik' => false,
+            'showCover' => true,
+            'coverKelasList' => [[
+                'kelas' => 'XII-1',
+                'angkatan' => 2023,
+            ]],
+            'siswaItems' => [],
+            'subTitle' => 'Satu Sampul',
+        ])->render();
+
+        $this->assertSame(1, substr_count($html, 'cv-dynamic'));
+    }
+
     public function test_pdf_replaces_placeholder_school_name_with_actual_school_name(): void
     {
         $html = view('pdf.cover', [

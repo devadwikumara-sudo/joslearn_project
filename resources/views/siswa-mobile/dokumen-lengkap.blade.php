@@ -314,17 +314,25 @@
         $angkatanSampul = null;
         foreach ($siswaItems as $itemSampul) {
             $siswaSampul = $itemSampul['siswa'];
+            $riwayatAktifSampul = null;
+            $riwayatTerakhirSampul = null;
             if (! $angkatanSampul && $siswaSampul->tanggal_diterima
                 && preg_match('/^(\\d{4})/', (string) $siswaSampul->tanggal_diterima, $match)) {
                 $angkatanSampul = (int) $match[1];
             }
             foreach ($itemSampul['riwayat'] as $riwayatSampul) {
-                $kelasSampul = $riwayatSampul['riwayatKelas']->kelas?->nama ?? $kelasSampul;
+                $modelRiwayatSampul = $riwayatSampul['riwayatKelas'];
+                $riwayatTerakhirSampul = $modelRiwayatSampul;
+                if (($modelRiwayatSampul->status ?? null) === 'Aktif') {
+                    $riwayatAktifSampul = $modelRiwayatSampul;
+                }
                 $taSampul = (string) ($riwayatSampul['taNama'] ?? '');
                 if (! $angkatanSampul && preg_match('/^(\\d{4})/', $taSampul, $match)) {
                     $angkatanSampul = (int) $match[1];
                 }
             }
+            $riwayatSampulTerpilih = $riwayatAktifSampul ?? $riwayatTerakhirSampul;
+            $kelasSampul = $riwayatSampulTerpilih?->kelas?->nama ?? $kelasSampul;
         }
         $angkatanSampul = $angkatanSampul ?: 2023;
     @endphp

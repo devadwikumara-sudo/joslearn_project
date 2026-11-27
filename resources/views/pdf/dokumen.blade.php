@@ -10,14 +10,13 @@
 
     {{-- 1. Sampul Kelas jika diminta atau jika mencetak satu kelas penuh --}}
     @if(!empty($showCover) && !empty($coverKelasList))
-        @foreach($coverKelasList as $cov)
-            @include('pdf.cover', [
-                'sekolah'   => $sekolah,
-                'kelasNama' => $cov['kelas'],
-                'angkatan'  => $cov['angkatan'] ?? '',
-            ])
-            @php $adaKonten = true; @endphp
-        @endforeach
+        @php $cov = $coverKelasList[0]; @endphp
+        @include('pdf.cover', [
+            'sekolah'   => $sekolah,
+            'kelasNama' => $cov['kelas'],
+            'angkatan'  => $cov['angkatan'] ?? '',
+        ])
+        @php $adaKonten = true; @endphp
     @endif
 
     {{-- 2. Daftar Dokumen Siswa --}}
