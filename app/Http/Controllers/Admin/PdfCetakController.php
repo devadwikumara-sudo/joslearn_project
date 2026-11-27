@@ -263,16 +263,21 @@ class PdfCetakController extends Controller
         if (! $sekolah) {
             $sekolah = (object) [
                 'nama' => 'SMA Negeri 1 Rejoso Nganjuk',
-                'npsn' => '20539744',
-                'alamat' => 'Jl. Raya Rejoso No. 1, Rejoso, Nganjuk',
-                'desa' => null,
-                'kelurahan' => null,
-                'kecamatan' => null,
-                'kabupaten' => null,
-                'provinsi' => null,
+                'npsn' => '20538396',
+                'alamat' => 'Jalan Yos Sudarso',
+                'desa' => 'Sidokare',
+                'kelurahan' => 'Sidokare',
+                'kecamatan' => 'Rejoso',
+                'kabupaten' => 'Nganjuk',
+                'provinsi' => 'Jawa Timur',
                 'nama_kepala_sekolah' => null,
                 'nip_kepala_sekolah' => null,
             ];
+        } else {
+            $namaSekolahNormal = trim((string) ($sekolah->nama ?? ''));
+            if ($namaSekolahNormal === '' || str_contains(strtolower($namaSekolahNormal), 'contoh')) {
+                $sekolah->nama = 'SMA Negeri 1 Rejoso Nganjuk';
+            }
         }
 
         // 2. Daftar Tahun Ajaran
@@ -505,27 +510,41 @@ class PdfCetakController extends Controller
             ];
         }
 
-        // 6. Cover Kelas (Sesuai prototype covers(ss, p))
+        // Sampul selalu menjadi halaman pertama. Kelas dan angkatan dihitung dari
+        // riwayat/data siswa aktual, bukan nilai sampel yang sama untuk semua siswa.
         $coverKelasList = [];
-        $showCover = ($isBatch || count($siswaItems) > 1 || $request->has('cover')) && ($optBio || $optNilai);
-        if ($showCover) {
-            foreach (array_keys($uniqueClasses) as $kNama) {
-                // Cari tahun angkatan tertua di kelas ini
-                $minTahun = null;
-                foreach ($siswaCollection as $s) {
-                    if ($s->tanggal_diterima && preg_match('/^(\d{4})/', $s->tanggal_diterima, $ym)) {
-                        $y = (int) $ym[1];
-                        if ($minTahun === null || $y < $minTahun) {
-                            $minTahun = $y;
-                        }
+        foreach (array_keys($uniqueClasses) as $kNama) {
+            $minTahun = null;
+            foreach ($siswaCollection as $s) {
+                foreach ($s->riwayatKelas as $rk) {
+                    if (($rk->kelas?->nama ?? '') !== $kNama) {
+                        continue;
+                    }
+                    $candidates = [];
+                    if ($s->tanggal_diterima && preg_match('/^(\d{4})/', (string) $s->tanggal_diterima, $match)) {
+                        $candidates[] = (int) $match[1];
+                    }
+                    if ($rk->tahunAjaran?->nama && preg_match('/^(\d{4})/', (string) $rk->tahunAjaran->nama, $match)) {
+                        $candidates[] = (int) $match[1];
+                    }
+                    if ($candidates !== []) {
+                        $tahun = min($candidates);
+                        $minTahun = $minTahun === null ? $tahun : min($minTahun, $tahun);
                     }
                 }
-                $coverKelasList[] = [
-                    'kelas' => $kNama,
-                    'angkatan' => $minTahun ?: (date('Y') - 1),
-                ];
             }
+            $coverKelasList[] = [
+                'kelas' => $kNama,
+                'angkatan' => $minTahun ?: 2023,
+            ];
         }
+        if ($coverKelasList === []) {
+            $coverKelasList = [[
+                'kelas' => 'X-1',
+                'angkatan' => 2023,
+            ]];
+        }
+        $showCover = true;
 
         $kktp = DB::table('sekolah_pengaturan')
             ->where('kunci', 'kktp')

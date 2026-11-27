@@ -1,94 +1,94 @@
-{{-- Sampul Kelas Buku Induk Register Sesuai Prototype (cover(k, ss)) --}}
 @php
-    $npsn = (string)($sekolah->npsn ?? '20539744');
+    $npsn = (string) ($sekolah->npsn ?: '20538396');
     $npsnChars = str_split($npsn);
-    $angkatan = $angkatan ?? '';
-    $tahunLulus = $angkatan ? ((int)$angkatan + 3) : '';
-    $namaSekolah = strtoupper($sekolah->nama ?? 'SMA NEGERI 1 REJOSO NGANJUK');
-    $alamat = $sekolah->alamat ?? 'Jl. Raya Rejoso No. 1, Rejoso, Nganjuk';
-    $kelurahan = $sekolah->desa ?? $sekolah->kelurahan ?? '-';
-    $kecamatan = $sekolah->kecamatan ?? '-';
-    $kabupaten = $sekolah->kabupaten ?? '-';
-    $provinsi = $sekolah->provinsi ?? '-';
+    $angkatan = (int) ($angkatan ?: 2023);
+    $tahunLulus = $angkatan + 3;
+    $namaSekolahSetting = trim((string) ($sekolah->nama ?? ''));
+    $namaSekolah = str_contains(strtolower($namaSekolahSetting), 'contoh') || $namaSekolahSetting === ''
+        ? 'SMA NEGERI 1 REJOSO NGANJUK'
+        : strtoupper($namaSekolahSetting);
+    $alamat = ($sekolah->alamat ?? null) ?: 'Jalan Yos Sudarso';
+    $kelurahan = ($sekolah->desa ?? null) ?: (($sekolah->kelurahan ?? null) ?: 'Sidokare');
+    $kecamatan = ($sekolah->kecamatan ?? null) ?: 'Rejoso';
+    $kabupaten = ($sekolah->kabupaten ?? null) ?: 'Nganjuk';
+    $provinsi = ($sekolah->provinsi ?? null) ?: 'Jawa Timur';
+
+    $borderPath = public_path('images/cover-border-gold.png');
+    $borderUri = is_file($borderPath)
+        ? 'data:image/png;base64,'.base64_encode((string) file_get_contents($borderPath))
+        : null;
+
+    $logoJpg = public_path('images/tut-wuri-handayani.jpg');
+    $logoUri = is_file($logoJpg)
+        ? 'data:image/jpeg;base64,'.base64_encode((string) file_get_contents($logoJpg))
+        : null;
 @endphp
-<div class="pg dc cv">
-    {{-- Frame Ornaments --}}
-    <div class="cv-frame"></div>
-    <div class="cv-frame-inner"></div>
-    <div class="cv-corner tl"></div>
-    <div class="cv-corner tr"></div>
-    <div class="cv-corner bl"></div>
-    <div class="cv-corner br"></div>
+<div class="pg dc cv cv-dynamic">
+    @if($borderUri)
+        <img class="cv-ornament-frame" src="{{ $borderUri }}" alt="">
+    @else
+        <div class="cv-frame-outer"></div>
+        <div class="cv-frame-gold"></div>
+        <div class="cv-frame-inner"></div>
+    @endif
 
-    {{-- Top National / School Bar --}}
-    <div>
-        <div class="cvt">
-            <span><b>NOMOR POKOK SEKOLAH NASIONAL</b></span>
-            <span class="cvt-tag"><b>KELAS {{ $kelasNama ?? '-' }}</b></span>
-        </div>
-
-        <div class="npsn-wrap">
-            <div class="npsn" style="margin-top:6px">
-                @foreach($npsnChars as $c)
-                    <i>{{ $c }}</i>
-                @endforeach
+    <div class="cv-inner">
+        <div class="cv-top">
+            <div class="cvt">
+                <div class="cvt-left">
+                    <b>NOMOR POKOK SEKOLAH NASIONAL</b>
+                    <div class="npsn">
+                        @foreach($npsnChars as $c)<i>{{ $c }}</i>@endforeach
+                    </div>
+                </div>
+                <div class="cvt-right">
+                    <b>KELAS {{ $kelasNama ?? '-' }}</b>
+                </div>
             </div>
         </div>
-    </div>
 
-    {{-- Center Crest & Title --}}
-    <div style="margin: auto 0; padding: 20px 0;">
-        <div class="cv-crest">
-            <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"></path>
-                <path d="M6 6h10"></path>
-                <path d="M6 10h10"></path>
-                <path d="M6 14h7"></path>
-            </svg>
-        </div>
-
-        <div class="cvh">
-            BUKU INDUK REGISTER PESERTA DIDIK<br>
-            <span style="font-size: 15px; font-weight: 700; color: var(--jb-navy-700); letter-spacing: 1px;">TAHUN ANGKATAN {{ $angkatan ?: '—' }} &bull; TAHUN LULUS {{ $tahunLulus ?: '—' }}</span>
-        </div>
-
-        <div class="cvh-sub">KURIKULUM MERDEKA</div>
-
-        <div style="margin-top: 24px;">
+        <div class="cv-center">
+            <div class="cv-crest">
+                @if($logoUri)
+                    <img src="{{ $logoUri }}" alt="Logo Tut Wuri Handayani">
+                @endif
+            </div>
+            <div class="cvh">
+                BUKU INDUK REGISTER PESERTA DIDIK<br>
+                TAHUN ANGKATAN {{ $angkatan 
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            }}<br>
+            
+                TAHUN LULUS {{ $tahunLulus }}
+            </div>
             <div class="cvs">{{ $namaSekolah }}</div>
         </div>
-    </div>
 
-    {{-- Bottom School Address Card --}}
-    <div>
-        <div class="cva">
-            <table class="cva-table">
-                <tr>
-                    <td>Alamat</td>
-                    <td>:</td>
-                    <td>{{ $alamat }}</td>
-                </tr>
-                <tr>
-                    <td>Kelurahan</td>
-                    <td>:</td>
-                    <td>{{ $kelurahan }}</td>
-                </tr>
-                <tr>
-                    <td>Kecamatan</td>
-                    <td>:</td>
-                    <td>{{ $kecamatan }}</td>
-                </tr>
-                <tr>
-                    <td>Kab/Kota</td>
-                    <td>:</td>
-                    <td>{{ $kabupaten }}</td>
-                </tr>
-                <tr>
-                    <td>Provinsi</td>
-                    <td>:</td>
-                    <td>{{ $provinsi }}</td>
-                </tr>
-            </table>
+        <div class="cv-bottom">
+            <div class="cva-outer">
+                <div class="cva">
+                    <span class="cva-corner cva-tl"></span>
+                    <span class="cva-corner cva-tr"></span>
+                    <span class="cva-corner cva-bl"></span>
+                    <span class="cva-corner cva-br"></span>
+                    <table class="cva-table">
+                        <tr><td>Alamat</td><td>:</td><td>{{ $alamat }}</td></tr>
+                        <tr><td>Kelurahan</td><td>:</td><td>{{ $kelurahan ?: 'Sidokare' }}</td></tr>
+                        <tr><td>Kecamatan</td><td>:</td><td>{{ $kecamatan }}</td></tr>
+                        <tr><td>Kab/Kota</td><td>:</td><td>{{ $kabupaten }}</td></tr>
+                        <tr><td>Provinsi</td><td>:</td><td>{{ $provinsi }}</td></tr>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 </div>

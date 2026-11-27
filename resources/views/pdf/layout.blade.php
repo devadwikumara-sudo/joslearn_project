@@ -287,9 +287,12 @@
            CONTAINER DOKUMEN CETAK (CANVAS)
            ========================================================================== */
         .pdf-container {
-            max-width: 860px;
+            max-width: 215mm;
             margin: 28px auto 60px;
-            padding: 0 16px;
+            padding: 0;
+        }
+        body.paper-a4 .pdf-container {
+            max-width: 210mm;
         }
 
         /* ==========================================================================
@@ -298,7 +301,7 @@
         .pg {
             background: #ffffff;
             margin: 0 auto 32px;
-            min-height: 1060px;
+            min-height: 330mm;
             border-radius: 4px;
             box-shadow: 
                 0 1px 3px rgba(0, 0, 0, 0.08),
@@ -308,6 +311,9 @@
             position: relative;
             box-sizing: border-box;
             overflow: hidden;
+        }
+        body.paper-a4 .pg {
+            min-height: 297mm;
         }
 
         .pg:last-child {
@@ -343,21 +349,9 @@
             );
         }
 
-        /* Elegant Running Footer */
+        /* Footer hanya untuk preview layar bila perlu; cetak resmi tidak memakai footer */
         .dc:not(.cv)::after {
-            content: "Buku Induk Peserta Didik \00B7 Kurikulum Merdeka \00B7 JosBook Digital System";
-            position: absolute;
-            left: 36px;
-            right: 36px;
-            bottom: 12px;
-            border-top: 1px solid var(--jb-slate-200);
-            padding-top: 5px;
-            font-size: 8px;
-            font-weight: 500;
-            color: var(--jb-slate-400);
-            letter-spacing: 1.2px;
-            text-transform: uppercase;
-            text-align: center;
+            display: none;
         }
 
         /* ==========================================================================
@@ -643,223 +637,463 @@
         }
 
         /* ==========================================================================
-           SAMPUL KELAS / COVER (.cv) - Luxury Architectural Front Page
+           SAMPUL KELAS / COVER (.cv) - Format Resmi Sekolah
            ========================================================================== */
         .cv {
             text-align: center;
-            padding: 44px 36px;
+            padding: 0;
             box-sizing: border-box;
             background: #ffffff;
             position: relative;
+            min-height: 850pt;
+            font-family: 'Century Gothic', Arial, sans-serif;
+            border-top: 0;
+        }
+        .cv-inner {
+            position: relative;
+            z-index: 2;
+            padding: 58pt 64pt 54pt;
+            min-height: 850pt;
+            box-sizing: border-box;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            min-height: 1040px;
         }
-
-        /* Double Ornamental Border Frame */
-        .cv-frame {
+        .cv::before,
+        .cv::after {
+            display: none;
+        }
+        .cv-ornament-frame {
             position: absolute;
-            top: 14px;
-            left: 14px;
-            right: 14px;
-            bottom: 14px;
-            border: 2px solid var(--jb-navy-800);
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
             pointer-events: none;
-            box-sizing: border-box;
         }
-
-        .cv-frame-inner {
-            position: absolute;
-            top: 19px;
-            left: 19px;
-            right: 19px;
-            bottom: 19px;
-            border: 1px solid var(--jb-gold-500);
-            pointer-events: none;
-            box-sizing: border-box;
+        .cv-top,
+        .cv-center,
+        .cv-bottom {
+            position: relative;
+            z-index: 2;
         }
-
-        /* Geometric Corner Ornaments */
-        .cv-corner {
-            position: absolute;
-            width: 14px;
-            height: 14px;
-            border-color: var(--jb-navy-800);
-            border-style: solid;
-        }
-        .cv-corner.tl { top: 10px; left: 10px; border-width: 3px 0 0 3px; }
-        .cv-corner.tr { top: 10px; right: 10px; border-width: 3px 3px 0 0; }
-        .cv-corner.bl { bottom: 10px; left: 10px; border-width: 0 0 3px 3px; }
-        .cv-corner.br { bottom: 10px; right: 10px; border-width: 0 3px 3px 0; }
-
+        .cv-top { margin-top: 0; }
+        .cv-center { margin: auto 0; }
+        .cv-bottom { padding-bottom: 12pt; }
         .cvt {
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            font-size: 11px;
-            font-weight: 700;
-            color: var(--jb-navy-900);
-            padding: 0 8px;
-            letter-spacing: 0.8px;
-            margin-top: 6px;
-        }
-
-        .cvt-tag {
-            background: var(--jb-navy-800);
-            color: #ffffff;
-            padding: 3px 12px;
-            border-radius: 4px;
-            font-size: 10.5px;
-            letter-spacing: 0.5px;
-        }
-
-        .npsn-wrap {
-            margin: 10px 0 20px;
-            display: flex;
-            flex-direction: column;
             align-items: flex-start;
-            padding: 0 8px;
+            font-size: 10.2pt;
+            color: #111111;
+            letter-spacing: 0;
         }
-
-        .npsn-label {
-            font-size: 9px;
-            font-weight: 700;
-            color: var(--jb-slate-600);
-            letter-spacing: 0.8px;
-            margin-bottom: 4px;
-            text-transform: uppercase;
-        }
-
+        .cvt-left { text-align: left; }
+        .cvt-right { text-align: right; }
         .npsn {
             display: flex;
-            gap: 2px;
+            gap: 0;
+            margin-top: 4pt;
         }
-
         .npsn i {
-            width: 22px;
-            height: 26px;
-            border: 1.5px solid var(--jb-navy-800);
-            border-radius: 3px;
+            width: 16pt;
+            height: 18pt;
+            border: 1pt solid #111111;
+            margin-left: -1pt;
             display: inline-flex;
             align-items: center;
             justify-content: center;
             font-style: normal;
-            font-weight: 800;
-            font-size: 13px;
-            color: var(--jb-navy-900);
-            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            font-weight: 400;
+            font-size: 10.2pt;
+            color: #111111;
+            background: #ffffff;
         }
-
+        .npsn i:first-child { margin-left: 0; }
         .cv-crest {
-            margin: 20px auto 14px;
-            width: 84px;
-            height: 84px;
-            border-radius: 50%;
-            border: 2px solid var(--jb-gold-500);
-            background: linear-gradient(135deg, var(--jb-navy-900) 0%, var(--jb-navy-700) 100%);
+            width: 118pt;
+            height: 124pt;
+            margin: 10pt auto 18pt;
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 4px 15px rgba(15, 54, 97, 0.25);
-            color: var(--jb-gold-400);
-            font-size: 38px;
         }
-
-        .cv-garuda {
-            width: 54px;
-            height: 54px;
-            object-fit: contain;
+        .cv-crest img {
+            width: 116pt;
+            height: auto;
         }
-
         .cvh {
-            font-size: 21px;
-            font-weight: 800;
-            line-height: 1.45;
-            color: var(--jb-navy-900);
-            margin: 18px 0 16px;
-            letter-spacing: 0.8px;
-            text-transform: uppercase;
-        }
-
-        .cvh-sub {
-            display: inline-block;
-            background: linear-gradient(90deg, var(--jb-gold-600), var(--jb-gold-500));
-            color: #ffffff;
-            font-size: 11px;
+            font-family: 'Century Gothic', Arial, sans-serif;
+            font-size: 18pt;
             font-weight: 700;
-            letter-spacing: 1.5px;
-            padding: 4px 16px;
-            border-radius: 20px;
-            margin-top: 10px;
-            text-transform: uppercase;
-            box-shadow: 0 2px 6px rgba(217, 119, 6, 0.3);
+            line-height: 1.38;
+            color: #111111;
+            margin: 6pt 0 18pt;
+            letter-spacing: 0;
         }
-
         .cvs {
-            font-size: 20px;
-            font-weight: 800;
-            color: var(--jb-navy-800);
-            letter-spacing: 0.6px;
-            margin: 20px 0 32px;
+            font-family: 'Century Gothic', Arial, sans-serif;
+            font-size: 18pt;
+            font-weight: 700;
+            color: #111111;
+            letter-spacing: 0;
             text-transform: uppercase;
+        }
+        .cva-outer {
+            width: 348pt;
+            max-width: 82%;
+            margin: 0 auto;
+            border: 1pt solid #111111;
+            padding: 2.5pt;
+            background: #ffffff;
             position: relative;
-            display: inline-block;
         }
-
-        .cvs::after {
-            content: '';
-            position: absolute;
-            bottom: -8px;
-            left: 20%;
-            right: 20%;
-            height: 2px;
-            background: linear-gradient(90deg, transparent 0%, var(--jb-gold-500) 50%, transparent 100%);
-        }
-
         .cva {
-            border: 1.5px solid var(--jb-navy-800);
-            border-left: 5px solid var(--jb-navy-800);
-            border-radius: 6px;
-            padding: 16px 28px;
+            border: 1pt solid #111111;
+            padding: 12pt 20pt;
             text-align: left;
-            display: inline-block;
-            font-size: 11.5px;
-            line-height: 1.7;
-            background: var(--jb-slate-50);
-            box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
-            color: var(--jb-slate-800);
-            margin: 0 auto 16px;
-            max-width: 520px;
-            box-sizing: border-box;
+            font-family: 'Century Gothic', Arial, sans-serif;
+            font-size: 12.5pt;
+            line-height: 1.45;
+            background: #ffffff;
+            color: #111111;
+            position: relative;
         }
-
+        .cva-corner {
+            position: absolute;
+            width: 10pt;
+            height: 10pt;
+            border: 1pt solid #111111;
+            background: #ffffff;
+        }
+        .cva-tl { top: -3.5pt; left: -3.5pt; }
+        .cva-tr { top: -3.5pt; right: -3.5pt; }
+        .cva-bl { bottom: -3.5pt; left: -3.5pt; }
+        .cva-br { bottom: -3.5pt; right: -3.5pt; }
         .cva-table {
             width: 100%;
             border-collapse: collapse;
         }
-
         .cva-table td {
-            padding: 2px 4px;
+            padding: 1.5pt 3pt;
             vertical-align: top;
+            font-weight: 400;
+            color: #111111;
+        }
+        .cva-table td:first-child { width: 82pt; }
+        .cva-table td:nth-child(2) { width: 12pt; text-align: center; }
+
+        /* ==========================================================================
+           REGISTER PESERTA DIDIK (.reg) - Format Resmi Sekolah
+           ========================================================================== */
+        .reg {
+            font-family: Arial, sans-serif;
+            color: #111111;
+            border-top: 0;
+            font-size: 9.6pt;
+            line-height: 1.3;
+            padding: 18pt 32pt 20pt 44pt;
+        }
+        .reg::before,
+        .reg::after {
+            display: none;
+        }
+        .reg-title {
+            text-align: center;
+            font-size: 12.2pt;
+            font-weight: 800;
+            line-height: 1.35;
+            margin-bottom: 12pt;
+        }
+        .reg-number {
+            display: flex;
+            justify-content: space-between;
+            padding: 0 86pt 6pt 96pt;
+            font-weight: 400;
+            font-size: 9.6pt;
+        }
+        .reg-num-val {
+            display: inline-block;
+            min-width: 90pt;
+            border-bottom: 0.75pt solid #333333;
+            padding: 0 3pt 1pt;
+        }
+        .reg-p1-body {
+            padding-right: 86pt;
+        }
+        .reg-photo-stack {
+            position: absolute;
+            right: 32pt;
+            top: 96pt;
+            width: 72pt;
+        }
+        .reg-photo {
+            width: 70pt;
+            height: 88pt;
+            border: 0.8pt solid #111111;
+            margin-bottom: 10pt;
+            padding: 0;
+            background: #ffffff;
+            box-sizing: border-box;
+        }
+        .reg-photo-inner {
+            width: 100%;
+            height: 100%;
+            border: 0;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            padding-bottom: 4pt;
+            box-sizing: border-box;
+        }
+        .reg-photo-size {
+            position: absolute;
+            top: 34pt;
+            left: 0;
+            right: 0;
+            text-align: center;
+            font-size: 7.5pt;
+            color: #444444;
+        }
+        .reg-photo-label {
+            font-size: 7.5pt;
+            color: #111111;
+        }
+        .reg-photo img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+        .reg-fh {
+            background: transparent;
+            color: #111111;
+            border: 0;
+            border-radius: 0;
+            box-shadow: none;
+            padding: 6pt 0 2pt;
+            margin: 7pt 0 2pt;
+            font-size: 9.6pt;
+            font-weight: 800;
+            letter-spacing: 0;
+        }
+        .reg .fr {
+            display: grid;
+            grid-template-columns: 18pt 142pt 8pt 1fr;
+            font-size: 9.6pt;
+            padding: 1.4pt 0;
+            align-items: end;
+        }
+        .reg .fr.in {
+            grid-template-columns: 18pt 142pt 8pt 1fr;
+            padding-left: 0;
+        }
+        .reg .fr > span:first-child { font-weight: 400; color: #111111; }
+        .reg .fr > span:nth-child(2) { font-weight: 400; color: #111111; }
+        .reg .fr .c { text-align: left; color: #111111; }
+        .reg .fr .v {
+            border-bottom: 0.75pt solid #333333;
+            color: #111111;
+            font-weight: 400;
+            min-height: 12pt;
+            padding-left: 3pt;
+        }
+        .reg-catatan-lines {
+            margin-top: 6pt;
+        }
+        .reg-catatan-line {
+            border-bottom: 0.75pt solid #111111;
+            height: 15pt;
+            line-height: 15pt;
+            font-size: 9.6pt;
+            padding-left: 2pt;
         }
 
-        .cva-table td:first-child {
-            font-weight: 600;
-            color: var(--jb-slate-600);
-            width: 110px;
+        /* ==========================================================================
+           LAPORAN CAPAIAN PEMBELAJARAN (.capaian) - Format Resmi Sekolah
+           ========================================================================== */
+        .capaian {
+            font-family: Arial, sans-serif;
+            color: #111111;
+            border-top: 0;
+            padding: 18pt 32pt 20pt 44pt;
         }
-
-        .cva-table td:nth-child(2) {
-            width: 10px;
-            font-weight: 600;
-            color: var(--jb-slate-400);
+        .capaian::before,
+        .capaian::after {
+            display: none;
         }
-
-        .cva-table td:last-child {
+        .capaian-title {
+            text-align: left;
+            padding-left: 0;
+            font-size: 12.8pt;
+            font-weight: 800;
+            line-height: 1.38;
+            margin: 0 0 12pt;
+        }
+        .capaian-title span {
+            display: block;
+            margin-top: 2pt;
+            padding-left: 18pt;
+            font-size: 12.8pt;
+        }
+        .capaian-fh,
+        .fh.capaian-fh {
+            background: transparent;
+            color: #111111;
+            border: 0;
+            border-left: 0;
+            border-radius: 0;
+            box-shadow: none;
+            padding: 5pt 0 3pt;
+            margin: 9pt 0 4pt;
+            font-size: 10.1pt;
+            font-weight: 800;
+            letter-spacing: 0;
+        }
+        .capaian .fr {
+            display: grid;
+            grid-template-columns: 20pt 106pt 8pt 1fr;
+            font-size: 10.1pt;
+            padding: 1.2pt 0;
+        }
+        .capaian .fr > span:nth-child(2) { font-weight: 400; color: #111111; }
+        .capaian .fr .c { color: #111111; }
+        .capaian .fr .v {
+            border: 0;
+            color: #111111;
+            font-weight: 400;
+            padding: 0;
+            min-height: 0;
+        }
+        .capaian .lt {
+            width: 100%;
+            border-collapse: collapse;
+            border: 0.75pt solid #8db4e2;
+            border-radius: 0;
+            border-spacing: 0;
+            font-size: 9.6pt;
+            margin: 4pt 0;
+            overflow: visible;
+        }
+        .capaian .lt.lt-blue-head {
+            width: 100%;
+        }
+        .capaian .lt th,
+        .capaian .lt td {
+            border: 0.75pt solid #8db4e2;
+            color: #111111;
+            padding: 2.5pt 4pt;
+            text-align: center;
+            letter-spacing: 0;
+        }
+        .capaian .lt td.l { text-align: left; font-weight: 400; }
+        .capaian .lt.lt-intra thead th {
+            background: #ffffff !important;
+            background-image: none !important;
+            color: #111111;
             font-weight: 700;
-            color: var(--jb-navy-900);
+        }
+        .capaian .lt.lt-blue-head thead th,
+        .capaian .lt.kk-table thead th {
+            background: #dce6f1 !important;
+            background-image: none !important;
+            color: #111111;
+            font-weight: 700;
+        }
+        .capaian .lt tr:nth-child(even) td {
+            background: #ffffff !important;
+        }
+        .capaian .lt tr.alt td {
+            background: #eaf2fb !important;
+        }
+        .capaian .lt .gh td,
+        .capaian .lt tr.summary-row td {
+            background: #dce6f1 !important;
+            font-weight: 800;
+        }
+        .capaian .lt .gh td {
+            text-align: left;
+            padding: 3px 6px;
+        }
+        .capaian-ket {
+            font-size: 8.8px;
+            color: #111111;
+            margin-top: 4px;
+            line-height: 1.35;
+        }
+        .capaian-ket span {
+            display: inline-block;
+            padding-left: 16px;
+        }
+        .capaian .kk-table {
+            margin: 4px 0 14px;
+        }
+        .capaian .kk-table td.kk-no {
+            vertical-align: top;
+            text-align: center;
+            padding-top: 5px;
+        }
+        .capaian .kk-table td.kk-desc {
+            vertical-align: top;
+            text-align: left;
+            height: 64pt;
+            padding: 4pt 6pt;
+            line-height: 1.35;
+        }
+        .kenaikan-keputusan {
+            padding-left: 20pt;
+            font-size: 10.1pt;
+            margin-bottom: 4pt;
+        }
+        .kenaikan-table {
+            margin-left: 20pt;
+            border-collapse: collapse;
+            font-size: 10.1pt;
+        }
+        .kenaikan-table td.kl {
+            width: 225pt;
+            text-align: right;
+            padding: 1.5pt 8pt 1.5pt 0;
+            color: #111111;
+        }
+        .kenaikan-table td.kv {
+            text-align: left;
+            padding: 1.5pt 0;
+            color: #111111;
+        }
+        .capaian .ttd {
+            margin-top: 26pt;
+            padding: 0 12pt;
+            font-size: 10.1pt;
+            overflow: hidden;
+        }
+        .capaian .ttd-left {
+            float: left;
+            width: 175pt;
+            text-align: center;
+        }
+        .capaian .ttd-right {
+            float: right;
+            width: 175pt;
+            text-align: center;
+        }
+        .capaian .ttd-title {
+            color: #111111;
+            margin-bottom: 44pt;
+            line-height: 1.4;
+        }
+        .capaian .ttd-name {
+            font-weight: 800;
+            color: #111111;
+            text-decoration: none;
+        }
+        .capaian .ttd-nip {
+            font-size: 9.5pt;
+            color: #111111;
+            margin-top: 2pt;
         }
 
         /* ==========================================================================
@@ -886,14 +1120,66 @@
                 border-radius: 0 !important;
                 page-break-after: always !important;
                 border: none !important;
+                min-height: 0 !important;
             }
             .pg:last-child {
                 page-break-after: auto !important;
             }
+            .cv,
+            .cv-inner {
+                min-height: 304mm !important;
+                height: 304mm !important;
+            }
+            body.paper-a4 .cv,
+            body.paper-a4 .cv-inner {
+                min-height: 274mm !important;
+                height: 274mm !important;
+            }
         }
+
+        /* ==========================================================================
+           RESPONSIF UKURAN KERTAS A4 (210 x 297 mm)
+           ========================================================================== */
+        body.paper-a4 .cv,
+        body.paper-a4 .cv-inner {
+            min-height: 274mm;
+        }
+        body.paper-a4 .cv-inner { padding: 44pt 56pt 38pt; }
+        body.paper-a4 .cv-crest { width: 104pt; height: 108pt; margin: 4pt auto 12pt; }
+        body.paper-a4 .cv-crest img { width: 102pt; }
+        body.paper-a4 .cvh { font-size: 16.5pt; margin: 4pt 0 14pt; }
+        body.paper-a4 .cvs { font-size: 16.5pt; }
+        body.paper-a4 .cva { font-size: 11.5pt; padding: 10pt 18pt; }
+
+        body.paper-a4 .reg { padding: 10pt 28pt 12pt 36pt; font-size: 8.8pt; line-height: 1.22; }
+        body.paper-a4 .reg-title { font-size: 11.2pt; margin-bottom: 8pt; }
+        body.paper-a4 .reg-number { font-size: 8.8pt; padding: 0 78pt 4pt 88pt; }
+        body.paper-a4 .reg-fh { margin: 5pt 0 2pt; padding: 3pt 0 1pt; font-size: 8.8pt; }
+        body.paper-a4 .reg .fr { font-size: 8.8pt; padding: 0.8pt 0; }
+        body.paper-a4 .reg-p1-body { padding-right: 78pt; }
+        body.paper-a4 .reg-photo-stack { right: 28pt; top: 82pt; width: 68pt; }
+        body.paper-a4 .reg-photo { width: 66pt; height: 82pt; margin-bottom: 7pt; }
+        body.paper-a4 .reg-photo img { width: 66pt; height: 82pt; }
+        body.paper-a4 .reg-catatan-line { height: 13pt; line-height: 13pt; font-size: 8.8pt; }
+
+        body.paper-a4 .capaian { padding: 10pt 28pt 12pt 36pt; }
+        body.paper-a4 .capaian-title { font-size: 11.5pt; margin-bottom: 8pt; }
+        body.paper-a4 .capaian-title span { font-size: 11.5pt; }
+        body.paper-a4 .capaian-fh { font-size: 9.2pt; margin: 6pt 0 3pt; padding: 2pt 0; }
+        body.paper-a4 .capaian .fr { font-size: 9.2pt; padding: 0.8pt 0; }
+        body.paper-a4 .capaian .lt { font-size: 8.2pt; margin: 3pt 0; }
+        body.paper-a4 .capaian .lt th,
+        body.paper-a4 .capaian .lt td { padding: 1.8pt 3.5pt; }
+        body.paper-a4 .capaian .kk-table { margin: 3pt 0 6pt; }
+        body.paper-a4 .capaian .kk-table td.kk-desc { height: 42pt; padding: 3pt 5pt; line-height: 1.28; }
+        body.paper-a4 .kenaikan-keputusan,
+        body.paper-a4 .kenaikan-table,
+        body.paper-a4 .capaian .ttd { font-size: 9.2pt; }
+        body.paper-a4 .capaian .ttd { margin-top: 18pt; }
+        body.paper-a4 .capaian .ttd-title { margin-bottom: 36pt; }
     </style>
 </head>
-<body>
+<body class="paper-{{ strtolower($paper ?? 'F4') }}">
 
 {{-- Toolbar Atas Interaktif --}}
 <div class="pdf-toolbar-wrap no-print">
@@ -1019,6 +1305,8 @@
 function changePaper(size) {
     document.getElementById('pp').textContent = '@page { size: ' + (size === 'A4' ? '210mm 297mm' : '215mm 330mm') + '; margin: 10mm; }';
     document.getElementById('form-paper').value = size;
+    document.body.classList.remove('paper-a4', 'paper-f4');
+    document.body.classList.add('paper-' + size.toLowerCase());
 }
 
 function applyPreset(v) {

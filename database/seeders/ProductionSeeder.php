@@ -14,8 +14,8 @@ class ProductionSeeder extends Seeder
         DB::table('sekolah_identitas')->insertOrIgnore([
             'id' => 1,
             'nama' => 'SMA Negeri 1 Rejoso Nganjuk',
-            'npsn' => '20539744',
-            'alamat' => 'Jl. Raya Rejoso No. 1, Rejoso, Nganjuk',
+            'npsn' => '20538396',
+            'alamat' => 'Jalan Yos Sudarso',
             'created_at' => now(),
             'updated_at' => now(),
         ]);
