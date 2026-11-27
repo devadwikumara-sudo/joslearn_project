@@ -3413,6 +3413,42 @@ class ImportStudentMatchingTest extends TestCase
             ->assertViewHas('siswaList', fn ($students): bool => $students->getCollection()->contains('id', 2));
     }
 
+    public function test_cancelling_exit_restores_student_to_active_data(): void
+    {
+        DB::table('siswa_biodata')->where('id', 2)->update([
+            'alasan_keluar' => 'Keluar',
+            'tanggal_keluar' => '2025-10-01',
+            'kelas_keluar' => 'X-1',
+        ]);
+        DB::table('siswa_riwayat_kelas')->where('siswa_id', 2)->update(['status' => 'Keluar']);
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.alumni', [
+                'aj' => 'Pindah / Keluar',
+                'siswa' => 2,
+            ]))
+            ->assertOk()
+            ->assertSee('Batalkan keluar');
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.alumni.cancel-transfer', 2), [
+                'aj' => 'Pindah / Keluar',
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('siswa_biodata', [
+            'id' => 2,
+            'alasan_keluar' => null,
+            'tanggal_keluar' => null,
+            'kelas_keluar' => null,
+        ]);
+        $this->assertDatabaseHas('siswa_riwayat_kelas', [
+            'siswa_id' => 2,
+            'tahun_ajaran_id' => 1,
+            'status' => 'Aktif',
+        ]);
+    }
+
     public function test_transfer_cancellation_is_unavailable_without_an_active_year_transfer_history(): void
     {
         DB::table('siswa_biodata')->where('id', 2)->update([

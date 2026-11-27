@@ -8,6 +8,7 @@ use App\Models\Admin\CatatanAktivitas;
 use App\Models\SekolahKelas;
 use App\Models\SekolahTahunAjaran;
 use App\Models\SiswaBiodata;
+use App\Support\StudentSearch;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -159,7 +160,7 @@ class AlumniController extends Controller
             && ! ($selectedAlumni?->isGraduated() ?? true)
             && $selectedAlumni->riwayatKelas->contains(
                 static fn ($history): bool => (int) $history->tahun_ajaran_id === (int) $activeAcademicYearId
-                    && $history->status === 'Pindah keluar'
+                    && in_array($history->status, ['Pindah keluar', 'Keluar'], true)
             );
 
         return view('admin.alumni', [
@@ -461,7 +462,7 @@ class AlumniController extends Controller
         $riwayatPindah = $tahunAjaranAktif
             ? $siswa->riwayatKelas()
                 ->where('tahun_ajaran_id', $tahunAjaranAktif->id)
-                ->where('status', 'Pindah keluar')
+                ->whereIn('status', ['Pindah keluar', 'Keluar'])
                 ->whereNull('deleted_at')
                 ->latest('id')
                 ->first()
@@ -472,6 +473,7 @@ class AlumniController extends Controller
                 'mutasi' => 'Pindah keluar tidak dapat dibatalkan karena siswa belum memiliki riwayat pindah keluar pada tahun ajaran aktif.',
             ]);
         }
+        $mutasiLabel = $riwayatPindah->status;
 
         DB::transaction(function () use ($request, $siswa, $riwayatPindah): void {
             $riwayatPindah->update(['status' => 'Aktif']);
@@ -486,7 +488,7 @@ class AlumniController extends Controller
                 'pengguna_id' => auth()->id(),
                 'peran' => auth()->user()->peran ?? 'admin',
                 'aksi' => 'batalkan_mutasi_siswa',
-                'keterangan' => "Membatalkan pindah keluar siswa: {$siswa->nama_lengkap} ({$siswa->nisn})",
+                'keterangan' => "Membatalkan mutasi siswa: {$siswa->nama_lengkap} ({$siswa->nisn})",
                 'objek_tipe' => 'siswa',
                 'objek_id' => $siswa->id,
                 'alamat_ip' => $request->ip(),
@@ -501,7 +503,7 @@ class AlumniController extends Controller
             'kelas' => $request->input('kelas'),
             'page' => $request->integer('page') ?: null,
         ], static fn ($value): bool => $value !== null && $value !== ''))
-            ->with('success', "Pindah keluar {$siswa->nama_lengkap} berhasil dibatalkan. Siswa kembali ke Data Siswa aktif.");
+            ->with('success', "{$mutasiLabel} {$siswa->nama_lengkap} berhasil dibatalkan. Siswa kembali ke Data Siswa aktif.");
     }
 
     public function export(Request $request): BinaryFileResponse
@@ -641,11 +643,7 @@ class AlumniController extends Controller
         }
 
         if ($search !== '') {
-            $query->where(function (Builder $query) use ($search): void {
-                $query->where('nama_lengkap', 'like', "{$search}%")
-                    ->orWhere('nomor_induk', 'like', "%{$search}%")
-                    ->orWhere('nisn', 'like', "%{$search}%");
-            });
+            StudentSearch::apply($query, $search);
         }
 
         if ($kelas !== '') {

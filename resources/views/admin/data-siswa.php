@@ -86,7 +86,7 @@
             @endforeach
         </select>
 
-        <input type="text" name="q" placeholder="Cari nama / NISN" value="{{ $search }}" style="width:160px">
+        <input type="text" name="q" placeholder="Cari nama / NIS / NISN / NIK" value="{{ $search }}" style="width:220px">
 
         <select name="st">
             <option value="">Semua status</option>
@@ -94,6 +94,7 @@
                 <option value="{{ $st }}" {{ $statusFilter === $st ? 'selected' : '' }}>{{ $st }}</option>
             @endforeach
         </select>
+        <button type="submit" class="btn">🔍 Cari</button>
 
     </form>
 

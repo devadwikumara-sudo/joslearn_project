@@ -38,7 +38,7 @@
             @endforeach
         </select>
 
-        <input type="text" name="q" placeholder="Cari nama / NISN" value="{{ $filters['q'] }}" style="width:200px">
+        <input type="text" name="q" placeholder="Cari nama / NIS / NISN / NIK" value="{{ $filters['q'] }}" style="width:220px">
 
         <select name="st" aria-label="Pilih status">
             <option value="">Semua status</option>

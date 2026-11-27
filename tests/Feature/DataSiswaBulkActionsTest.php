@@ -163,6 +163,26 @@ class DataSiswaBulkActionsTest extends TestCase
         ]);
     }
 
+    public function test_student_search_matches_multiple_fields_and_terms(): void
+    {
+        $admin = $this->createAccount('admin');
+        $matchingId = $this->createStudent('Deva Dwi Kumara', 2, 1);
+        $nonMatchingId = $this->createStudent('Deva Siswa Lain', 2, 1);
+        DB::table('siswa_biodata')->where('id', $matchingId)->update([
+            'nisn' => '1234567890',
+            'nomor_induk' => '2468',
+        ]);
+
+        $response = $this->actingAs($admin)->get(route('admin.data-siswa', [
+            'tahun_ajaran' => 2,
+            'q' => 'Deva 2468',
+        ]));
+
+        $response->assertOk()
+            ->assertViewHas('siswaList', fn ($students): bool => $students->getCollection()->contains('id', $matchingId)
+                && ! $students->getCollection()->contains('id', $nonMatchingId));
+    }
+
     public function test_delete_all_for_current_year_does_not_trash_students_from_other_years(): void
     {
         $this->actingAs($this->createAccount('admin'));

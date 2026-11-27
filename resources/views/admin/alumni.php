@@ -150,7 +150,7 @@
             <option value="{{ $kelasOption }}" {{ $kelas === $kelasOption ? 'selected' : '' }}>{{ $kelasOption }}</option>
             @endforeach
         </select>
-        <input type="text" name="aq" placeholder="Cari nama / induk / NISN" value="{{ $aq }}" style="width:200px">
+        <input type="text" name="aq" placeholder="Cari nama / induk / NISN / NIK" value="{{ $aq }}" style="width:220px">
         <button type="submit" class="btn">🔍 Cari</button>
         <span class="sp"></span>
         <a href="{{ route('admin.alumni.export', ['aj' => $aj, 'ay' => $ay, 'kelas' => $kelas, 'aq' => $aq]) }}" class="btn o">📊 Ekspor Excel (Kontrol Induk + Biodata)</a>
@@ -408,19 +408,19 @@
                         <button type="button" class="btn o" disabled>Batalkan kelulusan</button>
                         <p class="sub">Tidak dapat dibatalkan karena belum ada riwayat pada tahun ajaran aktif.</p>
                     @endif
-                @elseif($selectedAlumni->status_alumni === 'Pindah keluar')
+                @elseif(in_array($selectedAlumni->status_alumni, ['Pindah keluar', 'Keluar'], true))
                     @if($canCancelTransfer)
-                        <form class="alumni-side-form" method="POST" action="{{ route('admin.alumni.cancel-transfer', $selectedAlumni->id) }}" onsubmit="return confirm('Batalkan pindah keluar dan kembalikan siswa ke Data Siswa aktif?')">
+                        <form class="alumni-side-form" method="POST" action="{{ route('admin.alumni.cancel-transfer', $selectedAlumni->id) }}" onsubmit="return confirm('Batalkan mutasi keluar dan kembalikan siswa ke Data Siswa aktif?')">
                             @csrf
                             <input type="hidden" name="aj" value="{{ $aj }}">
                             <input type="hidden" name="ay" value="{{ $ay }}">
                             <input type="hidden" name="kelas" value="{{ $kelas }}">
                             <input type="hidden" name="aq" value="{{ $aq }}">
                             <input type="hidden" name="page" value="{{ $alumni->currentPage() }}">
-                            <button type="submit" class="btn o">Batalkan pindah keluar</button>
+                            <button type="submit" class="btn o">Batalkan {{ strtolower($selectedAlumni->status_alumni) }}</button>
                         </form>
                     @else
-                        <button type="button" class="btn o" disabled>Batalkan pindah keluar</button>
+                        <button type="button" class="btn o" disabled>Batalkan {{ strtolower($selectedAlumni->status_alumni) }}</button>
                         <p class="sub">Tidak dapat dibatalkan karena tidak ada riwayat pindah keluar pada tahun ajaran aktif.</p>
                     @endif
                 @endif

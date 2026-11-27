@@ -8,6 +8,7 @@ use App\Models\SekolahTahunAjaran;
 use App\Models\SiswaBiodata;
 use App\Services\AcademicRecordAccess;
 use App\Services\AksesGuru;
+use App\Support\StudentSearch;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -153,12 +154,7 @@ class DataSiswaGuruController extends Controller
         }
 
         if ($filters['q'] !== '') {
-            $search = $filters['q'];
-            $query->where(function (Builder $searchQuery) use ($search): void {
-                $searchQuery->where('nama_lengkap', 'like', "%{$search}%")
-                    ->orWhere('nisn', 'like', "%{$search}%")
-                    ->orWhere('nomor_induk', 'like', "%{$search}%");
-            });
+            StudentSearch::apply($query, $filters['q']);
         }
 
         return $query->with(['riwayatKelas' => function (Relation $historyQuery) use ($historyFilters): void {

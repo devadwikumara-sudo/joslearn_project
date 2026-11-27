@@ -12,6 +12,7 @@ use App\Models\SiswaBiodata;
 use App\Models\SiswaRiwayatKelas;
 use App\Services\AksesGuru;
 use App\Support\Semester;
+use App\Support\StudentSearch;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -313,11 +314,7 @@ class DataSiswaController extends Controller
         }
 
         if ($search !== '') {
-            $query->where(function (Builder $searchQuery) use ($search): void {
-                $searchQuery->where('nama_lengkap', 'like', "%{$search}%")
-                    ->orWhere('nisn', 'like', "%{$search}%")
-                    ->orWhere('nomor_induk', 'like', "%{$search}%");
-            });
+            StudentSearch::apply($query, $search);
         }
 
         return $query;
