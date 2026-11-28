@@ -191,7 +191,7 @@ class DataSiswaGuruController extends Controller
             'tahun_ajaran' => ['nullable', 'integer', 'exists:sekolah_tahun_ajaran,id'],
             'kelas' => ['nullable', 'string', Rule::in($kelasList)],
             'q' => ['nullable', 'string', 'max:150'],
-            'st' => ['nullable', 'in:Aktif'],
+            'st' => ['nullable', 'in:Aktif,Lulus,Pindah keluar'],
             'tab' => ['nullable', 'in:mapel,wali'],
         ]);
 

@@ -64,7 +64,7 @@ class PdfCetakController extends Controller
             'kelas' => ['sometimes', 'nullable', 'string', 'max:100'],
             'ta' => ['sometimes', 'nullable', 'string', 'max:30'],
             'q' => ['sometimes', 'nullable', 'string', 'max:150'],
-            'st' => ['sometimes', 'nullable', 'in:Aktif'],
+            'st' => ['sometimes', 'nullable', 'in:Aktif,Lulus,Pindah keluar'],
             'tab' => ['sometimes', 'in:mapel,wali'],
         ]);
         $ids = array_map('intval', $selection['ids'] ?? []);
@@ -249,7 +249,7 @@ class PdfCetakController extends Controller
             'target_kelas' => ['sometimes', 'nullable', 'string', 'max:100'],
             'target_ta' => ['sometimes', 'nullable', 'string', 'max:30'],
             'q' => ['sometimes', 'nullable', 'string', 'max:150'],
-            'st' => ['sometimes', 'nullable', 'in:Aktif'],
+            'st' => ['sometimes', 'nullable', 'in:Aktif,Lulus,Pindah keluar'],
             'tab' => ['sometimes', 'in:mapel,wali'],
             'slots_present' => ['sometimes', 'boolean'],
             'slots' => ['sometimes', 'array'],

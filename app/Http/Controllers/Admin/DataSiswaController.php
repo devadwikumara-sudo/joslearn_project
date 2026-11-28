@@ -348,7 +348,7 @@ class DataSiswaController extends Controller
         $validated = $request->validate([
             'tahun_ajaran' => ['required', 'integer', 'exists:sekolah_tahun_ajaran,id'],
             'kelas' => ['nullable', 'string', 'max:64'],
-            'st' => ['nullable', 'in:Aktif'],
+            'st' => ['nullable', 'in:Aktif,Lulus,Pindah keluar'],
             'q' => ['nullable', 'string', 'max:150'],
             'siswa_ids' => ['sometimes', 'array', 'min:1'],
             'siswa_ids.*' => ['required', 'integer', 'distinct', 'exists:siswa_biodata,id'],
@@ -507,7 +507,7 @@ class DataSiswaController extends Controller
         $validated = $request->validate([
             'tahun_ajaran' => ['required', 'string'],
             'kelas' => ['nullable', 'string', 'max:64'],
-            'st' => ['nullable', 'in:Aktif'],
+            'st' => ['nullable', 'in:Aktif,Lulus,Pindah keluar'],
             'q' => ['nullable', 'string', 'max:150'],
             'konfirmasi' => ['required', 'in:hapus'],
             'siswa_ids' => ['sometimes', 'array', 'min:1'],

@@ -90,8 +90,8 @@
 
         <select name="st">
             <option value="">Semua status</option>
-            @foreach(['Aktif'] as $st)
-                <option value="{{ $st }}" {{ $statusFilter === $st ? 'selected' : '' }}>{{ $st }}</option>
+            @foreach(['Aktif' => 'Aktif', 'Lulus' => 'Alumni', 'Pindah keluar' => 'Mutasi'] as $value => $label)
+                <option value="{{ $value }}" {{ $statusFilter === $value ? 'selected' : '' }}>{{ $label }}</option>
             @endforeach
         </select>
         <button type="submit" class="btn">🔍 Cari</button>
@@ -191,6 +191,7 @@
                     $rk = $s->riwayatKelas->first();
                     $kelasNama = $rk?->kelas?->nama ?? 'Belum ditetapkan';
                     $statusNama = $rk?->status ?? 'Belum diatur';
+                    $statusLabel = ['Lulus' => 'Alumni', 'Pindah keluar' => 'Mutasi'][$statusNama] ?? $statusNama;
                     $formEditUrl = route('admin.data-siswa', array_merge(request()->query(), [
                         'panel' => 'form',
                         'mode' => 'edit',
@@ -210,7 +211,7 @@
                     <td>{{ $s->tempat_lahir ?? '-' }}, {{ $s->tanggal_lahir ? \Carbon\Carbon::parse($s->tanggal_lahir)->translatedFormat('d M Y') : '-' }}</td>
                     <td>{{ $s->agama ?? '-' }}</td>
                     <td>{{ $s->nama_ayah ?? $s->nama_ibu ?? '-' }}</td>
-                    <td><span class="bd {{ $badgeClass }}">{{ $statusNama }}</span></td>
+                    <td><span class="bd {{ $badgeClass }}">{{ $statusLabel }}</span></td>
                     <td style="white-space:nowrap">
                         <button
                             type="button"
