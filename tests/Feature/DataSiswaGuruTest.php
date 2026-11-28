@@ -152,9 +152,13 @@ class DataSiswaGuruTest extends TestCase
             ->assertDontSee('Siswa Pindah')
             ->assertSee('<option value="X-1"', false)
             ->assertDontSee('<option value="X-2"', false)
-            ->assertDontSee('<option value="Lulus"', false)
-            ->assertDontSee('<option value="Pindah keluar"', false)
+            ->assertSee('<option value="Lulus" >Alumni</option>', false)
+            ->assertSee('<option value="Pindah keluar" >Mutasi</option>', false)
             ->assertDontSee('<option value="Keluar"', false);
+
+        $this->get(route('guru.data-siswa', ['st' => 'Lulus']))
+            ->assertOk()
+            ->assertSee('<option value="Lulus" selected>Alumni</option>', false);
     }
 
     public function test_teacher_and_homeroom_views_only_show_their_separately_assigned_classes(): void

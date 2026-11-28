@@ -42,8 +42,8 @@
 
         <select name="st" aria-label="Pilih status">
             <option value="">Semua status</option>
-            @foreach(['Aktif'] as $status)
-                <option value="{{ $status }}" {{ $filters['st'] === $status ? 'selected' : '' }}>{{ $status }}</option>
+            @foreach(['Aktif' => 'Aktif', 'Lulus' => 'Alumni', 'Pindah keluar' => 'Mutasi'] as $value => $label)
+                <option value="{{ $value }}" {{ $filters['st'] === $value ? 'selected' : '' }}>{{ $label }}</option>
             @endforeach
         </select>
 
@@ -109,6 +109,7 @@
                             $riwayat = $murid->riwayatKelas->first();
                             $kelasNama = $riwayat?->kelas?->nama ?? 'Belum ditetapkan';
                             $statusNama = $riwayat?->status ?? 'Belum diatur';
+                            $statusLabel = ['Lulus' => 'Alumni', 'Pindah keluar' => 'Mutasi'][$statusNama] ?? $statusNama;
                             $badgeClass = in_array($statusNama, ['Aktif', 'Lulus'], true)
                                 ? 'ok'
                                 : (in_array($statusNama, ['Pindah keluar', 'Belum diatur'], true) ? 'w' : 'e');
@@ -124,7 +125,7 @@
                             <td>{{ $murid->tempat_lahir ?? '-' }}, {{ $murid->tanggal_lahir ? \Carbon\Carbon::parse($murid->tanggal_lahir)->translatedFormat('d M Y') : '-' }}</td>
                             <td>{{ $murid->agama ?? '-' }}</td>
                             <td>{{ $murid->nama_ayah ?? $murid->nama_ibu ?? '-' }}</td>
-                            <td><span class="bd {{ $badgeClass }}">{{ $statusNama }}</span></td>
+                            <td><span class="bd {{ $badgeClass }}">{{ $statusLabel }}</span></td>
                             <td style="white-space:nowrap">
                                 <a href="{{ route('guru.data-siswa.show', array_merge(['id' => $murid->id], $queryFilters)) }}" class="btn o" style="padding:4px 9px;font-size:12px">👁 Lihat</a>
                                 <a href="{{ route('guru.data-siswa.pdf', array_merge(['id' => $murid->id], $studentFilters)) }}" class="btn a" style="padding:4px 9px;font-size:12px">⬇ PDF</a>

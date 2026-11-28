@@ -328,7 +328,7 @@ class DataSiswaBulkActionsTest extends TestCase
         ];
     }
 
-    public function test_admin_data_siswa_status_dropdown_only_offers_active(): void
+    public function test_admin_data_siswa_offers_status_labels_without_changing_move_target_options(): void
     {
         $this->createStudent('Siswa Aktif', 2, 1);
 
@@ -337,21 +337,19 @@ class DataSiswaBulkActionsTest extends TestCase
 
         $response->assertOk();
 
-        // Yang dibatasi hanya Aktif: filter status daftar dan "Status tujuan" pindah kelas massal.
+        // Filter status daftar memetakan label; "Status tujuan" pindah kelas massal tetap hanya Aktif.
         // Form pendataan di panel samping sengaja memuat semua status untuk mengedit satu siswa.
         $html = $response->getContent();
         $this->assertSame(1, preg_match('/<select name="st">(.*?)<\/select>/s', $html, $filter));
-        $this->assertStringContainsString('value="Aktif"', $filter[1]);
+        $this->assertStringContainsString('value="Aktif" >Aktif', $filter[1]);
+        $this->assertStringContainsString('value="Lulus" >Alumni', $filter[1]);
+        $this->assertStringContainsString('value="Pindah keluar" >Mutasi', $filter[1]);
 
-        $dropdowns = [$filter[1]];
         if (preg_match('/<select name="target_status"[^>]*>(.*?)<\/select>/s', $html, $target)) {
-            $dropdowns[] = $target[1];
-        }
-
-        foreach ($dropdowns as $options) {
             foreach (['Lulus', 'Pindah keluar', 'Keluar'] as $status) {
-                $this->assertStringNotContainsString('value="'.$status.'"', $options);
+                $this->assertStringNotContainsString('value="'.$status.'"', $target[1]);
             }
+            $this->assertStringContainsString('value="Aktif"', $target[1]);
         }
     }
 
