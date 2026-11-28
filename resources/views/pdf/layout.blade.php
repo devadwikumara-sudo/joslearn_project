@@ -1038,8 +1038,8 @@
         }
         .capaian .kk-table td.kk-desc {
             vertical-align: top;
-            text-align: left;
-            height: 64pt;
+            text-align: justify;
+            height: 84pt;
             padding: 4pt 6pt;
             line-height: 1.35;
         }
@@ -1171,7 +1171,7 @@
         body.paper-a4 .capaian .lt th,
         body.paper-a4 .capaian .lt td { padding: 1.8pt 3.5pt; }
         body.paper-a4 .capaian .kk-table { margin: 3pt 0 6pt; }
-        body.paper-a4 .capaian .kk-table td.kk-desc { height: 42pt; padding: 3pt 5pt; line-height: 1.28; }
+        body.paper-a4 .capaian .kk-table td.kk-desc { height: 58pt; padding: 3pt 5pt; line-height: 1.28; }
         body.paper-a4 .kenaikan-keputusan,
         body.paper-a4 .kenaikan-table,
         body.paper-a4 .capaian .ttd { font-size: 9.2pt; }

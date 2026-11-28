@@ -74,6 +74,10 @@ class ImportTemplateControllerTest extends TestCase
             'nilai' => ['nilai', ['NISN', 'Nama', 'Kelas', 'Semester', 'Mata Pelajaran', 'Nilai Akhir']],
             'kehadiran' => ['kehadiran', ['NISN', 'Nama', 'Kelas', 'Semester', 'Sakit (hari)', 'Izin (hari)', 'Alpa (hari)', 'Kokurikuler']],
             'ekskul' => ['ekskul', ['NISN', 'Nama', 'Kelas', 'Semester', 'Nama Ekskul', 'Predikat']],
+            'kokurikuler' => ['kokurikuler', [
+                'NISN', 'Nama', 'Kelas', 'Semester', 'Tema Kegiatan', 'Capaian Umum',
+                'Dimensi', 'Predikat Dimensi', 'Subdimensi', 'Deskripsi',
+            ]],
         ];
     }
 
@@ -101,6 +105,11 @@ class ImportTemplateControllerTest extends TestCase
         $this->assertSame($expectedHeaders, $workbook->getSheetByName('Data')->toArray()[0]);
         $this->assertStringContainsString('Header/urutan kolom boleh berbeda', (string) $workbook->getSheetByName('Petunjuk')->getCell('A2')->getValue());
         $this->assertStringContainsString('Tidak ada baris contoh', $workbook->getSheetByName('Petunjuk')->getCell('A3')->getValue());
+        if ($type === 'kokurikuler') {
+            $instruction = (string) $workbook->getSheetByName('Petunjuk')->getCell('A2')->getValue();
+            $this->assertStringContainsString('Satu baris untuk satu dimensi', $instruction);
+            $this->assertStringContainsString('NISN dan Semester sama digabung', $instruction);
+        }
         $workbook->disconnectWorksheets();
     }
 

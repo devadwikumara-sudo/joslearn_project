@@ -24,6 +24,7 @@ class ImportDataController extends Controller
         'nilai' => 'Nilai',
         'kehadiran' => 'Kehadiran',
         'ekskul' => 'Ekskul',
+        'kokurikuler' => 'Kokurikuler',
     ];
 
     public function index(
@@ -51,7 +52,7 @@ class ImportDataController extends Controller
         $tab = $type;
         $tabView = $allTab
             ? 'all'
-            : (in_array($type, ['nilai', 'kehadiran', 'ekskul'], true) ? 'academic' : $type);
+            : (in_array($type, ['nilai', 'kehadiran', 'ekskul', 'kokurikuler'], true) ? 'academic' : $type);
 
         if ($request->query->has('jenis') && ! $request->query->has('tab')) {
             $query = $request->query->all();
@@ -113,7 +114,7 @@ class ImportDataController extends Controller
         $riwayatImport = collect();
         $totalGuru = null;
 
-        if ($isAdmin && in_array($type, ['nilai', 'kehadiran', 'ekskul'], true)) {
+        if ($isAdmin && in_array($type, ['nilai', 'kehadiran', 'ekskul', 'kokurikuler'], true)) {
             $batches = $importBatchHistory->forYear($type, $tahunAjaranTerpilihId);
         } elseif ($isAdmin && $type === 'siswa' && $tahunAjaranTerpilihId !== null) {
             $riwayatImport = DB::table('siswa_riwayat_kelas as riwayat')
@@ -187,6 +188,7 @@ class ImportDataController extends Controller
         if ($aksesGuru->adalahWali($user)) {
             $types[] = 'kehadiran';
             $types[] = 'ekskul';
+            $types[] = 'kokurikuler';
         }
 
         return $types;

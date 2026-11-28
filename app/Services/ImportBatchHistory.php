@@ -18,6 +18,7 @@ class ImportBatchHistory
             'nilai' => 'siswa_nilai',
             'kehadiran' => 'siswa_kehadiran',
             'ekskul' => 'siswa_ekskul',
+            'kokurikuler' => 'siswa_kehadiran',
             default => throw new \InvalidArgumentException('Jenis import akademik tidak valid.'),
         };
 

@@ -59,7 +59,7 @@ async function importWorkbook(workbook, expectedType = 'siswa', dictionaries = {
     const window = {toast() {}};
     const preview = {innerHTML: ''};
     let payload = null;
-    const classField = ['nilai', 'hadir', 'ekskul', 'semua'].includes(expectedType)
+    const classField = ['nilai', 'hadir', 'ekskul', 'kokurikuler', 'semua'].includes(expectedType)
         ? {value: 'auto', options: []}
         : {value: 'X-1', options: []};
     const studentClassField = expectedType === 'semua' ? {value: ''} : null;
@@ -67,9 +67,9 @@ async function importWorkbook(workbook, expectedType = 'siswa', dictionaries = {
     const yearField = ['siswa', 'guru'].includes(expectedType) ? {value: '2025/2026'} : null;
     const semesterField = expectedType === 'semua'
         ? {value: 'auto'}
-        : (['nilai', 'hadir', 'ekskul'].includes(expectedType) ? {value: '1'} : null);
+        : (['nilai', 'hadir', 'ekskul', 'kokurikuler'].includes(expectedType) ? {value: '1'} : null);
     const duplicateField = ['siswa', 'guru', 'semua'].includes(expectedType) ? {value: 'lengkapi'} : null;
-    const academicDuplicateField = ['nilai', 'hadir', 'ekskul', 'semua'].includes(expectedType) ? {value: 'skip'} : null;
+    const academicDuplicateField = ['nilai', 'hadir', 'ekskul', 'kokurikuler', 'semua'].includes(expectedType) ? {value: 'skip'} : null;
     const csrfMeta = {getAttribute: () => 'csrf-test'};
     const endpointMeta = {getAttribute: () => '/test/save-batch'};
     const baseMeta = {getAttribute: () => '/test'};
@@ -585,7 +585,7 @@ test('holds academic rows when semester is neither detected nor selected', async
 
 test('previews all detected workbook categories and imports them in dependency order', async () => {
     const workbook = {
-        SheetNames: ['Data Siswa', 'Nilai Semester', 'Rekap Kehadiran', 'Kegiatan Ekstrakurikuler'],
+        SheetNames: ['Data Siswa', 'Nilai Semester', 'Rekap Kehadiran', 'Kegiatan Ekstrakurikuler', 'Kokurikuler'],
         Sheets: {
             'Data Siswa': [
                 ['NISN', 'Nama', 'Kelas'],
@@ -602,6 +602,11 @@ test('previews all detected workbook categories and imports them in dependency o
             'Kegiatan Ekstrakurikuler': [
                 ['NISN', 'Nama', 'Kelas', 'Semester', 'Nama Ekskul', 'Predikat'],
                 ['0000000123', 'Siswa Uji Semua', 'X-1', 'Ganjil', 'Pramuka', 'A']
+            ],
+            Kokurikuler: [
+                ['NISN', 'Nama', 'Kelas', 'Semester', 'Tema Kegiatan', 'Capaian Umum', 'Dimensi', 'Predikat Dimensi', 'Subdimensi', 'Deskripsi'],
+                ['0000000123', 'Siswa Uji Semua', 'X-1', 'Ganjil', 'Tema Uji', 'sangat baik', 'Toleransi', 'Cakap', 'Gotong royong', ''],
+                ['0000000123', 'Siswa Uji Semua', 'X-1', 'Ganjil', 'Tema lain', 'lainnya', 'Kepedulian', 'Mahir', 'Kepedulian', '']
             ]
         }
     };
@@ -609,15 +614,16 @@ test('previews all detected workbook categories and imports them in dependency o
     const preview = imported.getState();
 
     assert.deepEqual(imported.alerts, []);
-    assert.deepEqual(preview.allGroups.map(group => group.type), ['siswa', 'nilai', 'hadir', 'ekskul']);
+    assert.deepEqual(preview.allGroups.map(group => group.type), ['siswa', 'nilai', 'hadir', 'ekskul', 'kokurikuler']);
     assert.equal(preview.allGroups.every(group => group.errors.length === 0 && group.mappingIssues.length === 0), true);
+    assert.match(imported.preview.innerHTML, /Pada dimensi Toleransi, ananda Cakap dalam subdimensi Gotong royong\. Pada dimensi Kepedulian, ananda Mahir dalam subdimensi Kepedulian\./);
 
     await imported.runAllImport();
 
     const batchTypes = imported.requests
         .filter(({endpoint}) => endpoint.endsWith('/start-batch'))
         .map(({request}) => request.type);
-    assert.deepEqual(batchTypes, ['siswa', 'nilai', 'hadir', 'ekskul']);
+    assert.deepEqual(batchTypes, ['siswa', 'nilai', 'hadir', 'ekskul', 'kokurikuler']);
 });
 
 test('blocks every category when a workbook contains an unclassified sheet', async () => {
@@ -1165,4 +1171,63 @@ test('parses long-format subject and score columns with comma decimals', async (
     assert.equal(state.rows[0].mapelcol, 'Matematika');
     assert.equal(state.rows[0].nilaicol, '85.5');
     assert.equal(state.statuses[0].status, 'ready');
+});
+
+test('maps kokurikuler columns and previews combined descriptions by student and semester', async () => {
+    const workbook = {
+        SheetNames: ['Kokurikuler'],
+        Sheets: {
+            Kokurikuler: [
+                ['NISN', 'Nama', 'Kelas', 'Semester', 'Tema Kegiatan', 'Capaian Umum', 'Dimensi', 'Predikat Dimensi', 'Subdimensi', 'Deskripsi'],
+                ['0000000001', 'Siswa Uji', 'X-1', 'Ganjil', 'Tema Contoh', 'sangat baik', 'Toleransi', 'Cakap', 'Gotong royong', ''],
+                ['0000000001', 'Siswa Uji', 'X-1', 'Ganjil', 'Tema diabaikan', 'lainnya', 'Kepedulian', 'Mahir', 'Kepedulian', ''],
+                ['0000000001', 'Siswa Uji', 'X-1', 'Genap', 'Tema Contoh', '', 'Kreatif', 'Mahir', 'Kreatif dan Inovatif', '']
+            ]
+        }
+    };
+    const {state, preview} = await importWorkbook(workbook, 'kokurikuler');
+
+    assert.equal(state.rows.length, 3);
+    assert.deepEqual(state.rows.map(row => row.kk_dimensi), ['Toleransi', 'Kepedulian', 'Kreatif']);
+    assert.match(preview.innerHTML, /2 deskripsi dari 3 baris/);
+    assert.match(preview.innerHTML, /Pada dimensi Toleransi, ananda Cakap dalam subdimensi Gotong royong\. Pada dimensi Kepedulian, ananda Mahir dalam subdimensi Kepedulian\./);
+    assert.match(preview.innerHTML, /Pada semester ini, ananda menunjukkan capaian yang sangat baik/);
+});
+
+test('keeps Kokurikuler dimensions for one student and semester in the same import chunk', async () => {
+    const rows = [
+        ['0000000001', 'Siswa Uji', 'X-1', 'Ganjil', 'Tema Contoh', 'sangat baik', 'Toleransi', 'Cakap', 'Gotong royong'],
+        ...Array.from({length: 199}, (_, index) => [
+            String(2 + index).padStart(10, '0'),
+            `Siswa ${index + 2}`,
+            'X-1',
+            'Ganjil',
+            'Tema Contoh',
+            'sangat baik',
+            'Kreatif',
+            'Mahir',
+            'Kreatif dan Inovatif'
+        ]),
+        ['0000000001', 'Siswa Uji', 'X-1', 'Ganjil', 'Tema diabaikan', 'lainnya', 'Kepedulian', 'Mahir', 'Kepedulian']
+    ];
+    const workbook = {
+        SheetNames: ['Kokurikuler'],
+        Sheets: {
+            Kokurikuler: [
+                ['NISN', 'Nama', 'Kelas', 'Semester', 'Tema Kegiatan', 'Capaian Umum', 'Dimensi', 'Predikat Dimensi', 'Subdimensi'],
+                ...rows
+            ]
+        }
+    };
+    const imported = await importWorkbook(workbook, 'kokurikuler');
+
+    await imported.runImport();
+
+    const chunks = imported.requests
+        .filter(({endpoint}) => endpoint.endsWith('/save-batch'))
+        .map(({request}) => request.rows);
+    const studentChunks = chunks.map(chunk => chunk.filter(row => row.nisn === '0000000001'));
+
+    assert.equal(chunks.length, 2);
+    assert.deepEqual(studentChunks.map(chunk => chunk.length), [2, 0]);
 });

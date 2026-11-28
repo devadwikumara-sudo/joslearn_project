@@ -45,6 +45,10 @@ class ImportTemplateController extends Controller
             'headers' => ['NISN', 'Nama', 'Kelas', 'Semester', 'Nama Ekskul', 'Predikat'],
             'instruction' => 'Satu baris untuk satu kegiatan. Semester dapat berupa Ganjil/Genap atau nomor 1–6. Header/urutan kolom boleh berbeda; periksa pemetaan dan pratinjau sebelum menyimpan.',
         ],
+        'kokurikuler' => [
+            'headers' => ['NISN', 'Nama', 'Kelas', 'Semester', 'Tema Kegiatan', 'Capaian Umum', 'Dimensi', 'Predikat Dimensi', 'Subdimensi', 'Deskripsi'],
+            'instruction' => 'Satu baris untuk satu dimensi. Baris dengan NISN dan Semester sama digabung menjadi satu deskripsi. Capaian Umum opsional (default sangat baik); Deskripsi opsional untuk memakai teks langsung. Semester dapat berupa Ganjil/Genap atau nomor 1–6. Header/urutan kolom boleh berbeda; periksa pemetaan dan pratinjau sebelum menyimpan.',
+        ],
     ];
 
     public function download(string $jenis): BinaryFileResponse

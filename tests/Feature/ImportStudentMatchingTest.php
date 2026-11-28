@@ -1408,6 +1408,12 @@ class ImportStudentMatchingTest extends TestCase
         foreach ([
             ['type' => 'hadir', 'value' => ['sakit' => 2]],
             ['type' => 'ekskul', 'value' => ['ekskul' => 'Pramuka', 'predikat' => 'A']],
+            ['type' => 'kokurikuler', 'value' => [
+                'kk_tema' => 'Tema Uji',
+                'kk_dimensi' => 'Toleransi',
+                'kk_predikat' => 'Cakap',
+                'kk_subdimensi' => 'Peduli',
+            ]],
         ] as $import) {
             $response = $this->actingAs($wali)->withoutMiddleware()->postJson(route('guru.import.save-batch'), [
                 'type' => $import['type'],
@@ -1428,6 +1434,159 @@ class ImportStudentMatchingTest extends TestCase
 
         $this->assertSame(1, DB::table('siswa_kehadiran')->count());
         $this->assertSame(1, DB::table('siswa_ekskul')->count());
+        $this->assertStringContainsString('Pada semester ini', (string) DB::table('siswa_kehadiran')->value('kokurikuler'));
+    }
+
+    public function test_kokurikuler_import_groups_dimensions_and_preserves_attendance_and_tracking(): void
+    {
+        DB::table('siswa_kehadiran')->insert([
+            'riwayat_kelas_id' => 1,
+            'semester' => 'Ganjil',
+            'import_unggahan_id' => 61,
+            'import_terakhir_unggahan_id' => 62,
+            'sakit' => 5,
+            'izin' => 3,
+            'alpa' => 2,
+            'kokurikuler' => null,
+        ]);
+
+        $response = $this->import('kokurikuler', [
+            [
+                'nisn' => '0000000001',
+                'nama' => 'Nama Sama',
+                'kelas' => 'X-1',
+                'sem' => 'Ganjil',
+                'kk_tema' => ' Satuan   Langkah dalam Kebhinnekaan untuk Indonesia Maju, Sekolah Kita yang Aman dan Nyaman ',
+                'kk_umum' => ' sangat   baik ',
+                'kk_dimensi' => ' Toleransi ',
+                'kk_predikat' => ' Cakap ',
+                'kk_subdimensi' => ' Kepedulian, gotong royong dan toleransi ',
+            ],
+            [
+                'nisn' => '0000000001',
+                'nama' => 'Nama Sama',
+                'kelas' => 'X-1',
+                'sem' => 'Ganjil',
+                'kk_tema' => 'Tema ini diabaikan',
+                'kk_umum' => 'perlu perbaikan',
+                'kk_dimensi' => 'Kepedulian',
+                'kk_predikat' => 'Mahir',
+                'kk_subdimensi' => 'Kepedulian',
+            ],
+            [
+                'nisn' => '0000000001',
+                'nama' => 'Nama Sama',
+                'kelas' => 'X-1',
+                'sem' => 'Genap',
+                'kk_tema' => 'Satuan Langkah dalam Kebhinnekaan untuk Indonesia Maju, Sekolah Kita yang Aman dan Nyaman',
+                'kk_dimensi' => 'Kreatif',
+                'kk_predikat' => 'Mahir',
+                'kk_subdimensi' => 'Kreatif dan Inovatif',
+            ],
+        ], 'auto');
+
+        $expectedOddDescription = 'Pada semester ini, ananda menunjukkan capaian yang sangat baik dalam penguatan profil lulusan, yang ditunjukkan melalui kegiatan kokurikuler Satuan Langkah dalam Kebhinnekaan untuk Indonesia Maju, Sekolah Kita yang Aman dan Nyaman. Pada dimensi Toleransi, ananda Cakap dalam subdimensi Kepedulian, gotong royong dan toleransi. Pada dimensi Kepedulian, ananda Mahir dalam subdimensi Kepedulian.';
+        $expectedEvenDescription = 'Pada semester ini, ananda menunjukkan capaian yang sangat baik dalam penguatan profil lulusan, yang ditunjukkan melalui kegiatan kokurikuler Satuan Langkah dalam Kebhinnekaan untuk Indonesia Maju, Sekolah Kita yang Aman dan Nyaman. Pada dimensi Kreatif, ananda Mahir dalam subdimensi Kreatif dan Inovatif.';
+
+        $response->assertOk()
+            ->assertJsonPath('count', 2)
+            ->assertJsonPath('skipped', 0);
+        $this->assertDatabaseHas('siswa_kehadiran', [
+            'riwayat_kelas_id' => 1,
+            'semester' => 'Ganjil',
+            'kokurikuler' => $expectedOddDescription,
+            'sakit' => 5,
+            'izin' => 3,
+            'alpa' => 2,
+            'import_unggahan_id' => 61,
+            'import_terakhir_unggahan_id' => 62,
+        ]);
+        $this->assertDatabaseHas('siswa_kehadiran', [
+            'riwayat_kelas_id' => 1,
+            'semester' => 'Genap',
+            'kokurikuler' => $expectedEvenDescription,
+            'sakit' => 0,
+            'izin' => 0,
+            'alpa' => 0,
+            'import_unggahan_id' => null,
+            'import_terakhir_unggahan_id' => null,
+        ]);
+        $this->assertSame(2, DB::table('import_unggahan')->where('jenis', 'kokurikuler')->value('jumlah_tersimpan'));
+
+        $batchId = (int) DB::table('import_unggahan')->where('jenis', 'kokurikuler')->value('id');
+        $this->get(route('admin.import', ['tab' => 'kokurikuler']))
+            ->assertOk()
+            ->assertSee('Data hasil impor')
+            ->assertSee('2')
+            ->assertDontSee('>Lihat</a>', false)
+            ->assertDontSee('>Edit</a>', false)
+            ->assertDontSee('Hapus batch');
+        $this->get(route('admin.import.batch.show', ['batch' => $batchId]))->assertNotFound();
+        $this->put(route('admin.import.batch.records.update', ['batch' => $batchId, 'record' => 1]), [
+            'kokurikuler' => 'Deskripsi tidak boleh diedit melalui batch ini.',
+        ])->assertNotFound();
+        $this->delete(route('admin.import.batch.destroy', ['batch' => $batchId]), [
+            'tahun_ajaran_id' => 1,
+            'konfirmasi' => 'HAPUS BATCH '.$batchId,
+        ])->assertNotFound();
+        $this->assertDatabaseHas('siswa_kehadiran', [
+            'riwayat_kelas_id' => 1,
+            'semester' => 'Ganjil',
+            'kokurikuler' => $expectedOddDescription,
+        ]);
+    }
+
+    public function test_kokurikuler_direct_description_fills_empty_data_skips_duplicates_and_can_be_overwritten(): void
+    {
+        DB::table('siswa_kehadiran')->insert([
+            'riwayat_kelas_id' => 1,
+            'semester' => 'Ganjil',
+            'sakit' => 4,
+            'izin' => 2,
+            'alpa' => 1,
+            'kokurikuler' => null,
+        ]);
+
+        $first = $this->import('kokurikuler', [[
+            'nisn' => '0000000001',
+            'kelas' => 'X-1',
+            'sem' => '1',
+            'kk_deskripsi' => '  Catatan   bebas... ',
+        ]]);
+        $first->assertOk()->assertJsonPath('count', 1);
+        $this->assertDatabaseHas('siswa_kehadiran', [
+            'riwayat_kelas_id' => 1,
+            'semester' => 'Ganjil',
+            'kokurikuler' => 'Catatan bebas.',
+            'sakit' => 4,
+            'izin' => 2,
+            'alpa' => 1,
+        ]);
+
+        $this->import('kokurikuler', [[
+            'nisn' => '0000000001',
+            'kelas' => 'X-1',
+            'sem' => 'Ganjil',
+            'kk_deskripsi' => 'Versi baru',
+        ]])->assertOk()
+            ->assertJsonPath('count', 0)
+            ->assertJsonPath('skipped', 1);
+
+        $this->import('kokurikuler', [[
+            'nisn' => '0000000001',
+            'kelas' => 'X-1',
+            'sem' => 'Ganjil',
+            'kk_deskripsi' => '  Versi   ditimpa ',
+        ]], duplicateMode: 'timpa')->assertOk()->assertJsonPath('count', 1);
+
+        $this->assertDatabaseHas('siswa_kehadiran', [
+            'riwayat_kelas_id' => 1,
+            'semester' => 'Ganjil',
+            'kokurikuler' => 'Versi ditimpa',
+            'sakit' => 4,
+            'izin' => 2,
+            'alpa' => 1,
+        ]);
     }
 
     public function test_admin_can_import_unassigned_subject_attendance_and_extracurricular_data(): void
@@ -1515,7 +1674,7 @@ class ImportStudentMatchingTest extends TestCase
             $this->followingRedirects()->get(route($routeName))->assertForbidden();
         }
 
-        foreach (['nilai', 'kehadiran', 'ekskul', 'siswa', 'guru'] as $type) {
+        foreach (['nilai', 'kehadiran', 'ekskul', 'kokurikuler', 'siswa', 'guru'] as $type) {
             $this->postJson(route('guru.import.metadata'), ['type' => $type])->assertForbidden();
             $this->postJson(route('guru.import.start-batch'), [
                 'type' => $type,
@@ -1533,7 +1692,7 @@ class ImportStudentMatchingTest extends TestCase
         $response = $this->actingAs($this->admin)->withoutMiddleware()->get(route('admin.import'));
 
         $response->assertOk()
-            ->assertViewHas('allowedTypes', ['siswa', 'guru', 'nilai', 'kehadiran', 'ekskul'])
+            ->assertViewHas('allowedTypes', ['siswa', 'guru', 'nilai', 'kehadiran', 'ekskul', 'kokurikuler'])
             ->assertViewHas('type', 'siswa')
             ->assertViewHas('tab', 'siswa')
             ->assertSee('Import Data')
@@ -1595,6 +1754,14 @@ class ImportStudentMatchingTest extends TestCase
             ->assertDontSee('loadDemoHadir')
             ->assertDontSee('Jumlah Siswa');
         $this->assertMatchesRegularExpression('/class="[^"]*\bon\b[^"]*" data-menu="import-data"/', $academicImport->getContent());
+
+        $this->get(route('admin.import', ['tab' => 'kokurikuler']))
+            ->assertOk()
+            ->assertViewHas('type', 'kokurikuler')
+            ->assertViewHas('typeJs', 'kokurikuler')
+            ->assertSee('Import Kokurikuler')
+            ->assertSee('loadDemoKokurikuler')
+            ->assertSee('baris dengan NISN dan semester sama digabung');
     }
 
     public function test_importing_teacher_biodata_does_not_create_an_account_with_a_default_password(): void
@@ -1675,21 +1842,23 @@ class ImportStudentMatchingTest extends TestCase
             ->assertSee('Riwayat Import Nilai Saya')
             ->assertDontSee('Import Kehadiran')
             ->assertDontSee('Import Ekskul')
+            ->assertDontSee('Import Kokurikuler')
             ->assertDontSee('Kelas X (tingkat)');
 
         $this->actingAs($guruWali)
             ->get(route('guru.import-data'))
             ->assertOk()
-            ->assertViewHas('allowedTypes', ['kehadiran', 'ekskul'])
+            ->assertViewHas('allowedTypes', ['kehadiran', 'ekskul', 'kokurikuler'])
             ->assertViewHas('kelasList', fn ($kelasList): bool => $kelasList->all() === ['X-1'])
             ->assertDontSee('Import Nilai')
             ->assertSee('Import Kehadiran')
-            ->assertSee('Import Ekskul');
+            ->assertSee('Import Ekskul')
+            ->assertSee('Import Kokurikuler');
 
         $this->actingAs($guruRangkap)
             ->get(route('guru.import-data'))
             ->assertOk()
-            ->assertViewHas('allowedTypes', ['nilai', 'kehadiran', 'ekskul'])
+            ->assertViewHas('allowedTypes', ['nilai', 'kehadiran', 'ekskul', 'kokurikuler'])
             ->assertSee('Input Nilai Mapel');
     }
 
@@ -1700,8 +1869,10 @@ class ImportStudentMatchingTest extends TestCase
         $this->actingAs($guru)->withoutMiddleware();
 
         $this->get(route('guru.import-data', ['tab' => 'ekskul']))->assertForbidden();
+        $this->get(route('guru.import-data', ['tab' => 'kokurikuler']))->assertForbidden();
         $this->get(route('guru.import-data', ['jenis' => 'ekskul']))->assertForbidden();
         $this->get(route('guru.import-data.template', ['jenis' => 'siswa']))->assertForbidden();
+        $this->get(route('guru.import-data.template', ['jenis' => 'kokurikuler']))->assertForbidden();
         $this->get(route('guru.import-data.template', ['jenis' => 'nilai']))->assertOk();
     }
 
@@ -1765,6 +1936,7 @@ class ImportStudentMatchingTest extends TestCase
             'subject teacher cannot import student biodata' => ['mapel', 'siswa'],
             'subject teacher cannot import attendance' => ['mapel', 'kehadiran'],
             'subject teacher cannot import extracurriculars' => ['mapel', 'ekskul'],
+            'subject teacher cannot import cocurricular records' => ['mapel', 'kokurikuler'],
         ];
     }
 
@@ -3777,7 +3949,7 @@ class ImportStudentMatchingTest extends TestCase
         ?string $duplicateMode = null,
         array $targetOptions = []
     ): TestResponse {
-        $academicImport = in_array($type, ['nilai', 'hadir', 'kehadiran', 'ekskul'], true);
+        $academicImport = in_array($type, ['nilai', 'hadir', 'kehadiran', 'ekskul', 'kokurikuler'], true);
 
         $payload = [
             'type' => $type,
