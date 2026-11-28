@@ -4,9 +4,11 @@ namespace Tests\Feature;
 
 use App\Models\Auth\Pengguna;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 class PdfSemesterFilterTest extends TestCase
@@ -205,7 +207,7 @@ class PdfSemesterFilterTest extends TestCase
     public function test_admin_can_render_single_and_batch_student_pdfs(): void
     {
         Storage::fake('local');
-        Storage::disk('local')->put('siswa/foto/foto_siswa.jpg', 'foto-uji');
+        Storage::disk('local')->put('siswa/foto/foto_siswa.jpg', UploadedFile::fake()->image('foto.jpg')->getContent());
         DB::table('siswa_biodata')->where('id', 1)->update([
             'foto' => 'siswa/foto/foto_siswa.jpg',
         ]);
@@ -222,13 +224,14 @@ class PdfSemesterFilterTest extends TestCase
         $singleResponse->assertOk()
             ->assertSee('I. BUKU INDUK REGISTER PESERTA DIDIK')
             ->assertSee('Siswa Enam Semester')
-            ->assertSee(route('admin.data-siswa.foto', 1), false);
+            ->assertSee('data:image/jpeg;base64,', false);
 
         $batchResponse = $this->get(route('admin.pdf.batch', ['ids' => '1']));
 
         $batchResponse->assertOk()
             ->assertSee('I. BUKU INDUK REGISTER PESERTA DIDIK')
-            ->assertSee('Siswa Enam Semester');
+            ->assertSee('Siswa Enam Semester')
+            ->assertSee('data:image/jpeg;base64,', false);
     }
 
     public function test_batch_pdf_keeps_forty_student_registers_with_bounded_output_and_render_time(): void
@@ -353,8 +356,12 @@ class PdfSemesterFilterTest extends TestCase
         $activeStudentId = $this->createActiveStudent();
         Storage::fake('local');
         Storage::disk('local')->put('siswa/foto/foto_siswa_aktif.jpg', 'foto-uji');
+        Storage::disk('local')->put('siswa/foto/foto_siswa_luar_cakupan.jpg', 'foto-uji');
         DB::table('siswa_biodata')->where('id', $activeStudentId)->update([
             'foto' => 'siswa/foto/foto_siswa_aktif.jpg',
+        ]);
+        DB::table('siswa_biodata')->where('id', 1)->update([
+            'foto' => 'siswa/foto/foto_siswa_luar_cakupan.jpg',
         ]);
 
         $guruId = DB::table('guru_biodata')->insertGetId([
@@ -374,18 +381,162 @@ class PdfSemesterFilterTest extends TestCase
             'guru_id' => $guruId,
         ]);
 
-        $this->actingAs($teacher)
+        $forbiddenSingleResponse = $this->actingAs($teacher)
             ->get(route('guru.data-siswa.pdf', ['id' => 1, 'tab' => 'wali']))
             ->assertForbidden();
+        $forbiddenSingleResponse->assertDontSee('data:image/jpeg;base64,', false);
 
-        $this->get(route('guru.data-siswa.pdf-batch', ['ids' => '1', 'tab' => 'wali']))
+        $forbiddenBatchResponse = $this->get(route('guru.data-siswa.pdf-batch', ['ids' => '1', 'tab' => 'wali']))
             ->assertForbidden();
+        $forbiddenBatchResponse->assertDontSee('data:image/jpeg;base64,', false);
 
         $this->get(route('guru.data-siswa.pdf', ['id' => $activeStudentId, 'tab' => 'wali']))
             ->assertOk()
-            ->assertSee(route('guru.data-siswa.foto', $activeStudentId), false);
+            ->assertSee('data:image/jpeg;base64,', false);
         $this->get(route('guru.data-siswa.pdf-batch', ['ids' => (string) $activeStudentId, 'tab' => 'wali']))
-            ->assertOk();
+            ->assertOk()
+            ->assertSee('data:image/jpeg;base64,', false);
+    }
+
+    public function test_pdf_orders_missing_grade_placeholders_before_the_existing_xii_history(): void
+    {
+        DB::table('siswa_riwayat_kelas')->where('kelas_id', '!=', 3)->delete();
+
+        $response = $this->renderCapaianPdf();
+
+        $response->assertOk()
+            ->assertSee('X : Tidak diajarkan pada semester tersebut');
+        $this->assertSame(['X', 'XI', 'XII-1'], $this->reportClasses((string) $response->getContent()));
+        $this->assertSame(2, substr_count((string) $response->getContent(), 'Belum ada data'));
+    }
+
+    public function test_pdf_orders_x_placeholder_and_xii_history_when_xi_is_missing(): void
+    {
+        DB::table('siswa_riwayat_kelas')->where('id', 2)->delete();
+
+        $response = $this->renderCapaianPdf();
+
+        $response->assertOk()
+            ->assertSee('X : Tidak diajarkan pada semester tersebut')
+            ->assertSee('Belum ada data');
+        $this->assertSame(['X-1', 'XI', 'XII-1'], $this->reportClasses((string) $response->getContent()));
+    }
+
+    public function test_pdf_orders_complete_grade_histories_by_grade_not_school_year(): void
+    {
+        DB::table('sekolah_tahun_ajaran')->where('id', 1)->update(['nama' => '2025/2026']);
+        DB::table('sekolah_tahun_ajaran')->where('id', 2)->update(['nama' => '2023/2024']);
+        DB::table('sekolah_tahun_ajaran')->where('id', 3)->update(['nama' => '2024/2025']);
+
+        $response = $this->renderCapaianPdf();
+
+        $response->assertOk();
+        $this->assertSame(['X-1', 'XI-1', 'XII-1'], $this->reportClasses((string) $response->getContent()));
+    }
+
+    public function test_hide_empty_pdf_removes_placeholders_and_keeps_nonempty_history(): void
+    {
+        DB::table('siswa_riwayat_kelas')->whereIn('id', [1, 2])->delete();
+
+        $response = $this->renderCapaianPdf(['hide_empty' => 1]);
+
+        $response->assertOk()
+            ->assertDontSee('Belum ada data');
+        $this->assertSame(['XII-1'], $this->reportClasses((string) $response->getContent()));
+    }
+
+    public function test_specific_school_year_filter_does_not_add_grade_placeholders(): void
+    {
+        $response = $this->renderCapaianPdf(['ta' => '2024/2025']);
+
+        $response->assertOk()
+            ->assertDontSee('Belum ada data');
+        $this->assertSame(['XI-1'], $this->reportClasses((string) $response->getContent()));
+    }
+
+    public function test_pdf_embeds_the_photo_in_both_entry_slots_for_f4_and_a4(): void
+    {
+        Storage::fake('local');
+        Storage::disk('local')->put('siswa/foto/foto_x.jpg', UploadedFile::fake()->image('foto.jpg')->getContent());
+        DB::table('siswa_biodata')->where('id', 1)->update(['foto' => 'siswa/foto/foto_x.jpg']);
+
+        foreach (['F4', 'A4'] as $paper) {
+            $response = $this->renderCapaianPdf([
+                'bio' => 1,
+                'nilai' => 0,
+                'paper' => $paper,
+            ]);
+            $content = (string) $response->assertOk()->getContent();
+
+            $this->assertSame(2, substr_count($content, 'alt="Foto masuk"'));
+            preg_match_all('/<img src="data:image\/jpeg;base64,[^"]+" alt="Foto masuk">/', $content, $matches);
+            $this->assertCount(2, $matches[0]);
+            $this->assertSame(2, substr_count($content, 'Foto Keluar'));
+            $this->assertStringContainsString($paper === 'F4' ? '215mm 330mm' : '210mm 297mm', $content);
+        }
+
+        $this->assertSame('siswa/foto/foto_x.jpg', DB::table('siswa_biodata')->where('id', 1)->value('foto'));
+    }
+
+    public function test_missing_or_unapproved_photo_paths_keep_register_placeholders_and_return_ok(): void
+    {
+        Storage::fake('local');
+
+        foreach ([
+            null,
+            'siswa/foto/tidak-ada.jpg',
+            'siswa/foto/../rahasia.txt',
+            'siswa/foto/foto.php',
+            'siswa/foto/foto.txt',
+        ] as $photoPath) {
+            DB::table('siswa_biodata')->where('id', 1)->update(['foto' => $photoPath]);
+
+            $response = $this->renderCapaianPdf([
+                'bio' => 1,
+                'nilai' => 0,
+            ]);
+            $content = (string) $response->assertOk()->getContent();
+
+            $this->assertStringNotContainsString('alt="Foto masuk"', $content);
+            $this->assertSame(2, substr_count($content, 'Foto Masuk'));
+        }
+    }
+
+    public function test_pdf_embeds_photos_from_the_legacy_public_upload_path(): void
+    {
+        $directory = public_path('uploads/foto');
+        $uploadsDirectory = public_path('uploads');
+        $directoryExisted = is_dir($directory);
+        $uploadsDirectoryExisted = is_dir($uploadsDirectory);
+        $photoPath = $directory.DIRECTORY_SEPARATOR.'foto_pdf_test.png';
+        $photoBytes = UploadedFile::fake()->image('foto.png')->getContent();
+
+        if (! $directoryExisted) {
+            mkdir($directory, 0777, true);
+        }
+        file_put_contents($photoPath, $photoBytes);
+        DB::table('siswa_biodata')->where('id', 1)->update(['foto' => 'uploads/foto/foto_pdf_test.png']);
+
+        try {
+            $response = $this->renderCapaianPdf([
+                'bio' => 1,
+                'nilai' => 0,
+            ]);
+            $content = (string) $response->assertOk()->getContent();
+
+            preg_match_all('/<img src="data:image\/png;base64,[^"]+" alt="Foto masuk">/', $content, $matches);
+            $this->assertCount(2, $matches[0]);
+        } finally {
+            if (is_file($photoPath)) {
+                unlink($photoPath);
+            }
+            if (! $directoryExisted && is_dir($directory) && count(scandir($directory)) === 2) {
+                rmdir($directory);
+            }
+            if (! $uploadsDirectoryExisted && is_dir($uploadsDirectory) && count(scandir($uploadsDirectory)) === 2) {
+                rmdir($uploadsDirectory);
+            }
+        }
     }
 
     public function test_missing_slots_print_empty_tables_unless_they_are_hidden(): void
@@ -435,6 +586,25 @@ class PdfSemesterFilterTest extends TestCase
         ]);
 
         return $studentId;
+    }
+
+    private function renderCapaianPdf(array $filters = []): TestResponse
+    {
+        return $this->withoutMiddleware()->get(route('admin.data-siswa.pdf', array_merge([
+            'id' => 1,
+            'bio' => 0,
+            'nilai' => 1,
+            'hadir' => 0,
+            'ekskul' => 0,
+            'naik' => 0,
+        ], $filters)));
+    }
+
+    private function reportClasses(string $content): array
+    {
+        preg_match_all('/<th colspan="\d+">Kelas ([^<]+)<\/th>/', $content, $matches);
+
+        return $matches[1];
     }
 
     public function test_pdf_uses_correct_school_identity_defaults_when_school_settings_are_empty(): void

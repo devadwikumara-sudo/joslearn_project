@@ -13,6 +13,7 @@ use App\Models\SiswaKehadiran;
 use App\Models\SiswaNilai;
 use App\Models\SiswaRiwayatKelas;
 use App\Services\AksesGuru;
+use App\Support\FotoSiswa;
 use App\Support\Semester;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
@@ -95,7 +96,7 @@ class PdfCetakController extends Controller
      */
     public function dataDokumen(Request $request, array $siswaIds): array
     {
-        return $this->renderDocumentView($request, $siswaIds, false)->getData();
+        return $this->renderDocumentView($request, $siswaIds, false, false)->getData();
     }
 
     /**
@@ -232,7 +233,7 @@ class PdfCetakController extends Controller
     /**
      * Core builder data dokumen cetak sesuai format prototype Kurikulum Merdeka.
      */
-    private function renderDocumentView(Request $request, array $siswaIds, bool $isBatch): View
+    private function renderDocumentView(Request $request, array $siswaIds, bool $isBatch, bool $embedPhotos = true): View
     {
         $request->validate([
             'bio' => ['sometimes', 'boolean'],
@@ -496,6 +497,21 @@ class PdfCetakController extends Controller
                 }
             }
 
+            $gradeOrder = ['X' => 1, 'XI' => 2, 'XII' => 3];
+            usort($riwayatDataList, static function (array $left, array $right) use ($gradeOrder): int {
+                $leftKelas = $left['riwayatKelas']->kelas;
+                $rightKelas = $right['riwayatKelas']->kelas;
+                $leftTingkat = strtoupper((string) ($leftKelas?->tingkat ?? Semester::tingkatDariNamaKelas($leftKelas?->nama ?? '') ?? ''));
+                $rightTingkat = strtoupper((string) ($rightKelas?->tingkat ?? Semester::tingkatDariNamaKelas($rightKelas?->nama ?? '') ?? ''));
+                $tingkatComparison = ($gradeOrder[$leftTingkat] ?? PHP_INT_MAX) <=> ($gradeOrder[$rightTingkat] ?? PHP_INT_MAX);
+
+                if ($tingkatComparison !== 0) {
+                    return $tingkatComparison;
+                }
+
+                return strcmp($left['taNama'], $right['taNama']);
+            });
+
             $riwayatDataList = array_values(array_filter($riwayatDataList, function (array $historyData) use ($hideEmptySlots): bool {
                 if ($hideEmptySlots) {
                     return count($historyData['emptySemesters']) < count($historyData['slotSemesters']);
@@ -503,6 +519,10 @@ class PdfCetakController extends Controller
 
                 return true;
             }));
+
+            if ($embedPhotos) {
+                $s->foto = FotoSiswa::sebagaiDataUri($s->foto);
+            }
 
             $siswaItems[] = [
                 'siswa' => $s,

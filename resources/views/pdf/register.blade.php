@@ -33,7 +33,7 @@
     <div class="reg-photo-stack">
         @for($i=0;$i<2;$i++)
             <div class="reg-photo">
-                @if($i===0&&$fotoSrc)
+                @if($fotoSrc)
                     <img src="{{ $fotoSrc }}" alt="Foto masuk">
                 @else
                     <div class="reg-photo-inner">
