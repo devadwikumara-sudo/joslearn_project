@@ -87,6 +87,7 @@ class ApiSiswaAksesTest extends TestCase
                 'alamat_kecamatan', 'alamat_kabupaten', 'alamat_provinsi', 'alamat_kode_pos',
                 'nama_ayah', 'nama_ibu', 'nama_wali', 'sekolah_asal', 'tanggal_diterima',
                 'tinggi_badan_cm', 'berat_badan_kg', 'foto',
+                'foto_masuk_2x3', 'foto_masuk_3x4', 'foto_keluar_2x3', 'foto_keluar_3x4',
             ] as $column) {
                 $table->string($column)->nullable();
             }
@@ -416,6 +417,41 @@ class ApiSiswaAksesTest extends TestCase
 
         $this->expectPdf('biodata-1234567890.pdf', function (string $html): void {
             $this->assertStringContainsString('data:image/jpeg;base64,'.base64_encode('ISI-FOTO-UJI'), $html);
+        });
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->get('/api/v1/unduh/bio')
+            ->assertOk();
+    }
+
+    public function test_mobile_pdf_embeds_each_of_the_four_student_photo_slots(): void
+    {
+        Storage::fake('local');
+        $ownStudentId = $this->createStudent('Siswa Milik Akun', '1234567890');
+        $slots = [
+            'foto_masuk_2x3',
+            'foto_masuk_3x4',
+            'foto_keluar_2x3',
+            'foto_keluar_3x4',
+        ];
+        $photoPaths = [];
+        $photoContents = [];
+        foreach ($slots as $slot) {
+            $content = 'photo-content-'.$slot;
+            $path = 'siswa/foto/'.$slot.'.png';
+            Storage::disk('local')->put($path, $content);
+            $photoPaths[$slot] = $path;
+            $photoContents[$slot] = $content;
+        }
+        DB::table('siswa_biodata')->where('id', $ownStudentId)->update($photoPaths);
+        $token = $this->createStudentAccount('siswa-foto', $ownStudentId)->createToken('uji')->plainTextToken;
+
+        $this->expectPdf('biodata-1234567890.pdf', function (string $html) use ($photoContents): void {
+            foreach ($photoContents as $slot => $content) {
+                $this->assertStringContainsString('data:image/png;base64,'.base64_encode($content), $html);
+            }
+            $this->assertSame(2, substr_count($html, 'alt="Foto masuk"'));
+            $this->assertSame(2, substr_count($html, 'alt="Foto keluar"'));
         });
 
         $this->withHeader('Authorization', 'Bearer '.$token)

@@ -32,6 +32,12 @@ class PdfCetakController extends Controller
         'XII-2' => ['tingkat' => 'XII', 'jenis' => 'Genap'],
     ];
 
+    private const SLOT_GRADE_OPTIONS = [
+        'X' => ['X-1', 'X-2'],
+        'XI' => ['XI-1', 'XI-2'],
+        'XII' => ['XII-1', 'XII-2'],
+    ];
+
     /**
      * Cetak dokumen PDF satu siswa (Register, Nilai, Hadir, Ekskul, Kenaikan).
      */
@@ -254,7 +260,7 @@ class PdfCetakController extends Controller
             'tab' => ['sometimes', 'in:mapel,wali'],
             'slots_present' => ['sometimes', 'boolean'],
             'slots' => ['sometimes', 'array'],
-            'slots.*' => ['string', 'in:X-1,X-2,XI-1,XI-2,XII-1,XII-2'],
+            'slots.*' => ['string', 'in:X,XI,XII,X-1,X-2,XI-1,XI-2,XII-1,XII-2'],
             'hide_empty' => ['sometimes', 'boolean'],
             'paper' => ['sometimes', 'in:F4,A4'],
         ]);
@@ -307,25 +313,16 @@ class PdfCetakController extends Controller
         $filterKelasList = SekolahKelas::orderBy('nama')->pluck('nama')->toArray();
         $paper = $request->input('paper', 'F4');
         $selectedSlots = $this->selectedSlots($request, $filterSem, $filterKelas);
+        $selectedSlotGrades = array_values(array_unique(array_map(
+            static fn (string $slot): string => self::SLOT_OPTIONS[$slot]['tingkat'],
+            $selectedSlots
+        )));
         $slotTermsByGrade = [];
         foreach ($selectedSlots as $slot) {
             $option = self::SLOT_OPTIONS[$slot];
             $slotTermsByGrade[$option['tingkat']][] = $option['jenis'];
         }
         $hideEmptySlots = $request->boolean('hide_empty');
-
-        // 4. Mapping Next Kelas (Untuk Kenaikan Kelas)
-        $allKelas = SekolahKelas::pluck('nama')->toArray();
-        $nextKelasMap = [];
-        foreach ($allKelas as $k) {
-            if (str_starts_with($k, 'X-')) {
-                $nextKelasMap[$k] = str_replace('X-', 'XI-', $k);
-            } elseif (str_starts_with($k, 'XI-')) {
-                $nextKelasMap[$k] = str_replace('XI-', 'XII-', $k);
-            } else {
-                $nextKelasMap[$k] = 'LULUS';
-            }
-        }
 
         $tingkatMapel = [];
         $mapelKurikulumRows = DB::table('sekolah_mapel_per_tingkat as kurikulum')
@@ -358,9 +355,10 @@ class PdfCetakController extends Controller
         $uniqueClasses = [];
 
         foreach ($siswaCollection as $s) {
-            $riwayatSorted = $s->riwayatKelas->sortBy(function ($r) {
+            $riwayatSemua = $s->riwayatKelas->sortBy(function ($r) {
                 return $r->tahunAjaran?->nama ?? '';
-            });
+            })->values();
+            $riwayatSorted = $riwayatSemua;
 
             // Filter TA jika bukan 'Semua'
             if ($filterTa !== 'Semua') {
@@ -456,7 +454,7 @@ class PdfCetakController extends Controller
 
                 $riwayatDataList[] = [
                     'riwayatKelas' => $rk,
-                    'kelasTujuanNama' => $rk->kelasTujuan?->nama,
+                    'kelasTujuanNama' => $this->kelasTujuanDariRiwayat($rk, $riwayatSemua),
                     'taNama' => $taNama,
                     'nilaiMap' => $nilaiMap,
                     'hadirMap' => $hadirMap,
@@ -522,6 +520,9 @@ class PdfCetakController extends Controller
 
             if ($embedPhotos) {
                 $s->foto = FotoSiswa::sebagaiDataUri($s->foto);
+                foreach (array_keys(FotoSiswa::SLOTS) as $photoSlot) {
+                    $s->{$photoSlot} = FotoSiswa::sebagaiDataUri($s->{$photoSlot});
+                }
             }
 
             $siswaItems[] = [
@@ -591,14 +592,14 @@ class PdfCetakController extends Controller
             'filterKelas',
             'filterKelasList',
             'selectedSlots',
+            'selectedSlotGrades',
             'hideEmptySlots',
             'paper',
             'tingkatMapel',
             'subTitle',
             'showCover',
             'coverKelasList',
-            'siswaItems',
-            'nextKelasMap'
+            'siswaItems'
         ));
     }
 
@@ -613,7 +614,19 @@ class PdfCetakController extends Controller
                 return [];
             }
 
-            return array_values(array_intersect(array_keys(self::SLOT_OPTIONS), $slots));
+            $selected = [];
+            foreach ($slots as $slot) {
+                if (isset(self::SLOT_GRADE_OPTIONS[$slot])) {
+                    $selected = array_merge($selected, self::SLOT_GRADE_OPTIONS[$slot]);
+                } elseif (isset(self::SLOT_OPTIONS[$slot])) {
+                    $selected[] = $slot;
+                }
+            }
+
+            return array_values(array_intersect(
+                array_keys(self::SLOT_OPTIONS),
+                array_unique($selected)
+            ));
         }
 
         if (ctype_digit($filterSem) && $filterSem !== '0') {
@@ -637,6 +650,41 @@ class PdfCetakController extends Controller
         }
 
         return $selected;
+    }
+
+    private function kelasTujuanDariRiwayat(
+        SiswaRiwayatKelas $riwayatAsal,
+        EloquentCollection $riwayatSiswa
+    ): ?string {
+        $tingkatAsal = strtoupper((string) (
+            $riwayatAsal->kelas?->tingkat
+            ?? Semester::tingkatDariNamaKelas($riwayatAsal->kelas?->nama ?? '')
+            ?? ''
+        ));
+        $tingkatTujuan = match ($tingkatAsal) {
+            'X' => 'XI',
+            'XI' => 'XII',
+            default => null,
+        };
+
+        if ($tingkatTujuan === null) {
+            return $riwayatAsal->kelasTujuan?->nama;
+        }
+
+        $tahunAsal = (string) ($riwayatAsal->tahunAjaran?->nama ?? '');
+        $riwayatTujuanBerikutnya = $riwayatSiswa->first(function (SiswaRiwayatKelas $riwayat) use ($tingkatTujuan, $tahunAsal): bool {
+            $kelas = $riwayat->kelas;
+            $tingkat = strtoupper((string) (
+                $kelas?->tingkat
+                ?? Semester::tingkatDariNamaKelas($kelas?->nama ?? '')
+                ?? ''
+            ));
+            $tahun = (string) ($riwayat->tahunAjaran?->nama ?? '');
+
+            return $tingkat === $tingkatTujuan && strcmp($tahun, $tahunAsal) > 0;
+        });
+
+        return $riwayatTujuanBerikutnya?->kelas?->nama ?? $riwayatAsal->kelasTujuan?->nama;
     }
 
     /** @param array<string, array<string, mixed>> $nilaiMap

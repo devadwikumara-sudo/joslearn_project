@@ -89,6 +89,9 @@ class DokumenSiswaPdf
         $siswaDokumen = $data['siswaItems'][0]['siswa'] ?? null;
         if ($siswaDokumen) {
             $siswaDokumen->foto = FotoSiswa::sebagaiDataUri($siswa->foto);
+            foreach (array_keys(FotoSiswa::SLOTS) as $photoSlot) {
+                $siswaDokumen->{$photoSlot} = FotoSiswa::sebagaiDataUri($siswa->{$photoSlot});
+            }
         }
 
         $html = view('siswa-mobile.dokumen-lengkap', $data)->render();

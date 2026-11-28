@@ -326,12 +326,19 @@
     /* ── FOTO BOX ── */
     .sf-photo-box {
         display: flex;
-        align-items: center;
-        gap: 18px;
-        padding: 16px;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 12px;
         border-radius: 14px;
         background: #f8fafc;
         border: 1px dashed #cbd5e1;
+        margin-bottom: 0;
+    }
+
+    .sf-photo-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
         margin-bottom: 18px;
     }
 
@@ -348,10 +355,20 @@
         box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
     }
 
+    .sf-photo-preview.photo-2x3 {
+        height: 117px;
+    }
+
     .sf-photo-preview img {
         width: 100%;
         height: 100%;
         object-fit: cover;
+    }
+
+    @media (max-width: 680px) {
+        .sf-photo-grid {
+            grid-template-columns: 1fr;
+        }
     }
 
     /* ── UPLOAD BERKAS CARDS ── */
@@ -581,21 +598,45 @@
                         </div>
                     </div>
 
-                    {{-- Pas Foto Upload Section --}}
-                    <div class="sf-photo-box">
-                        <div class="sf-photo-preview">
-                            @if($edit && $edit->foto)
-                                <img id="preview-foto" src="{{ route('admin.data-siswa.foto', $edit->id) }}" alt="Pas Foto">
-                            @else
-                                <img id="preview-foto" style="display:none" alt="Pas Foto">
-                                <span id="label-foto" style="font-size:11px;color:#64748b;text-align:center;font-weight:600">Pas Foto<br>3×4</span>
-                            @endif
-                        </div>
-                        <div style="flex:1">
-                            <label class="sf-label" style="margin-bottom:4px">Upload Pas Foto 3×4 Resmi</label>
-                            <input type="file" name="foto_file" id="foto-input" accept=".jpg,.jpeg,.png,.webp" class="sf-input" style="max-width:320px;font-size:12.5px;padding:6px 10px">
-                            <p class="sf-hint">Format didukung: JPG, PNG, atau WEBP. Ukuran maksimal 2 MB berseragam sekolah.</p>
-                        </div>
+                    <div class="sf-photo-grid">
+                        @php
+                            $hasStoredPhotoSlots = $edit && collect(array_keys(\App\Support\FotoSiswa::SLOTS))
+                                ->contains(fn ($slot) => filled($edit->{$slot}));
+                        @endphp
+                        @foreach(\App\Support\FotoSiswa::SLOTS as $photoSlot => $details)
+                            @php
+                                $inputName = $photoSlot.'_file';
+                                $previewId = 'preview-'.$photoSlot;
+                                $labelId = 'label-'.$photoSlot;
+                                $photoPath = $edit?->{$photoSlot};
+                                $usesLatestPhotoFallback = ! $hasStoredPhotoSlots
+                                    && $photoSlot === 'foto_masuk_3x4'
+                                    && filled($edit?->foto);
+                                if ($usesLatestPhotoFallback) {
+                                    $photoPath = $edit->foto;
+                                }
+                                $photoUrl = $edit && filled($photoPath)
+                                    ? ($usesLatestPhotoFallback
+                                        ? route('admin.data-siswa.foto', $edit->id)
+                                        : route('admin.data-siswa.foto', ['id' => $edit->id, 'slot' => $photoSlot]))
+                                    : null;
+                            @endphp
+                            <div class="sf-photo-box">
+                                <div class="sf-photo-preview {{ $details['size'] === '2x3' ? 'photo-2x3' : '' }}">
+                                    @if($photoUrl)
+                                        <img id="{{ $previewId }}" src="{{ $photoUrl }}" alt="{{ $details['label'] }} {{ $details['size'] }}">
+                                    @else
+                                        <img id="{{ $previewId }}" style="display:none" alt="{{ $details['label'] }} {{ $details['size'] }}">
+                                        <span id="{{ $labelId }}" style="font-size:11px;color:#64748b;text-align:center;font-weight:600">{{ $details['size'] }}<br>{{ $details['label'] }}</span>
+                                    @endif
+                                </div>
+                                <div style="flex:1">
+                                    <label for="{{ $inputName }}" class="sf-label" style="margin-bottom:4px">{{ $details['label'] }} {{ $details['size'] }}</label>
+                                    <input type="file" name="{{ $inputName }}" id="{{ $inputName }}" accept=".jpg,.jpeg,.png,.webp" class="sf-input sf-photo-input" data-preview="{{ $previewId }}" data-label="{{ $labelId }}" style="font-size:12.5px;padding:6px 10px">
+                                    <p class="sf-hint">JPG, PNG, atau WEBP. Maksimal 2 MB.</p>
+                                </div>
+                            </div>
+                        @endforeach
                     </div>
 
                     <div class="sf-grid-3">
@@ -1377,10 +1418,12 @@ function openStudentCreateModal() {
     var form = document.getElementById('form-pendataan-siswa');
     if (form && !@json($edit ? true : false)) {
         form.reset();
-        var previewFoto = document.getElementById('preview-foto');
-        var labelFoto = document.getElementById('label-foto');
-        if (previewFoto) { previewFoto.src = ''; previewFoto.style.display = 'none'; }
-        if (labelFoto) { labelFoto.style.display = 'block'; }
+        form.querySelectorAll('.sf-photo-input').forEach(function(input) {
+            var preview = document.getElementById(input.dataset.preview);
+            var label = document.getElementById(input.dataset.label);
+            if (preview) { preview.src = ''; preview.style.display = 'none'; }
+            if (label) { label.style.display = 'block'; }
+        });
     }
 
     if (typeof window.sfShowTab === 'function') {
@@ -1497,28 +1540,27 @@ function closeStudentForm(event, modalEl) {
         showTab(currentIndex + 1);
     });
 
-    // Preview Foto Canvas
-    var fotoInput = document.getElementById('foto-input');
-    var previewFoto = document.getElementById('preview-foto');
-    var labelFoto = document.getElementById('label-foto');
-
-    fotoInput?.addEventListener('change', function(e) {
-        var file = e.target.files[0];
-        if (!file) return;
-        if (!file.type.startsWith('image/')) {
-            alert('File harus berupa gambar (JPG/PNG/WEBP).');
-            return;
-        }
-
-        var reader = new FileReader();
-        reader.onload = function(evt) {
-            if (previewFoto) {
-                previewFoto.src = evt.target.result;
-                previewFoto.style.display = 'block';
+    formPanel.querySelectorAll('.sf-photo-input').forEach(function(photoInput) {
+        photoInput.addEventListener('change', function(event) {
+            var file = event.target.files[0];
+            if (!file) return;
+            if (!file.type.startsWith('image/')) {
+                alert('File harus berupa gambar (JPG/PNG/WEBP).');
+                return;
             }
-            if (labelFoto) labelFoto.style.display = 'none';
-        };
-        reader.readAsDataURL(file);
+
+            var preview = document.getElementById(photoInput.dataset.preview);
+            var label = document.getElementById(photoInput.dataset.label);
+            var reader = new FileReader();
+            reader.onload = function(loadEvent) {
+                if (preview) {
+                    preview.src = loadEvent.target.result;
+                    preview.style.display = 'block';
+                }
+                if (label) label.style.display = 'none';
+            };
+            reader.readAsDataURL(file);
+        });
     });
 
     // Input Synchronization across tabs

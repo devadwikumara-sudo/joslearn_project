@@ -9,6 +9,7 @@ use App\Models\SekolahTahunAjaran;
 use App\Models\SiswaBerkas;
 use App\Models\SiswaBiodata;
 use App\Models\SiswaRiwayatKelas;
+use App\Support\FotoSiswa;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -153,17 +154,17 @@ class FormPendataanController extends Controller
         );
         $kelas = SekolahKelas::where('nama', $data['kelas'])->firstOrFail();
 
-        unset($data['kelas'], $data['status'], $data['tahun_ajaran'], $data['foto_file'], $data['berkas']);
+        unset($data['kelas'], $data['status'], $data['tahun_ajaran'], $data['berkas']);
+        $this->removePhotoUploadsFromData($data);
         $this->normalizeDocumentFlags($request, $data);
-        $fotoPath = null;
-        $uploadedAttachmentPaths = [];
-        $replacedAttachmentPaths = [];
+        $uploadedFilePaths = [];
+        $replacedFilePaths = [];
 
         try {
-            $siswa = DB::transaction(function () use ($request, $data, $tahunAjaran, $kelas, &$fotoPath, &$uploadedAttachmentPaths, &$replacedAttachmentPaths): SiswaBiodata {
-                $this->storePhoto($request, $data, $fotoPath);
+            $siswa = DB::transaction(function () use ($request, $data, $tahunAjaran, $kelas, &$uploadedFilePaths, &$replacedFilePaths): SiswaBiodata {
+                $this->storePhotos($request, $data, null, $uploadedFilePaths, $replacedFilePaths);
                 $siswa = SiswaBiodata::create($data);
-                $this->storeAttachments($request, $siswa, $uploadedAttachmentPaths, $replacedAttachmentPaths);
+                $this->storeAttachments($request, $siswa, $uploadedFilePaths, $replacedFilePaths);
 
                 SiswaRiwayatKelas::create([
                     'siswa_id' => $siswa->id,
@@ -185,10 +186,7 @@ class FormPendataanController extends Controller
                 return $siswa;
             });
         } catch (\Throwable $exception) {
-            if ($fotoPath !== null) {
-                Storage::disk('local')->delete($fotoPath);
-            }
-            $this->deleteStoredFiles($uploadedAttachmentPaths);
+            $this->deleteStoredFiles($uploadedFilePaths);
 
             if (! $exception instanceof RuntimeException) {
                 throw $exception;
@@ -202,7 +200,7 @@ class FormPendataanController extends Controller
             return back()->withInput()->with('error', 'Gagal menyimpan data siswa. Periksa log aplikasi atau hubungi administrator.');
         }
 
-        $this->deleteStoredFiles($replacedAttachmentPaths);
+        $this->deleteStoredFiles($replacedFilePaths);
 
         $routeName = auth()->user()?->peran === 'guru' ? 'guru.data-siswa' : 'admin.data-siswa';
 
@@ -228,17 +226,17 @@ class FormPendataanController extends Controller
         );
         $kelas = SekolahKelas::where('nama', $data['kelas'])->firstOrFail();
 
-        unset($data['kelas'], $data['status'], $data['tahun_ajaran'], $data['foto_file'], $data['berkas']);
+        unset($data['kelas'], $data['status'], $data['tahun_ajaran'], $data['berkas']);
+        $this->removePhotoUploadsFromData($data);
         $this->normalizeDocumentFlags($request, $data);
-        $fotoPath = null;
-        $uploadedAttachmentPaths = [];
-        $replacedAttachmentPaths = [];
+        $uploadedFilePaths = [];
+        $replacedFilePaths = [];
 
         try {
-            DB::transaction(function () use ($request, $data, $siswa, $tahunAjaran, $kelas, &$fotoPath, &$uploadedAttachmentPaths, &$replacedAttachmentPaths): void {
-                $this->storePhoto($request, $data, $fotoPath);
+            DB::transaction(function () use ($request, $data, $siswa, $tahunAjaran, $kelas, &$uploadedFilePaths, &$replacedFilePaths): void {
+                $this->storePhotos($request, $data, $siswa, $uploadedFilePaths, $replacedFilePaths);
                 $siswa->update($data);
-                $this->storeAttachments($request, $siswa, $uploadedAttachmentPaths, $replacedAttachmentPaths);
+                $this->storeAttachments($request, $siswa, $uploadedFilePaths, $replacedFilePaths);
                 $riwayat = SiswaRiwayatKelas::withTrashed()->firstOrNew([
                     'siswa_id' => $siswa->id,
                     'tahun_ajaran_id' => $tahunAjaran->id,
@@ -259,10 +257,7 @@ class FormPendataanController extends Controller
                 ]);
             });
         } catch (\Throwable $exception) {
-            if ($fotoPath !== null) {
-                Storage::disk('local')->delete($fotoPath);
-            }
-            $this->deleteStoredFiles($uploadedAttachmentPaths);
+            $this->deleteStoredFiles($uploadedFilePaths);
 
             if (! $exception instanceof RuntimeException) {
                 throw $exception;
@@ -277,7 +272,7 @@ class FormPendataanController extends Controller
             return back()->withInput()->with('error', 'Gagal memperbarui data siswa. Periksa log aplikasi atau hubungi administrator.');
         }
 
-        $this->deleteStoredFiles($replacedAttachmentPaths);
+        $this->deleteStoredFiles($replacedFilePaths);
 
         return redirect()
             ->route('admin.data-siswa', [
@@ -309,16 +304,16 @@ class FormPendataanController extends Controller
             'tracking_keterangan' => ['nullable', 'string', 'max:255'],
         ]);
         unset($data['kegiatan_setelah_lulus']);
-        unset($data['foto_file'], $data['berkas']);
+        unset($data['berkas']);
+        $this->removePhotoUploadsFromData($data);
         $this->normalizeDocumentFlags($request, $data);
-        $fotoPath = null;
-        $uploadedAttachmentPaths = [];
-        $replacedAttachmentPaths = [];
+        $uploadedFilePaths = [];
+        $replacedFilePaths = [];
         $trackingChanged = false;
 
         try {
-            DB::transaction(function () use ($request, $data, $trackingData, $hasTrackingInput, $siswa, &$fotoPath, &$uploadedAttachmentPaths, &$replacedAttachmentPaths, &$trackingChanged): void {
-                $this->storePhoto($request, $data, $fotoPath);
+            DB::transaction(function () use ($request, $data, $trackingData, $hasTrackingInput, $siswa, &$uploadedFilePaths, &$replacedFilePaths, &$trackingChanged): void {
+                $this->storePhotos($request, $data, $siswa, $uploadedFilePaths, $replacedFilePaths);
                 $siswa->update($data);
                 if ($hasTrackingInput) {
                     $trackingAttributes = [
@@ -344,7 +339,7 @@ class FormPendataanController extends Controller
                         'kegiatan_setelah_lulus' => "{$trackingAttributes['jenis']} · {$trackingAttributes['nama_tempat']}",
                     ]);
                 }
-                $this->storeAttachments($request, $siswa, $uploadedAttachmentPaths, $replacedAttachmentPaths);
+                $this->storeAttachments($request, $siswa, $uploadedFilePaths, $replacedFilePaths);
 
                 CatatanAktivitas::create([
                     'pengguna_id' => auth()->id(),
@@ -369,10 +364,7 @@ class FormPendataanController extends Controller
                 }
             });
         } catch (\Throwable $exception) {
-            if ($fotoPath !== null) {
-                Storage::disk('local')->delete($fotoPath);
-            }
-            $this->deleteStoredFiles($uploadedAttachmentPaths);
+            $this->deleteStoredFiles($uploadedFilePaths);
 
             if (! $exception instanceof RuntimeException) {
                 throw $exception;
@@ -387,7 +379,7 @@ class FormPendataanController extends Controller
             return back()->withInput()->with('error', 'Gagal memperbarui biodata alumni. Periksa log aplikasi atau hubungi administrator.');
         }
 
-        $this->deleteStoredFiles($replacedAttachmentPaths);
+        $this->deleteStoredFiles($replacedFilePaths);
 
         $type = $request->input('return_aj');
         $type = is_string($type) && in_array($type, ['Alumni (Lulus)', 'Pindah / Keluar'], true)
@@ -456,6 +448,10 @@ class FormPendataanController extends Controller
             'berkas.surat_pindah' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
         ];
 
+        foreach (array_keys(FotoSiswa::SLOTS) as $photoSlot) {
+            $rules[$photoSlot.'_file'] = ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'];
+        }
+
         foreach (self::STRING_LIMITS as $column => $maxLength) {
             $rules[$column] = ['nullable', 'string', 'max:'.$maxLength];
         }
@@ -495,21 +491,73 @@ class FormPendataanController extends Controller
     /**
      * @param  array<string, mixed>  $data
      */
-    private function storePhoto(Request $request, array &$data, ?string &$fotoPath): void
+    private function removePhotoUploadsFromData(array &$data): void
     {
-        $foto = $request->file('foto_file');
-        if (! $foto) {
-            return;
+        unset($data['foto_file']);
+
+        foreach (array_keys(FotoSiswa::SLOTS) as $photoSlot) {
+            unset($data[$photoSlot.'_file']);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @param  array<int, string>  $uploadedPaths
+     * @param  array<int, string>  $replacedPaths
+     */
+    private function storePhotos(
+        Request $request,
+        array &$data,
+        ?SiswaBiodata $siswa,
+        array &$uploadedPaths,
+        array &$replacedPaths
+    ): void {
+        $photoInputs = ['foto_file' => 'foto'];
+        foreach (array_keys(FotoSiswa::SLOTS) as $photoSlot) {
+            $photoInputs[$photoSlot.'_file'] = $photoSlot;
         }
 
-        $filename = 'foto_'.$data['nisn'].'_'.Str::uuid().'.'.$foto->extension();
-        $fotoPath = $foto->storeAs('siswa/foto', $filename, 'local');
-        if ($fotoPath === false) {
-            throw new RuntimeException('Foto siswa tidak dapat disimpan.');
+        foreach ($photoInputs as $input => $column) {
+            $foto = $request->file($input);
+            if (! $foto instanceof UploadedFile) {
+                continue;
+            }
+
+            $filename = 'foto_'.$data['nisn'].'_'.$column.'_'.Str::uuid().'.'.$foto->extension();
+            $path = $foto->storeAs('siswa/foto', $filename, 'local');
+            if ($path === false) {
+                throw new RuntimeException('Foto siswa tidak dapat disimpan.');
+            }
+            $uploadedPaths[] = $path;
+
+            if ($column !== 'foto') {
+                $previousPath = $siswa?->{$column};
+                $isReferencedByAnotherSlot = collect(array_keys(FotoSiswa::SLOTS))
+                    ->contains(fn (string $otherSlot): bool => $otherSlot !== $column && $siswa?->{$otherSlot} === $previousPath);
+
+                if (! $isReferencedByAnotherSlot && $this->isManagedPhotoPath($previousPath)) {
+                    $replacedPaths[] = $previousPath;
+                }
+
+                $data[$column] = $path;
+            }
+
+            $data['foto'] = $path;
+            $data['foto_ada'] = true;
+        }
+    }
+
+    private function isManagedPhotoPath(?string $path): bool
+    {
+        if (! is_string($path) || ! str_starts_with($path, 'siswa/foto/')) {
+            return false;
         }
 
-        $data['foto'] = $fotoPath;
-        $data['foto_ada'] = true;
+        $filename = substr($path, strlen('siswa/foto/'));
+
+        return $filename !== ''
+            && basename($filename) === $filename
+            && in_array(strtolower(pathinfo($filename, PATHINFO_EXTENSION)), ['jpg', 'jpeg', 'png', 'webp'], true);
     }
 
     /**

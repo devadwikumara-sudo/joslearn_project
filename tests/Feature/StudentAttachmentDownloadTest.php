@@ -32,6 +32,10 @@ class StudentAttachmentDownloadTest extends TestCase
             $table->boolean('surat_pindah_ada')->default(false);
             $table->boolean('foto_ada')->default(false);
             $table->string('foto')->nullable();
+            $table->string('foto_masuk_2x3')->nullable();
+            $table->string('foto_masuk_3x4')->nullable();
+            $table->string('foto_keluar_2x3')->nullable();
+            $table->string('foto_keluar_3x4')->nullable();
             $table->softDeletes();
             $table->timestamps();
         });
@@ -181,7 +185,7 @@ class StudentAttachmentDownloadTest extends TestCase
             'nisn' => '1234567890',
             'kelas' => 'X-1',
             'tahun_ajaran' => '2025/2026',
-            'foto_file' => UploadedFile::fake()->image('pas-foto.jpg'),
+            'foto_file' => UploadedFile::fake()->create('pas-foto.jpg', 100, 'image/jpeg'),
             'berkas' => [
                 'kk' => UploadedFile::fake()->create('kartu-keluarga.pdf', 32, 'application/pdf'),
             ],
@@ -201,5 +205,75 @@ class StudentAttachmentDownloadTest extends TestCase
         $photoPath = DB::table('siswa_biodata')->value('foto');
         $this->assertNotNull($photoPath);
         Storage::disk('local')->assertExists($photoPath);
+    }
+
+    public function test_student_form_persists_all_four_photo_slots_and_keeps_the_latest_photo_pointer(): void
+    {
+        Storage::fake('local');
+        DB::table('sekolah_tahun_ajaran')->insert([
+            'nama' => '2025/2026',
+            'sedang_berjalan' => true,
+        ]);
+        DB::table('sekolah_kelas')->insert(['nama' => 'X-1']);
+        $photos = [
+            'foto_masuk_2x3' => UploadedFile::fake()->create('masuk-2x3.jpg', 100, 'image/jpeg'),
+            'foto_masuk_3x4' => UploadedFile::fake()->create('masuk-3x4.jpg', 100, 'image/jpeg'),
+            'foto_keluar_2x3' => UploadedFile::fake()->create('keluar-2x3.jpg', 100, 'image/jpeg'),
+            'foto_keluar_3x4' => UploadedFile::fake()->create('keluar-3x4.jpg', 100, 'image/jpeg'),
+        ];
+        $payload = [
+            'nama_lengkap' => 'Siswa Uji',
+            'nisn' => '1234567890',
+            'kelas' => 'X-1',
+            'tahun_ajaran' => '2025/2026',
+        ];
+        foreach ($photos as $slot => $photo) {
+            $payload[$slot.'_file'] = $photo;
+        }
+
+        $response = $this->withoutMiddleware()->post(route('admin.data-siswa.store'), $payload);
+
+        $response->assertRedirect(route('admin.data-siswa', [
+            'kelas' => 'X-1',
+            'tahun_ajaran' => 1,
+        ]));
+        $siswa = DB::table('siswa_biodata')->where('nisn', '1234567890')->first();
+
+        foreach (array_keys($photos) as $slot) {
+            $this->assertNotNull($siswa->{$slot});
+            Storage::disk('local')->assertExists($siswa->{$slot});
+        }
+        $this->assertSame($siswa->foto_keluar_3x4, $siswa->foto);
+        $this->assertSame(1, (int) $siswa->foto_ada);
+
+        $this->withoutMiddleware()
+            ->get(route('admin.data-siswa.foto', $siswa->id))
+            ->assertOk();
+        $this->get(route('admin.data-siswa.foto', [
+            'id' => $siswa->id,
+            'slot' => 'foto_masuk_2x3',
+        ]))->assertOk();
+    }
+
+    public function test_student_form_rejects_a_non_image_in_a_photo_slot(): void
+    {
+        Storage::fake('local');
+        DB::table('sekolah_tahun_ajaran')->insert([
+            'nama' => '2025/2026',
+            'sedang_berjalan' => true,
+        ]);
+        DB::table('sekolah_kelas')->insert(['nama' => 'X-1']);
+
+        $response = $this->withoutMiddleware()->post(route('admin.data-siswa.store'), [
+            'nama_lengkap' => 'Siswa Uji',
+            'nisn' => '1234567890',
+            'kelas' => 'X-1',
+            'tahun_ajaran' => '2025/2026',
+            'foto_masuk_2x3_file' => UploadedFile::fake()->create('dokumen.pdf', 100, 'application/pdf'),
+        ]);
+
+        $response->assertRedirect();
+        $this->assertDatabaseMissing('siswa_biodata', ['nisn' => '1234567890']);
+        $this->assertSame([], Storage::disk('local')->allFiles());
     }
 }

@@ -366,7 +366,10 @@ class DataSiswaBulkActionsTest extends TestCase
             ->assertSee('id="student-form-panel"', false)
             ->assertSee('onclick="return closeStudentForm(event)"', false)
             ->assertSee('Tambah Siswa')
-            ->assertSee('name="foto_file"', false)
+            ->assertSee('name="foto_masuk_2x3_file"', false)
+            ->assertSee('name="foto_masuk_3x4_file"', false)
+            ->assertSee('name="foto_keluar_2x3_file"', false)
+            ->assertSee('name="foto_keluar_3x4_file"', false)
             ->assertSee('name="berkas[kk]"', false)
             ->assertSee('Data Ayah Kandung')
             ->assertSee('Lampiran Berkas');

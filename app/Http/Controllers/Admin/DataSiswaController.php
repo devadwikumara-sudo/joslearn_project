@@ -11,6 +11,7 @@ use App\Models\SekolahTahunAjaran;
 use App\Models\SiswaBiodata;
 use App\Models\SiswaRiwayatKelas;
 use App\Services\AksesGuru;
+use App\Support\FotoSiswa;
 use App\Support\Semester;
 use App\Support\StudentSearch;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -226,7 +227,14 @@ class DataSiswaController extends Controller
     {
         $this->authorizeGuruStudent($request, $aksesGuru, $id);
         $siswa = SiswaBiodata::findOrFail($id);
-        $path = $siswa->foto;
+        $slot = $request->query('slot');
+        if ($slot === null) {
+            $path = $siswa->foto;
+        } elseif (is_string($slot) && array_key_exists($slot, FotoSiswa::SLOTS)) {
+            $path = $siswa->{$slot};
+        } else {
+            abort(404);
+        }
         abort_if(! $path, 404);
 
         $headers = [

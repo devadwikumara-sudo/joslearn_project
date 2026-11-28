@@ -1237,8 +1237,8 @@
             <div class="pdf-slot-picker">
                 <span style="font-weight:700;color:#fff;">Slot akademik:</span>
                 <div class="pdf-slot-list">
-                    @foreach(['X-1', 'X-2', 'XI-1', 'XI-2', 'XII-1', 'XII-2'] as $slot)
-                        <label class="pdf-slot-pill"><input type="checkbox" name="slots[]" value="{{ $slot }}" {{ in_array($slot, $selectedSlots ?? ['X-1', 'X-2', 'XI-1', 'XI-2', 'XII-1', 'XII-2'], true) ? 'checked' : '' }} onchange="this.form.submit()"> {{ $slot }}</label>
+                    @foreach(['X', 'XI', 'XII'] as $tingkat)
+                        <label class="pdf-slot-pill"><input type="checkbox" name="slots[]" value="{{ $tingkat }}" {{ in_array($tingkat, $selectedSlotGrades ?? ['X', 'XI', 'XII'], true) ? 'checked' : '' }} onchange="this.form.submit()"> {{ $tingkat }}</label>
                     @endforeach
                 </div>
                 <button type="button" class="btn-pdf outline" style="padding:3px 8px;font-size:10.5px" onclick="setSlots(true)">Pilih semua</button>

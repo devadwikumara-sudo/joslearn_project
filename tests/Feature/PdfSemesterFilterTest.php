@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Models\Auth\Pengguna;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
@@ -53,6 +52,10 @@ class PdfSemesterFilterTest extends TestCase
             $table->string('nisn')->nullable();
             $table->string('nomor_induk')->nullable();
             $table->string('foto')->nullable();
+            $table->string('foto_masuk_2x3')->nullable();
+            $table->string('foto_masuk_3x4')->nullable();
+            $table->string('foto_keluar_2x3')->nullable();
+            $table->string('foto_keluar_3x4')->nullable();
             $table->string('tahun_lulus')->nullable();
             $table->string('alasan_keluar')->nullable();
             $table->date('tanggal_keluar')->nullable();
@@ -207,7 +210,7 @@ class PdfSemesterFilterTest extends TestCase
     public function test_admin_can_render_single_and_batch_student_pdfs(): void
     {
         Storage::fake('local');
-        Storage::disk('local')->put('siswa/foto/foto_siswa.jpg', UploadedFile::fake()->image('foto.jpg')->getContent());
+        Storage::disk('local')->put('siswa/foto/foto_siswa.jpg', 'legacy-photo');
         DB::table('siswa_biodata')->where('id', 1)->update([
             'foto' => 'siswa/foto/foto_siswa.jpg',
         ]);
@@ -287,7 +290,7 @@ class PdfSemesterFilterTest extends TestCase
             ->assertDontSee('>88</td>', false);
     }
 
-    public function test_pdf_renders_only_selected_slots_and_defaults_to_all_six_slots(): void
+    public function test_pdf_renders_selected_grade_slots_and_defaults_to_all_three_grades(): void
     {
         $selectedResponse = $this->withoutMiddleware()->get(route('admin.data-siswa.pdf', [
             'id' => 1,
@@ -297,22 +300,24 @@ class PdfSemesterFilterTest extends TestCase
             'ekskul' => 0,
             'naik' => 0,
             'slots_present' => 1,
-            'slots' => ['X-1', 'XII-2'],
+            'slots' => ['X', 'XII'],
         ]));
 
         $selectedResponse->assertOk()
-            ->assertSee('value="X-1" checked', false)
-            ->assertSee('value="XII-2" checked', false)
-            ->assertDontSee('value="XI-1" checked', false)
+            ->assertSee('value="X" checked', false)
+            ->assertSee('value="XII" checked', false)
+            ->assertDontSee('value="XI" checked', false)
             ->assertSee('>81</td>', false)
+            ->assertSee('>82</td>', false)
+            ->assertSee('>94</td>', false)
             ->assertSee('>96</td>', false)
             ->assertDontSee('>88</td>', false)
-            ->assertDontSee('>94</td>', false);
+            ->assertDontSee('>89</td>', false);
 
         $allSlotsResponse = $this->get(route('admin.data-siswa.pdf', 1));
         $allSlotsResponse->assertOk();
-        foreach (['X-1', 'X-2', 'XI-1', 'XI-2', 'XII-1', 'XII-2'] as $slot) {
-            $allSlotsResponse->assertSee('value="'.$slot.'" checked', false);
+        foreach (['X', 'XI', 'XII'] as $grade) {
+            $allSlotsResponse->assertSee('value="'.$grade.'" checked', false);
         }
     }
 
@@ -457,7 +462,7 @@ class PdfSemesterFilterTest extends TestCase
     public function test_pdf_embeds_the_photo_in_both_entry_slots_for_f4_and_a4(): void
     {
         Storage::fake('local');
-        Storage::disk('local')->put('siswa/foto/foto_x.jpg', UploadedFile::fake()->image('foto.jpg')->getContent());
+        Storage::disk('local')->put('siswa/foto/foto_x.jpg', 'legacy-photo');
         DB::table('siswa_biodata')->where('id', 1)->update(['foto' => 'siswa/foto/foto_x.jpg']);
 
         foreach (['F4', 'A4'] as $paper) {
@@ -476,6 +481,36 @@ class PdfSemesterFilterTest extends TestCase
         }
 
         $this->assertSame('siswa/foto/foto_x.jpg', DB::table('siswa_biodata')->where('id', 1)->value('foto'));
+    }
+
+    public function test_pdf_embeds_each_of_the_four_photo_slots(): void
+    {
+        Storage::fake('local');
+        $slots = [
+            'foto_masuk_2x3',
+            'foto_masuk_3x4',
+            'foto_keluar_2x3',
+            'foto_keluar_3x4',
+        ];
+        $photoPaths = [];
+        foreach ($slots as $index => $slot) {
+            $path = 'siswa/foto/'.$slot.'.png';
+            Storage::disk('local')->put($path, 'photo-slot-'.$index);
+            $photoPaths[$slot] = $path;
+        }
+        DB::table('siswa_biodata')->where('id', 1)->update($photoPaths);
+
+        $response = $this->renderCapaianPdf([
+            'bio' => 1,
+            'nilai' => 0,
+        ]);
+        $content = (string) $response->assertOk()->getContent();
+
+        $this->assertSame(2, substr_count($content, 'alt="Foto masuk"'));
+        $this->assertSame(2, substr_count($content, 'alt="Foto keluar"'));
+        preg_match_all('/<img src="(data:image\/png;base64,[^"]+)" alt="Foto (?:masuk|keluar)">/', $content, $matches);
+        $this->assertCount(4, $matches[1]);
+        $this->assertCount(4, array_unique($matches[1]));
     }
 
     public function test_missing_or_unapproved_photo_paths_keep_register_placeholders_and_return_ok(): void
@@ -509,7 +544,7 @@ class PdfSemesterFilterTest extends TestCase
         $directoryExisted = is_dir($directory);
         $uploadsDirectoryExisted = is_dir($uploadsDirectory);
         $photoPath = $directory.DIRECTORY_SEPARATOR.'foto_pdf_test.png';
-        $photoBytes = UploadedFile::fake()->image('foto.png')->getContent();
+        $photoBytes = 'legacy-public-photo';
 
         if (! $directoryExisted) {
             mkdir($directory, 0777, true);
@@ -691,8 +726,10 @@ class PdfSemesterFilterTest extends TestCase
 
     public function test_pdf_uses_each_grade_curriculum_and_saved_promotion_and_homeroom_data(): void
     {
+        DB::table('sekolah_kelas')->where('id', 1)->update(['nama' => 'X-4', 'tingkat' => 'X']);
+        DB::table('sekolah_kelas')->where('id', 2)->update(['nama' => 'XI-5', 'tingkat' => 'XI']);
         DB::table('sekolah_kelas')->insert([
-            ['id' => 4, 'nama' => 'XI-2', 'tingkat' => 'XI'],
+            ['id' => 4, 'nama' => 'XI-6', 'tingkat' => 'XI'],
         ]);
         DB::table('siswa_riwayat_kelas')->where('id', 1)->update([
             'keputusan_kenaikan' => 'NAIK',
@@ -768,7 +805,7 @@ class PdfSemesterFilterTest extends TestCase
             ->assertSee('Semester 5')
             ->assertSee('Semester 6')
             ->assertSeeInOrder([
-                'Kelas X-1',
+                'Kelas X-4',
                 'Wajib X',
                 'Matematika',
                 '81',
@@ -778,7 +815,7 @@ class PdfSemesterFilterTest extends TestCase
                 '72',
                 '81,00',
                 '77,00',
-                'Kelas XI-1',
+                'Kelas XI-5',
                 'Wajib XI',
                 '88',
                 '89',
@@ -793,8 +830,8 @@ class PdfSemesterFilterTest extends TestCase
                 '94',
                 '98',
             ])
-            ->assertSee('Kelas X-1 Ke Kelas XI-2')
-            ->assertSee('Kelas XI-1 Ke Kelas XII-1')
+            ->assertSee('X-4 ke XI-5')
+            ->assertSee('XI-5 ke XII-1')
             ->assertSee('Wali X Tersimpan')
             ->assertSee('Wali XI Pengganti')
             ->assertSee('Wali XII Tersimpan')
@@ -803,6 +840,20 @@ class PdfSemesterFilterTest extends TestCase
             ->assertSee('NIP-XI-PENGGANTI')
             ->assertSee('<b>TIDAK NAIK</b>', false)
             ->assertSee('<b>TIDAK LULUS</b>', false);
+
+        $filteredResponse = $this->withoutMiddleware()->get(route('admin.data-siswa.pdf', [
+            'id' => 1,
+            'bio' => 0,
+            'nilai' => 0,
+            'hadir' => 0,
+            'ekskul' => 0,
+            'naik' => 1,
+            'kelas_filter' => 'X-4',
+        ]));
+
+        $filteredResponse->assertOk()
+            ->assertSee('X-4 ke XI-5')
+            ->assertDontSee('X-4 ke XI-6');
     }
 
     public function test_pdf_without_class_history_renders_and_supports_both_paper_sizes(): void
