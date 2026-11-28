@@ -26,7 +26,7 @@
                     @endforeach
                 </datalist>
             </div>
-        @elseif(in_array($type, ['nilai', 'kehadiran', 'ekskul'], true))
+        @elseif(in_array($type, ['nilai', 'kehadiran', 'ekskul', 'kokurikuler'], true))
             <div>
                 <label for="kelas">Kelas / tingkat tujuan</label>
                 <select name="kelas" id="kelas">
@@ -109,8 +109,8 @@
             <input type="file" accept=".xlsx,.xls,.csv" id="excel-file-input" onchange="smartFile(event, '{{ $typeJs }}')" style="width:100%;padding:8px">
         </div>
         <span class="sp"></span>
-        @if($isAdmin && in_array($type, ['nilai', 'kehadiran', 'ekskul'], true))
-            <button type="button" class="btn o" onclick="loadDemo{{ $type === 'nilai' ? 'Nilai' : ($type === 'kehadiran' ? 'Hadir' : 'Ekskul') }}()">🧪 Pakai Data Contoh</button>
+        @if($isAdmin && in_array($type, ['nilai', 'kehadiran', 'ekskul', 'kokurikuler'], true))
+            <button type="button" class="btn o" onclick="loadDemo{{ $type === 'nilai' ? 'Nilai' : ($type === 'kehadiran' ? 'Hadir' : ($type === 'kokurikuler' ? 'Kokurikuler' : 'Ekskul')) }}()">🧪 Pakai Data Contoh</button>
         @endif
         <a href="{{ route($templateRoute, ['jenis' => $type]) }}" class="btn o">⬇ Unduh Template Excel</a>
     </div>
@@ -130,6 +130,10 @@
         <p class="sub" style="margin:8px 0 0;font-size:12px">
             Kolom didukung: <code>nisn</code>, <code>nama</code>, <code>kelas</code>, <code>sem</code>, <code>ekskul</code>, dan <code>predikat</code>. Tahun ajaran tujuan mengikuti riwayat kelas siswa.
         </p>
+    @elseif($type === 'kokurikuler')
+        <p class="sub" style="margin:8px 0 0;font-size:12px">
+            Kolom didukung: <code>nisn</code>, <code>nama</code>, <code>kelas</code>, <code>semester</code>, <code>tema kegiatan</code>, <code>capaian umum</code> (opsional), <code>dimensi</code>, <code>predikat dimensi</code>, <code>subdimensi</code>, dan <code>deskripsi</code> (opsional). Satu baris untuk satu dimensi; baris dengan NISN dan semester sama digabung.
+        </p>
     @elseif($type === 'guru')
         <p class="sub" style="margin:8px 0 0;font-size:12px">
             Kolom didukung mencakup NIP, NUPTK, nama, jenis kelamin, data lahir, pendidikan, status kepegawaian, nomor HP, dan alamat.
@@ -139,7 +143,7 @@
             Format Excel dideteksi otomatis. Siswa dicocokkan berdasarkan NISN atau NIS; riwayat kelas tetap diproses untuk siswa yang sudah ada.
         </p>
     @endif
-    @if($isAdmin && in_array($type, ['nilai', 'kehadiran', 'ekskul'], true))
+    @if($isAdmin && in_array($type, ['nilai', 'kehadiran', 'ekskul', 'kokurikuler'], true))
         <p class="sub" style="margin:8px 0 0;font-size:12px">
             Semester 1/Ganjil dan 2/Genap dipetakan menurut tingkat kelas; kolom semester yang tidak tersedia wajib dipilih sebelum import.
         </p>
@@ -148,6 +152,6 @@
 
 <div id="josbook-import-preview-area"></div>
 
-@if($isAdmin && in_array($type, ['nilai', 'kehadiran', 'ekskul'], true))
+@if($isAdmin && in_array($type, ['nilai', 'kehadiran', 'ekskul', 'kokurikuler'], true))
     @include('admin.import._demo-scripts', ['type' => $type])
 @endif

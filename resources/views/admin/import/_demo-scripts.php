@@ -49,4 +49,21 @@
     }
     </script>
     @endpush
+@elseif($type === 'kokurikuler')
+    @push('scripts')
+    <script>
+    function loadDemoKokurikuler() {
+        var dummy = [
+            { nisn: '0081234561', nama: 'Ahmad Faiz', kelas: 'X-1', sem: 'Ganjil', kk_tema: 'Satuan Langkah dalam Kebhinnekaan untuk Indonesia Maju, Sekolah Kita yang Aman dan Nyaman', kk_umum: 'sangat baik', kk_dimensi: 'Toleransi', kk_predikat: 'Cakap', kk_subdimensi: 'Kepedulian, gotong royong dan toleransi' },
+            { nisn: '0081234561', nama: 'Ahmad Faiz', kelas: 'X-1', sem: 'Ganjil', kk_tema: 'Satuan Langkah dalam Kebhinnekaan untuk Indonesia Maju, Sekolah Kita yang Aman dan Nyaman', kk_umum: 'sangat baik', kk_dimensi: 'Kepedulian', kk_predikat: 'Mahir', kk_subdimensi: 'Kepedulian' },
+            { nisn: '0081234561', nama: 'Ahmad Faiz', kelas: 'X-1', sem: 'Genap', kk_tema: 'Satuan Langkah dalam Kebhinnekaan untuk Indonesia Maju, Sekolah Kita yang Aman dan Nyaman', kk_umum: 'sangat baik', kk_dimensi: 'Kreatif', kk_predikat: 'Mahir', kk_subdimensi: 'Kreatif dan Inovatif' }
+        ];
+        var ws = XLSX.utils.json_to_sheet(dummy);
+        var wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Kokurikuler');
+        var blob = new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })], { type: 'application/octet-stream' });
+        smartFile({ target: { files: [new File([blob], 'demo_kokurikuler.xlsx')] } }, 'kokurikuler');
+    }
+    </script>
+    @endpush
 @endif

@@ -4,6 +4,7 @@
         'nilai' => 'Nilai',
         'kehadiran' => 'Kehadiran',
         'ekskul' => 'Ekskul',
+        'kokurikuler' => 'Kokurikuler',
     ][$type];
     $hapusSemuaLabel = "HAPUS SEMUA ".mb_strtoupper($jenisLabel)." ".($tahunTerpilih?->nama ?? '');
 @endphp
@@ -23,7 +24,7 @@
             </select>
         </form>
 
-        @if($tahunTerpilih)
+        @if($tahunTerpilih && $type !== 'kokurikuler')
             <form method="POST" action="{{ route('admin.import.batch.destroy-all', ['jenis' => $type]) }}" class="batch-delete-all-form">
                 @csrf
                 @method('DELETE')
@@ -49,7 +50,9 @@
                     <th>Kelas</th>
                     <th>Semester</th>
                     <th>Baris</th>
-                    <th>Aksi</th>
+                    @if($type !== 'kokurikuler')
+                        <th>Aksi</th>
+                    @endif
                 </tr>
             </thead>
             <tbody>
@@ -63,11 +66,12 @@
                         <td>{{ $batch->semester_label ?? ($batch->semester ?: 'Sesuai data baris') }}</td>
                         <td>
                             <strong>{{ $batch->data_tercatat > 0 ? $batch->data_tercatat : $batch->jumlah_tersimpan }}</strong>
-                            @if($batch->data_tercatat === 0)
+                            @if($batch->data_tercatat === 0 && $type !== 'kokurikuler')
                                 <span class="sub" title="Catatan batch lama tidak memiliki tautan yang aman ke data hasil.">Belum terlacak</span>
                             @endif
                         </td>
-                        <td>
+                        @if($type !== 'kokurikuler')
+                            <td>
                             <div class="bar">
                                 <a class="btn o" href="{{ route('admin.import', ['tab' => $type, 'tahun_ajaran_id' => $tahunTerpilih?->id, 'batch' => $batch->id]) }}">Lihat</a>
                                 @if($batchCanBeEdited)
@@ -87,11 +91,12 @@
                                     <button type="button" class="btn danger" disabled title="Batch ini tidak membuat record baru yang aman untuk dihapus.">Hapus batch</button>
                                 @endif
                             </div>
-                        </td>
+                            </td>
+                        @endif
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="4" style="text-align:center;padding:24px;color:var(--mu)">
+                        <td colspan="{{ $type === 'kokurikuler' ? 3 : 4 }}" style="text-align:center;padding:24px;color:var(--mu)">
                             Belum ada batch {{ mb_strtolower($jenisLabel) }} pada tahun ajaran ini.
                         </td>
                     </tr>

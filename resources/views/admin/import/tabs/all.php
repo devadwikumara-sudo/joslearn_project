@@ -1,7 +1,7 @@
 <div class="card">
     <h3>Import Semua Data</h3>
     <p class="sub">
-        Pilih satu workbook yang berisi beberapa sheet. Sistem akan mendeteksi sheet siswa, nilai, kehadiran, dan ekskul,
+        Pilih satu workbook yang berisi beberapa sheet. Sistem akan mendeteksi sheet siswa, nilai, kehadiran, ekskul, dan kokurikuler,
         lalu memeriksa semuanya sebelum menyimpan.
     </p>
 

@@ -323,6 +323,11 @@
         izin: 'izin|ijin|jumlah hari izin|jumlah hari ijin|hari izin|hari ijin|excused days',
         alpa: 'alpa|alpha|alfa|tanpa keterangan|jumlah hari alpa|jumlah hari alpha|hari alpa|unexcused absence',
         kokur: 'kokurikuler|deskripsi kokurikuler|catatan kokurikuler|deskripsi nilai kokurikuler',
+        kk_tema: 'tema kegiatan|tema kokurikuler',
+        kk_umum: 'capaian umum',
+        kk_dimensi: 'dimensi',
+        kk_predikat: 'predikat dimensi',
+        kk_subdimensi: 'subdimensi',
         ekskul: 'ekskul|ekstrakurikuler|ekstra kurikuler|nama ekskul|kegiatan ekstrakurikuler|kegiatan ekstrakurikuler yang diikuti|nama kegiatan ekstrakurikuler|extracurricular activity',
         predikat: 'predikat|nilai ekskul|nilai predikat|predikat nilai|grade',
         sem: 'semester|smt',
@@ -383,6 +388,9 @@
         nik:'NIK', alamat:'Alamat Jalan', ayah:'Nama Ayah', ibu:'Nama Ibu',
         wali:'Nama Wali', hp:'Nomor HP', asal:'Sekolah Asal',
         sakit:'Sakit (hari)', izin:'Izin (hari)', alpa:'Alpa (hari)', kokur:'Kokurikuler',
+        kk_tema:'Tema Kegiatan', kk_umum:'Capaian Umum', kk_dimensi:'Dimensi',
+        kk_predikat:'Predikat Dimensi', kk_subdimensi:'Subdimensi',
+        kk_deskripsi:'Deskripsi', kk_hasil:'Deskripsi Gabungan', kk_jumlah_dimensi:'Jumlah Dimensi',
         ekskul:'Ekstrakurikuler', predikat:'Predikat', sem:'Semester', tahun_ajaran:'Tahun Ajaran'
     };
 
@@ -903,11 +911,14 @@
 
         if (!best) return null;
         const hr = best.r, heads = (aoa[hr] || []).map(h => String(h).trim()), map = {}, semOf = {}, base = {};
+        const kokurikulerSheet = lockType === 'kokurikuler'
+            || (!lockType && heads.some(header => /tema kegiatan|capaian umum|predikat dimensi|subdimensi/.test(nz(header))));
         heads.forEach((h, i) => {
             if (!h) return;
             const q = hsplit(h);
             base[i] = q.b;
             let m = mapelOf(q.b), f = m ? '' : fx(q.b);
+            if (kokurikulerSheet && (nz(q.b) === 'deskripsi' || f === 'kokur')) f = 'kk_deskripsi';
             map[i] = f || (m ? 'm:' + m : '');
             if (q.s && map[i]) semOf[i] = q.s;
         });
@@ -922,6 +933,7 @@
             ts.push(lockType);
         } else {
             if (nm || (has('mapelcol') && has('nilaicol'))) ts.push('nilai');
+            if (['kk_tema', 'kk_umum', 'kk_dimensi', 'kk_predikat', 'kk_subdimensi', 'kk_deskripsi'].some(has)) ts.push('kokurikuler');
             if (has('ekskul')) ts.push('ekskul');
             if (has('sakit') || has('izin') || has('alpa')) ts.push('hadir');
             if (has('nip') || has('nuptk')) ts.push('guru');
@@ -945,7 +957,7 @@
 
     // ─── Deteksi Kolom Otomatis (assignX Sesuai Prototipe) ──────────────────────
     function assignX(z, pt) {
-        const ty = k => !k || k === 'x' ? '' : (k.startsWith('m:') || k === 'new' || k === 'mapelcol' || k === 'nilaicol') ? 'nilai' : ['sakit', 'izin', 'alpa', 'kokur'].includes(k) ? 'hadir' : ['ekskul', 'predikat'].includes(k) ? 'ekskul' : FK.includes(k) ? 'siswa' : '';
+        const ty = k => !k || k === 'x' ? '' : (k.startsWith('m:') || k === 'new' || k === 'mapelcol' || k === 'nilaicol') ? 'nilai' : ['sakit', 'izin', 'alpa', 'kokur'].includes(k) ? 'hadir' : ['kk_tema', 'kk_umum', 'kk_dimensi', 'kk_predikat', 'kk_subdimensi', 'kk_deskripsi'].includes(k) ? 'kokurikuler' : ['ekskul', 'predikat'].includes(k) ? 'ekskul' : FK.includes(k) ? 'siswa' : '';
         const ty2 = j => {
             const m = z.map[j];
             return m === 'x' ? (z.xt && z.xt[j]) : m === 'new' ? 'nilai' : ty(m);
@@ -1050,6 +1062,17 @@
                 ...c,
                 ['ekskul', 'Nama Ekstrakurikuler'],
                 ['predikat', 'Predikat Nilai (A/B/C/D)'],
+                ['x', '＋ Kolom baru']
+            ];
+        } else if (t === 'kokurikuler') {
+            return [
+                ...c,
+                ['kk_tema', 'Tema Kegiatan'],
+                ['kk_umum', 'Capaian Umum (opsional)'],
+                ['kk_dimensi', 'Dimensi'],
+                ['kk_predikat', 'Predikat Dimensi'],
+                ['kk_subdimensi', 'Subdimensi'],
+                ['kk_deskripsi', 'Deskripsi (opsional)'],
                 ['x', '＋ Kolom baru']
             ];
         } else {
@@ -1239,7 +1262,7 @@
                 if (r.__active_status_with_graduation_year || (statusIsActive && hasGraduationYear)) {
                     addWarning(idx, id, 'Tahun lulus terisi tetapi status siswa Aktif; siswa akan diproses sebagai Lulus');
                 }
-            } else if (t === 'nilai' || t === 'hadir' || t === 'ekskul') {
+            } else if (t === 'nilai' || t === 'hadir' || t === 'ekskul' || t === 'kokurikuler') {
                 if (!r.nisn && !r.nama) {
                     addError(idx, 'Baris ' + statuses[idx].row, 'Tidak ada NISN atau Nama untuk identifikasi');
                 }
@@ -1292,6 +1315,16 @@
                 }
                 if (t === 'ekskul' && !String(r.ekskul || '').trim()) {
                     addError(idx, id, 'Nama ekstrakurikuler kosong');
+                }
+                if (t === 'kokurikuler') {
+                    const hasDescription = String(r.kk_deskripsi || '').trim() !== '';
+                    if (!hasDescription) {
+                        ['kk_tema', 'kk_dimensi', 'kk_predikat', 'kk_subdimensi'].forEach(key => {
+                            if (!String(r[key] || '').trim()) {
+                                addError(idx, id, `${FL[key] || key} wajib diisi jika Deskripsi kosong`);
+                            }
+                        });
+                    }
                 }
             } else if (t === 'guru') {
                 if (!r.nama) {
@@ -1381,7 +1414,7 @@
 
         const academicDupEl = document.querySelector('select[name="dup"]') || document.getElementById('dup');
         const studentDupEl = document.querySelector('select[name="duplikat"]') || document.getElementById('duplikat');
-        if (['nilai', 'hadir', 'ekskul', 'semua'].includes(I.t) && academicDupEl?.value) {
+        if (['nilai', 'hadir', 'ekskul', 'kokurikuler', 'semua'].includes(I.t) && academicDupEl?.value) {
             I.dup = academicDupEl.value;
         } else if (studentDupEl?.value) {
             I.dup = studentDupEl.value;
@@ -1393,14 +1426,14 @@
         if (modeEl && modeEl.value) I.mode = (modeEl.value === 'kelas') ? 'kelas' : 'semua';
 
         const kelasEl = document.querySelector('[name="kelas"]') || document.getElementById('kelas');
-        if (I.t === 'semua' || ['nilai', 'hadir', 'ekskul'].includes(I.t)) {
+        if (I.t === 'semua' || ['nilai', 'hadir', 'ekskul', 'kokurikuler'].includes(I.t)) {
             I.academicClass = targetClass(kelasEl?.value || 'auto');
         }
 
         if (I.t === 'semua' || (I.t === 'siswa' && I.allWorkbook)) {
             const studentClassEl = document.querySelector('[name="kelas_siswa"]') || document.getElementById('kelas-siswa');
             I.kelas = normK(studentClassEl?.value || '') || '';
-        } else if (['nilai', 'hadir', 'ekskul'].includes(I.t)) {
+        } else if (['nilai', 'hadir', 'ekskul', 'kokurikuler'].includes(I.t)) {
             I.kelas = I.academicClass;
         } else if (kelasEl) {
             if (kelasEl.value === '*') {
@@ -1421,7 +1454,7 @@
     }
 
     function syncDetectedAcademicYear(rows) {
-        if (['nilai', 'hadir', 'ekskul'].includes(S.imp.t)) return;
+        if (['nilai', 'hadir', 'ekskul', 'kokurikuler'].includes(S.imp.t)) return;
         const years = [...new Set((rows || []).map(row => normAcademicYear(row.tahun_ajaran || '')).filter(Boolean))];
         if (years.length !== 1) return;
 
@@ -1463,7 +1496,7 @@
         return data;
     }
 
-    const academicTypes = ['nilai', 'hadir', 'ekskul'];
+    const academicTypes = ['nilai', 'hadir', 'ekskul', 'kokurikuler'];
 
     function matchSignature(type, rows, kelas, semester) {
         const I = S.imp;
@@ -1662,7 +1695,68 @@
         if (I.t === 'ekskul' && !mapped.includes('ekskul')) {
             issues.push('Kolom nama ekstrakurikuler belum terdeteksi atau dipetakan.');
         }
+        if (I.t === 'kokurikuler' && !mapped.some(key => ['kk_deskripsi', 'kk_tema'].includes(key))) {
+            issues.push('Kolom Tema Kegiatan atau Deskripsi belum terdeteksi atau dipetakan.');
+        }
         return issues;
+    }
+
+    function cleanKokurikulerText(value) {
+        const text = String(value ?? '').replace(/\s+/g, ' ').trim();
+        return text || '';
+    }
+
+    function kokurikulerDescription(rows) {
+        const direct = rows.map(row => cleanKokurikulerText(row.kk_deskripsi))
+            .find(description => description !== '');
+        if (direct) return direct.replace(/\.{2,}$/, '.');
+
+        const first = rows[0] || {};
+        const theme = cleanKokurikulerText(first.kk_tema).replace(/\.+$/, '');
+        const general = cleanKokurikulerText(first.kk_umum).replace(/\.+$/, '') || 'sangat baik';
+        const dimensions = rows.map(row => {
+            const dimension = cleanKokurikulerText(row.kk_dimensi).replace(/\.+$/, '');
+            const predicate = cleanKokurikulerText(row.kk_predikat).replace(/\.+$/, '');
+            const subdimension = cleanKokurikulerText(row.kk_subdimensi).replace(/\.+$/, '');
+            if (!dimension || !predicate || !subdimension) return '';
+            return `Pada dimensi ${dimension}, ananda ${predicate} dalam subdimensi ${subdimension}`;
+        }).filter(Boolean);
+
+        if (!theme || !dimensions.length) return '';
+        return `Pada semester ini, ananda menunjukkan capaian yang ${general} dalam penguatan profil lulusan, yang ditunjukkan melalui kegiatan kokurikuler ${theme}. ${dimensions.join('. ')}.`;
+    }
+
+    function kokurikulerPreviewEntries(rows, semesterDefault) {
+        const grouped = new Map();
+        rows.forEach((row, index) => {
+            const student = String(row.nisn || row.nis || cleanKokurikulerText(row.nama) || `row-${row.__excel_row || index}`).trim().toLowerCase();
+            const semester = normSem(row.__target_semester || row.sem || semesterDefault);
+            const key = `${student}|${semester}`;
+            if (!grouped.has(key)) {
+                grouped.set(key, {
+                    row: {...row},
+                    sourceIndex: index,
+                    sourceIndexes: [],
+                    rows: []
+                });
+            }
+            const group = grouped.get(key);
+            group.sourceIndexes.push(index);
+            group.rows.push(row);
+        });
+
+        return [...grouped.values()].map(group => ({
+            ...group,
+            row: {
+                nisn: group.row.nisn,
+                nis: group.row.nis,
+                nama: group.row.nama,
+                kelas: group.row.kelas || group.row.__target_kelas || '',
+                sem: group.row.__target_semester || group.row.sem || semesterDefault,
+                kk_jumlah_dimensi: group.rows.length,
+                kk_hasil: kokurikulerDescription(group.rows)
+            }
+        }));
     }
 
     // ─── Render Panel Pratinjau & Pemetaan Kolom ────────────────────────────────
@@ -1680,6 +1774,7 @@
             nilai: 'Data Nilai Rapor',
             hadir: 'Ketidakhadiran & Kokurikuler',
             ekskul: 'Ekstrakurikuler',
+            kokurikuler: 'Kokurikuler',
             guru: 'Data Guru'
         };
 
@@ -1863,11 +1958,27 @@
         // 3. Pratinjau Tabel & Tombol Eksekusi
         const allKeys = [...new Set(rows.flatMap(row => Object.keys(row).filter(key => !key.startsWith('__'))))];
         const priorityKeys = ['nisn','nis','nama','kelas','tahun_ajaran','jk','tgl','ayah','ibu','sakit','izin','alpa','ekskul','predikat'];
-        const previewKeys = priorityKeys.filter(k => allKeys.includes(k))
-            .concat(allKeys.filter(k => !priorityKeys.includes(k)))
-            .filter((key, index, list) => list.indexOf(key) === index);
-        const previewRows = rows;
-        const statusByRow = statuses;
+        const previewEntries = t === 'kokurikuler'
+            ? kokurikulerPreviewEntries(rows, I.sem)
+            : rows.map((row, index) => ({row, sourceIndex: index, sourceIndexes: [index]}));
+        const previewRows = previewEntries.map(entry => entry.row);
+        const previewKeys = t === 'kokurikuler'
+            ? ['nisn', 'nis', 'nama', 'kelas', 'sem', 'kk_jumlah_dimensi', 'kk_hasil'].filter(key => previewRows.some(row => row[key] !== undefined))
+            : priorityKeys.filter(k => allKeys.includes(k))
+                .concat(allKeys.filter(k => !priorityKeys.includes(k)))
+                .filter((key, index, list) => list.indexOf(key) === index);
+        const statusByRow = previewEntries.map(entry => {
+            const sourceStatuses = entry.sourceIndexes.map(index => statuses[index]).filter(Boolean);
+            const statusPriority = {ready: 0, warning: 1, error: 2};
+            const status = sourceStatuses.reduce((current, item) =>
+                statusPriority[item.status] > statusPriority[current] ? item.status : current, 'ready');
+            return {
+                status,
+                row: sourceStatuses[0]?.row || entry.sourceIndex + 1,
+                errors: [...new Set(sourceStatuses.flatMap(item => item.errors))],
+                warns: [...new Set(sourceStatuses.flatMap(item => item.warns))]
+            };
+        });
         const warningsAccepted = Boolean(I.warningsConfirmed);
         const importDisabled = readyCount + warningCount <= 0
             || I.mappingIssues.length > 0
@@ -1886,7 +1997,7 @@
         let prevHtml = `
             <div class="card" style="margin-top:14px">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-                    <h3 style="margin:0">3. Pratinjau · ${totalRows} baris</h3>
+                    <h3 style="margin:0">3. Pratinjau · ${t === 'kokurikuler' ? `${previewRows.length} deskripsi dari ${totalRows} baris` : `${totalRows} baris`}</h3>
                     <div style="display:flex;gap:8px">
                         <span class="bd ok">✔ ${readyCount} Siap</span>
                         ${warningCount ? `<span class="bd w">⚠️ ${warningCount} Peringatan</span>` : ''}
@@ -1924,11 +2035,11 @@
                                 <td>${i + 1} <small>(Excel ${statusByRow[i].row})</small></td>
                                 <td><span class="bd ${statusByRow[i].status === 'error' ? 'e' : statusByRow[i].status === 'warning' ? 'w' : 'ok'}">${statusByRow[i].status === 'error' ? 'Error' : statusByRow[i].status === 'warning' ? 'Peringatan' : 'Siap'}</span>${[...statusByRow[i].errors, ...statusByRow[i].warns].map(message => `<div style="font-size:11px;margin-top:3px">${escapeHtml(message)}</div>`).join('')}</td>
                                 ${academicTypes.includes(t) ? (() => {
-                                    const result = matchResultsByIndex.get(i);
+                                    const result = matchResultsByIndex.get(previewEntries[i].sourceIndex);
                                     const method = {nisn: 'NISN', nis: 'NIS', nama: 'Nama'}[result?.metode] || '';
                                     return `<td>${escapeHtml(result?.student?.nama_lengkap || '')}</td><td>${escapeHtml(method)}</td><td>${escapeHtml(result?.target?.kelas || '')}</td><td>${escapeHtml(result?.target?.tahun_ajaran || '')}</td><td>${escapeHtml(result?.target?.semester || '')}</td>`;
                                 })() : ''}
-                                ${previewKeys.map(k => `<td contenteditable="true" data-row="${i}" data-field="${escapeHtml(k)}" onblur="window.editImportCell(this)" style="min-width:80px">${r[k] !== undefined && r[k] !== null && r[k] !== '' ? escapeHtml(r[k]) : ''}</td>`).join('')}
+                                ${previewKeys.map(k => `<td ${t === 'kokurikuler' ? '' : `contenteditable="true" data-row="${i}" data-field="${escapeHtml(k)}" onblur="window.editImportCell(this)"`} style="min-width:80px">${r[k] !== undefined && r[k] !== null && r[k] !== '' ? escapeHtml(r[k]) : ''}</td>`).join('')}
                             </tr>`).join('')}
                     </tbody>
                 </table></div>
@@ -2056,18 +2167,20 @@
         a.click();
     };
 
-    const ALL_IMPORT_TYPES = ['siswa', 'nilai', 'hadir', 'ekskul'];
+    const ALL_IMPORT_TYPES = ['siswa', 'nilai', 'hadir', 'ekskul', 'kokurikuler'];
     const ALL_IMPORT_LABELS = {
         siswa: 'Siswa / Alumni',
         nilai: 'Nilai',
         hadir: 'Kehadiran',
-        ekskul: 'Ekskul'
+        ekskul: 'Ekskul',
+        kokurikuler: 'Kokurikuler'
     };
 
     function detectAllImportType(name, aoa) {
         const sheetName = nz(name);
         if (/nilai|rapor|mapel/.test(sheetName)) return 'nilai';
         if (/kehadiran|absen|absensi|hadir/.test(sheetName)) return 'hadir';
+        if (/kokurikuler|kokur/.test(sheetName)) return 'kokurikuler';
         if (/ekskul|ekstrakurikuler|ekstra kurikuler/.test(sheetName)) return 'ekskul';
         if (/guru|pendidik|teacher/.test(sheetName)) return 'guru';
 
@@ -2075,6 +2188,9 @@
         const fields = Object.values(detected?.map || {});
         if (fields.some(field => field.startsWith('m:')) || (fields.includes('mapelcol') && fields.includes('nilaicol'))) {
             return 'nilai';
+        }
+        if (['kk_tema', 'kk_umum', 'kk_dimensi', 'kk_predikat', 'kk_subdimensi', 'kk_deskripsi'].some(field => fields.includes(field))) {
+            return 'kokurikuler';
         }
         if (fields.includes('ekskul') || fields.includes('predikat')) return 'ekskul';
         if (['sakit', 'izin', 'alpa', 'kokur'].some(field => fields.includes(field))) return 'hadir';
@@ -2210,6 +2326,7 @@
             ['nilai', ALL_IMPORT_LABELS.nilai],
             ['hadir', ALL_IMPORT_LABELS.hadir],
             ['ekskul', ALL_IMPORT_LABELS.ekskul],
+            ['kokurikuler', ALL_IMPORT_LABELS.kokurikuler],
             ['abaikan', 'Abaikan sheet ini']
         ];
         const selectedType = sheet.ignored ? 'abaikan' : (sheet.type || '');
@@ -2337,11 +2454,20 @@
             const warnings = group.warns.map(warning =>
                 `<li>Baris ${warning.no} · ${escapeHtml(warning.id)}: ${escapeHtml(warning.msg)}</li>`
             ).join('');
-            const keys = [...new Set(group.rows.slice(0, 15).flatMap(row => Object.keys(row).filter(key => !key.startsWith('__'))))].slice(0, 8);
-            const previewRows = group.rows.slice(0, 15).map((row, index) => {
-                const status = group.statuses[index];
-                const match = (I.allMatchPreviewResults[group.type] || []).find(result => result.index === index);
-                return `<tr><td>${index + 1}</td><td>${escapeHtml(status?.status || 'siap')}</td>${academicTypes.includes(group.type) ? `<td>${escapeHtml(match?.student?.nama_lengkap || '')}</td><td>${escapeHtml({nisn: 'NISN', nis: 'NIS', nama: 'Nama'}[match?.metode] || '')}</td><td>${escapeHtml(match?.target?.kelas || '')}</td><td>${escapeHtml(match?.target?.tahun_ajaran || '')}</td><td>${escapeHtml(match?.target?.semester || '')}</td>` : ''}${keys.map(key => `<td>${escapeHtml(row[key] ?? '')}</td>`).join('')}</tr>`;
+            const previewEntries = group.type === 'kokurikuler'
+                ? kokurikulerPreviewEntries(group.rows, I.sem)
+                : group.rows.map((row, index) => ({row, sourceIndex: index, sourceIndexes: [index]}));
+            const keys = group.type === 'kokurikuler'
+                ? ['nisn', 'nis', 'nama', 'kelas', 'sem', 'kk_jumlah_dimensi', 'kk_hasil'].filter(key => previewEntries.some(entry => entry.row[key] !== undefined))
+                : [...new Set(group.rows.slice(0, 15).flatMap(row => Object.keys(row).filter(key => !key.startsWith('__'))))].slice(0, 8);
+            const previewRows = previewEntries.slice(0, 15).map((entry, index) => {
+                const row = entry.row;
+                const sourceStatuses = entry.sourceIndexes.map(sourceIndex => group.statuses[sourceIndex]).filter(Boolean);
+                const statusPriority = {ready: 0, warning: 1, error: 2};
+                const status = sourceStatuses.reduce((current, item) =>
+                    statusPriority[item.status] > statusPriority[current] ? item.status : current, 'ready');
+                const match = (I.allMatchPreviewResults[group.type] || []).find(result => result.index === entry.sourceIndex);
+                return `<tr><td>${index + 1}</td><td>${escapeHtml(status)}</td>${academicTypes.includes(group.type) ? `<td>${escapeHtml(match?.student?.nama_lengkap || '')}</td><td>${escapeHtml({nisn: 'NISN', nis: 'NIS', nama: 'Nama'}[match?.metode] || '')}</td><td>${escapeHtml(match?.target?.kelas || '')}</td><td>${escapeHtml(match?.target?.tahun_ajaran || '')}</td><td>${escapeHtml(match?.target?.semester || '')}</td>` : ''}${keys.map(key => `<td>${escapeHtml(row[key] ?? '')}</td>`).join('')}</tr>`;
             }).join('');
             const messages = [
                 ...group.mappingIssues.map(issue => `<li>${escapeHtml(issue)}</li>`),
@@ -2349,7 +2475,7 @@
                 warnings
             ].filter(Boolean).join('');
             return `<div class="card" style="margin-top:12px">
-                <h3>${escapeHtml(ALL_IMPORT_LABELS[group.type])} · ${group.rows.length} baris</h3>
+                <h3>${escapeHtml(ALL_IMPORT_LABELS[group.type])} · ${group.type === 'kokurikuler' ? `${previewEntries.length} deskripsi dari ${group.rows.length} baris` : `${group.rows.length} baris`}</h3>
                 <div class="bar"><span class="bd ok">${group.statuses.filter(status => status.status === 'ready').length} Siap</span>
                     ${group.warns.length ? `<span class="bd w">${group.warns.length} Peringatan</span>` : ''}
                     ${group.errors.length ? `<span class="bd e">${group.errors.length} Error</span>` : ''}
@@ -2593,7 +2719,7 @@
             return;
         }
         if (!I.allGroups.some(group => group.rows.length > 0)) {
-            alert('Tidak ada baris siswa, nilai, kehadiran, atau ekskul yang dapat diimpor.');
+            alert('Tidak ada baris siswa, nilai, kehadiran, ekskul, atau kokurikuler yang dapat diimpor.');
             return;
         }
 
@@ -2852,6 +2978,40 @@
         document.querySelectorAll('input[type="file"]').forEach(i => { i.value = ''; });
     };
 
+    function importRowChunks(rows, type, chunkSize, semesterDefault) {
+        if (type !== 'kokurikuler') {
+            const chunks = [];
+            for (let start = 0; start < rows.length; start += chunkSize) {
+                chunks.push(rows.slice(start, start + chunkSize));
+            }
+            return chunks;
+        }
+
+        const groups = new Map();
+        rows.forEach((row, index) => {
+            const identity = normN(row.nisn || '') || normN(row.nis || '') ||
+                String(row.nama || `baris-${index}`).trim().toLowerCase();
+            const rawSemester = row.__target_semester || row.sem || semesterDefault;
+            const semester = normSem(rawSemester) || String(rawSemester).trim().toLowerCase();
+            const key = `${identity}|${semester}`;
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key).push(row);
+        });
+
+        const chunks = [];
+        let chunk = [];
+        for (const group of groups.values()) {
+            if (group.length > chunkSize) return null;
+            if (chunk.length + group.length > chunkSize) {
+                chunks.push(chunk);
+                chunk = [];
+            }
+            chunk.push(...group);
+        }
+        if (chunk.length) chunks.push(chunk);
+        return chunks;
+    }
+
     // ─── Eksekusi Batch Import ke Server ────────────────────────────────────────
     window.executeBatchImport = async function() {
         const I = S.imp;
@@ -2883,6 +3043,12 @@
             return null;
         }
 
+        const chunks = importRowChunks(rowsToSend, I.t, 200, I.sem);
+        if (chunks === null) {
+            alert('Satu kelompok NISN dan semester melebihi batas 200 baris per potongan. Kurangi dimensinya sebelum mengimpor.');
+            return null;
+        }
+
         const btn = document.getElementById('btn-do-import');
         if (btn) {
             btn.disabled = true;
@@ -2899,7 +3065,8 @@
             guru: 'Guru',
             nilai: 'Nilai',
             hadir: 'Kehadiran',
-            ekskul: 'Ekskul'
+            ekskul: 'Ekskul',
+            kokurikuler: 'Kokurikuler'
         }[I.t] || 'Data';
         const importPagePath = importRolePath === 'admin' ? 'import' : 'import-data';
         const reloadImportUrl = `${appBaseUrl}/${importRolePath}/${importPagePath}?tab=${encodeURIComponent(importType)}`;
@@ -2936,20 +3103,20 @@
         try {
             const started = await postImportJson(importEndpoint('start-batch'), payload);
             batchId = started.batch_id;
-            const chunkSize = 200;
-            const chunkCount = Math.ceil(rowsToSend.length / chunkSize);
+            const chunkCount = chunks.length;
             const errors = [];
             let count = 0;
             let skipped = 0;
             let activeCount = 0;
             let graduatedCount = 0;
             let lastResponse = null;
+            let processedRows = 0;
 
             for (let chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
-                const start = chunkIndex * chunkSize;
-                const chunk = rowsToSend.slice(start, start + chunkSize);
+                const chunk = chunks[chunkIndex];
+                processedRows += chunk.length;
                 if (btn) {
-                    btn.textContent = `⏳ Potongan ${chunkIndex + 1}/${chunkCount} · ${Math.min(start + chunk.length, rowsToSend.length)}/${rowsToSend.length} baris`;
+                    btn.textContent = `⏳ Potongan ${chunkIndex + 1}/${chunkCount} · ${processedRows}/${rowsToSend.length} baris`;
                 }
                 lastResponse = await postImportJson(endpoint, {
                     ...payload,

@@ -42,7 +42,7 @@ class ImportBatchController extends Controller
     public function previewMatch(Request $request): JsonResponse
     {
         $type = $this->canonicalImportType((string) $request->input('type', ''));
-        if (! in_array($type, ['siswa', 'nilai', 'kehadiran', 'ekskul', 'guru'], true)) {
+        if (! in_array($type, ['siswa', 'nilai', 'kehadiran', 'ekskul', 'kokurikuler', 'guru'], true)) {
             return response()->json(['success' => false, 'message' => 'Jenis import tidak valid.'], 422);
         }
 
@@ -198,7 +198,7 @@ class ImportBatchController extends Controller
     public function metadata(Request $request): JsonResponse
     {
         $type = $this->canonicalImportType((string) $request->input('type', 'siswa'));
-        if (! in_array($type, ['siswa', 'nilai', 'kehadiran', 'ekskul', 'guru'], true)) {
+        if (! in_array($type, ['siswa', 'nilai', 'kehadiran', 'ekskul', 'kokurikuler', 'guru'], true)) {
             return response()->json(['success' => false, 'message' => 'Jenis import tidak valid.'], 422);
         }
 
@@ -223,7 +223,7 @@ class ImportBatchController extends Controller
     public function startBatch(Request $request): JsonResponse
     {
         $type = $this->canonicalImportType((string) $request->input('type', 'siswa'));
-        if (! in_array($type, ['siswa', 'nilai', 'kehadiran', 'ekskul', 'guru'], true)) {
+        if (! in_array($type, ['siswa', 'nilai', 'kehadiran', 'ekskul', 'kokurikuler', 'guru'], true)) {
             return response()->json(['success' => false, 'message' => 'Jenis import tidak valid.'], 422);
         }
 
@@ -261,7 +261,7 @@ class ImportBatchController extends Controller
         ]);
 
         $user = $request->user();
-        $isAcademicImport = in_array($type, ['nilai', 'kehadiran', 'ekskul'], true);
+        $isAcademicImport = in_array($type, ['nilai', 'kehadiran', 'ekskul', 'kokurikuler'], true);
         $rawYear = trim((string) ($validated['tahun_ajaran'] ?? ''));
         $createHistory = (bool) ($validated['create_riwayat'] ?? false);
         $createYearId = $validated['create_tahun_ajaran_id'] ?? null;
@@ -350,6 +350,7 @@ class ImportBatchController extends Controller
 
     public function showManagedBatch(Request $request, ImportUnggahan $batch): RedirectResponse
     {
+        $this->assertManagedBatchType($batch);
         $this->academicTableForType($batch->jenis);
 
         $query = [
@@ -378,6 +379,7 @@ class ImportBatchController extends Controller
      */
     public function managedBatchDetails(ImportUnggahan $batch, bool $editing): array
     {
+        $this->assertManagedBatchType($batch);
         $this->academicTableForType($batch->jenis);
         $rows = ImportBaris::query()
             ->where('unggahan_id', $batch->id)
@@ -398,6 +400,7 @@ class ImportBatchController extends Controller
 
     public function updateManagedRecord(Request $request, ImportUnggahan $batch, int $record): RedirectResponse
     {
+        $this->assertManagedBatchType($batch);
         $this->academicTableForType($batch->jenis);
         abort_unless($batch->status === 'selesai', 404);
 
@@ -460,6 +463,7 @@ class ImportBatchController extends Controller
 
     public function destroyManagedBatch(Request $request, ImportUnggahan $batch): RedirectResponse
     {
+        $this->assertManagedBatchType($batch);
         $table = $this->academicTableForType($batch->jenis);
         $validated = $request->validate([
             'tahun_ajaran_id' => ['required', 'integer', 'exists:sekolah_tahun_ajaran,id'],
@@ -544,7 +548,7 @@ class ImportBatchController extends Controller
     public function saveBatch(Request $request): JsonResponse
     {
         $type = $this->canonicalImportType((string) $request->input('type', 'siswa'));
-        if (! in_array($type, ['siswa', 'nilai', 'kehadiran', 'ekskul', 'guru'], true)) {
+        if (! in_array($type, ['siswa', 'nilai', 'kehadiran', 'ekskul', 'kokurikuler', 'guru'], true)) {
             return response()->json(['success' => false, 'message' => 'Jenis import tidak valid.'], 422);
         }
 
@@ -552,7 +556,7 @@ class ImportBatchController extends Controller
             return $denied;
         }
 
-        $isAcademicImport = in_array($type, ['nilai', 'kehadiran', 'ekskul'], true);
+        $isAcademicImport = in_array($type, ['nilai', 'kehadiran', 'ekskul', 'kokurikuler'], true);
         $requestedTaName = trim((string) $request->input('tahun_ajaran', ''));
         if ($isAcademicImport && $request->user()?->peran === 'guru' && $requestedTaName !== '') {
             $currentYearName = SekolahTahunAjaran::query()->where('sedang_berjalan', true)->value('nama');
@@ -607,6 +611,18 @@ class ImportBatchController extends Controller
                 'success' => false,
                 'message' => 'Setiap potongan import maksimal 200 baris.',
             ], 422);
+        }
+
+        if ($type === 'kokurikuler') {
+            $request->validate([
+                'rows.*.kk_tema' => ['nullable', 'string', 'max:1000'],
+                'rows.*.kk_umum' => ['nullable', 'string', 'max:1000'],
+                'rows.*.kk_dimensi' => ['nullable', 'string', 'max:1000'],
+                'rows.*.kk_predikat' => ['nullable', 'string', 'max:1000'],
+                'rows.*.kk_subdimensi' => ['nullable', 'string', 'max:1000'],
+                'rows.*.kk_deskripsi' => ['nullable', 'string', 'max:4000'],
+                'rows.*.deskripsi' => ['nullable', 'string', 'max:4000'],
+            ]);
         }
 
         if (! $isAcademicImport && $requestedTaName !== '' && $taName === null) {
@@ -736,6 +752,8 @@ class ImportBatchController extends Controller
                     [$savedCount, $skippedCount, $rowErrors] = $this->saveKehadiran($rows, (string) $semester, (string) $kelasInput, $user, $dup, $createHistory, $createYearId, $createClassId, (int) $activeUpload->id, $createdHistoryIds);
                 } elseif ($type === 'ekskul') {
                     [$savedCount, $skippedCount, $rowErrors] = $this->saveEkskul($rows, (string) $semester, (string) $kelasInput, $user, $dup, $createHistory, $createYearId, $createClassId, (int) $activeUpload->id, $createdHistoryIds);
+                } elseif ($type === 'kokurikuler') {
+                    [$savedCount, $skippedCount, $rowErrors] = $this->saveKokurikuler($rows, (string) $semester, (string) $kelasInput, $user, $dup, $createHistory, $createYearId, $createClassId, $activeUpload, $createdHistoryIds);
                 } elseif ($type === 'guru') {
                     [$savedCount, $skippedCount, $rowErrors] = $this->saveGuru($rows);
                 }
@@ -833,7 +851,7 @@ class ImportBatchController extends Controller
         if ($user->peran === 'guru') {
             $hasAssignment = match ($type) {
                 'nilai' => $this->aksesGuru->adalahGuruMapel($user),
-                'kehadiran', 'ekskul' => $this->aksesGuru->adalahWali($user),
+                'kehadiran', 'ekskul', 'kokurikuler' => $this->aksesGuru->adalahWali($user),
                 default => true,
             };
 
@@ -868,7 +886,7 @@ class ImportBatchController extends Controller
         array $corrections
     ): ImportUnggahan {
         $academicYearId = $academicYear === null
-            ? (in_array($type, ['nilai', 'kehadiran', 'ekskul'], true)
+            ? (in_array($type, ['nilai', 'kehadiran', 'ekskul', 'kokurikuler'], true)
                 ? null
                 : SekolahTahunAjaran::query()->where('sedang_berjalan', true)->value('id'))
             : SekolahTahunAjaran::query()->where('nama', $academicYear)->value('id');
@@ -2224,6 +2242,11 @@ class ImportBatchController extends Controller
         };
     }
 
+    private function assertManagedBatchType(ImportUnggahan $batch): void
+    {
+        abort_unless(in_array($batch->jenis, ['nilai', 'kehadiran', 'ekskul'], true), 404);
+    }
+
     private function recordsForBatch(ImportUnggahan $batch): Collection
     {
         $relations = ['riwayatKelas.siswa', 'riwayatKelas.kelas'];
@@ -2562,6 +2585,230 @@ class ImportBatchController extends Controller
         }
 
         return [$saved, $skipped, $errors];
+    }
+
+    private function saveKokurikuler(
+        array $rows,
+        string $semester,
+        string $kelasInput,
+        Pengguna $user,
+        string $duplicateMode,
+        bool $createHistory,
+        ?int $createYearId,
+        ?int $createClassId,
+        ImportUnggahan $upload,
+        array &$createdHistoryIds
+    ): array {
+        $saved = 0;
+        $skipped = 0;
+        $errors = [];
+        $groups = [];
+
+        foreach ($rows as $rowIndex => $row) {
+            $rowNumber = is_array($row) ? max(1, (int) ($row['__excel_row'] ?? $rowIndex + 1)) : $rowIndex + 1;
+            if (! is_array($row)) {
+                $skipped++;
+                $errors[] = ['row' => $rowNumber, 'reason' => 'Format baris tidak valid.'];
+
+                continue;
+            }
+
+            $earlyClassName = $this->specificClassName(
+                (string) ($row['kelas'] ?? ''),
+                (string) ($row['__target_kelas'] ?? $kelasInput)
+            );
+            if ($user->peran === 'guru' && $earlyClassName !== null) {
+                $accessError = $this->importAccessError($user, 'hadir', [...$row, 'kelas' => $earlyClassName], (int) $rowIndex);
+                if ($accessError !== null) {
+                    $skipped++;
+                    $errors[] = $accessError;
+
+                    continue;
+                }
+            }
+
+            $target = $this->resolveImportTarget(
+                $row,
+                (int) $rowIndex,
+                (string) ($row['__target_kelas'] ?? $kelasInput),
+                (string) ($row['__target_semester'] ?? $semester),
+                $createHistory,
+                $createYearId,
+                $createClassId,
+                $user->peran === 'admin'
+            );
+            if ($target['error'] !== null) {
+                $skipped++;
+                $errors[] = $target['error'];
+
+                continue;
+            }
+
+            $accessError = $this->importAccessError(
+                $user,
+                'hadir',
+                [...$row, 'kelas' => $target['kelas']->nama],
+                (int) $rowIndex
+            );
+            if ($accessError !== null) {
+                $skipped++;
+                $errors[] = $accessError;
+
+                continue;
+            }
+
+            $groupKey = implode('|', [
+                (int) $target['student']->id,
+                (int) $target['tahun']->id,
+                (int) $target['kelas']->id,
+                $target['semester'],
+            ]);
+            if (! isset($groups[$groupKey])) {
+                $groups[$groupKey] = [
+                    'target' => $target,
+                    'row' => $rowNumber,
+                    'rows' => [],
+                ];
+            }
+            $groups[$groupKey]['rows'][] = $row;
+        }
+
+        $targetYearIds = [];
+        $targetClassIds = [];
+        $targetSemesters = [];
+        foreach ($groups as $group) {
+            $target = $group['target'];
+            $historyError = $this->persistTargetHistory($target, $createdHistoryIds);
+            if ($historyError !== null) {
+                $skipped++;
+                $errors[] = ['row' => $group['row'], 'reason' => $historyError];
+
+                continue;
+            }
+
+            $description = $this->buildKokurikulerDescription($group['rows']);
+            if ($description === null) {
+                $skipped++;
+                $errors[] = [
+                    'row' => $group['row'],
+                    'reason' => 'Tema kegiatan, dimensi, predikat dimensi, dan subdimensi wajib diisi jika Deskripsi kosong.',
+                ];
+
+                continue;
+            }
+            if (mb_strlen($description) > 4000) {
+                $skipped++;
+                $errors[] = ['row' => $group['row'], 'reason' => 'Deskripsi kokurikuler tidak boleh melebihi 4000 karakter.'];
+
+                continue;
+            }
+
+            $history = $target['history'];
+            $semesterTarget = $target['semester'];
+            $attendance = SiswaKehadiran::query()->firstOrNew([
+                'riwayat_kelas_id' => $history->id,
+                'semester' => $semesterTarget,
+            ]);
+            $existingDescription = $this->cleanKokurikulerText($attendance->kokurikuler);
+            if ($attendance->exists && $existingDescription !== null && $duplicateMode !== 'timpa') {
+                $skipped++;
+                $errors[] = [
+                    'row' => $group['row'],
+                    'reason' => 'Data kokurikuler untuk semester tersebut sudah ada; data dilewati.',
+                ];
+
+                continue;
+            }
+
+            if (! $attendance->exists) {
+                $attendance->fill([
+                    'sakit' => 0,
+                    'izin' => 0,
+                    'alpa' => 0,
+                ]);
+            }
+            $attendance->kokurikuler = $description;
+            $attendance->save();
+            $saved++;
+
+            $targetYearIds[] = (int) $target['tahun']->id;
+            $targetClassIds[] = (int) $target['kelas']->id;
+            $targetSemesters[] = $semesterTarget;
+
+            if (isset($target['warning'])) {
+                $errors[] = $target['warning'];
+            }
+        }
+
+        if ($groups !== []) {
+            $summary = [
+                'tahun_ajaran_id' => array_values(array_unique($targetYearIds)),
+                'kelas_id' => array_values(array_unique($targetClassIds)),
+                'semester' => array_values(array_unique($targetSemesters)),
+            ];
+            foreach ($summary as $column => $values) {
+                $value = count($values) === 1 ? $values[0] : null;
+                $current = $upload->{$column};
+                if ((int) $upload->jumlah_siap === 0 || ($current !== null && $current !== $value)) {
+                    $upload->setAttribute($column, $value);
+                }
+            }
+            $upload->save();
+        }
+
+        return [$saved, $skipped, $errors];
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $rows
+     */
+    private function buildKokurikulerDescription(array $rows): ?string
+    {
+        foreach ($rows as $row) {
+            $directDescription = $this->cleanKokurikulerText($row['kk_deskripsi'] ?? null)
+                ?? $this->cleanKokurikulerText($row['deskripsi'] ?? null);
+            if ($directDescription !== null) {
+                return preg_replace('/\.{2,}$/u', '.', $directDescription) ?? $directDescription;
+            }
+        }
+
+        $firstRow = $rows[0] ?? [];
+        $theme = $this->cleanKokurikulerText($firstRow['kk_tema'] ?? null);
+        $generalAchievement = $this->cleanKokurikulerText($firstRow['kk_umum'] ?? null) ?? 'sangat baik';
+        if ($theme === null) {
+            return null;
+        }
+        $theme = rtrim($theme, '.');
+        $dimensions = [];
+
+        foreach ($rows as $row) {
+            $dimension = $this->cleanKokurikulerText($row['kk_dimensi'] ?? null);
+            $predicate = $this->cleanKokurikulerText($row['kk_predikat'] ?? null);
+            $subdimension = $this->cleanKokurikulerText($row['kk_subdimensi'] ?? null);
+            if ($dimension === null || $predicate === null || $subdimension === null) {
+                return null;
+            }
+            $dimensions[] = 'Pada dimensi '.rtrim($dimension, '.').', ananda '.rtrim($predicate, '.').' dalam subdimensi '.rtrim($subdimension, '.');
+        }
+
+        if ($dimensions === []) {
+            return null;
+        }
+
+        return 'Pada semester ini, ananda menunjukkan capaian yang '.rtrim($generalAchievement, '.')
+            .' dalam penguatan profil lulusan, yang ditunjukkan melalui kegiatan kokurikuler '.$theme.'. '
+            .implode('. ', $dimensions).'.';
+    }
+
+    private function cleanKokurikulerText(mixed $value): ?string
+    {
+        if (! is_scalar($value)) {
+            return null;
+        }
+
+        $text = preg_replace('/\s+/u', ' ', trim((string) $value)) ?? trim((string) $value);
+
+        return $text === '' ? null : $text;
     }
 
     private function saveEkskul(
