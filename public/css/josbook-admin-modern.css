@@ -2605,24 +2605,21 @@ h1, h2, h3, h4, h5, h6,
 }
 
 .student-profile-identity {
-    background: linear-gradient(135deg, #3c97fa 0%, #1967d2 45%, #05286b 100%) !important;
-    border-radius: 16px !important;
-    padding: 22px !important;
-    box-shadow: 0 10px 30px rgba(5, 40, 107, 0.35) !important;
-    position: relative;
-    overflow: hidden;
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 14px !important;
+    padding: 18px !important;
+    box-shadow: none !important;
 }
 
-.student-profile-identity::after {
-    content: '';
-    position: absolute;
-    right: -20px;
-    bottom: -20px;
-    width: 140px;
-    height: 140px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(255, 255, 255, 0.15) 0%, transparent 70%);
-    pointer-events: none;
+.student-profile-identity h4 {
+    color: #2563eb !important;
+    font-size: 17px !important;
+    font-weight: 700 !important;
+}
+
+.student-profile-identity p {
+    color: #64748b !important;
 }
 
 .student-profile-avatar,
@@ -2630,8 +2627,13 @@ h1, h2, h3, h4, h5, h6,
     width: 64px !important;
     height: 64px !important;
     border-radius: 18px !important;
-    border: 2.5px solid rgba(255, 255, 255, 0.6) !important;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2) !important;
+    border: 2.5px solid #e2e8f0 !important;
+    box-shadow: none !important;
+}
+
+.student-profile-avatar {
+    background: #f1f5f9 !important;
+    color: #2563eb !important;
 }
 
 .student-profile-section {
