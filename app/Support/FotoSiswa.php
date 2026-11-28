@@ -6,6 +6,13 @@ use Illuminate\Support\Facades\Storage;
 
 class FotoSiswa
 {
+    public const SLOTS = [
+        'foto_masuk_2x3' => ['label' => 'Foto Masuk', 'size' => '2x3', 'alt' => 'Foto masuk'],
+        'foto_masuk_3x4' => ['label' => 'Foto Masuk', 'size' => '3x4', 'alt' => 'Foto masuk'],
+        'foto_keluar_2x3' => ['label' => 'Foto Keluar', 'size' => '2x3', 'alt' => 'Foto keluar'],
+        'foto_keluar_3x4' => ['label' => 'Foto Keluar', 'size' => '3x4', 'alt' => 'Foto keluar'],
+    ];
+
     private const EKSTENSI = [
         'jpg' => 'image/jpeg',
         'jpeg' => 'image/jpeg',

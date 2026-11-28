@@ -16,6 +16,8 @@
     $fotoSrc = $siswa->foto ? (str_starts_with($siswa->foto, 'data:')
         ? $siswa->foto
         : route(request()->routeIs('guru.*') ? 'guru.data-siswa.foto' : 'admin.data-siswa.foto', ['id' => $siswa->id])) : null;
+    $hasSlotPhotos = collect(array_keys(\App\Support\FotoSiswa::SLOTS))
+        ->contains(fn ($slot) => filled($siswa->{$slot}));
 @endphp
 
 {{-- ==================== HALAMAN 1: A, B, C + 4 Kotak Foto ==================== --}}
@@ -31,26 +33,24 @@
     </div>
 
     <div class="reg-photo-stack">
-        @for($i=0;$i<2;$i++)
+        @foreach(\App\Support\FotoSiswa::SLOTS as $photoSlot => $details)
+            @php
+                $photoSrc = $siswa->{$photoSlot};
+                if (! $hasSlotPhotos && str_starts_with($photoSlot, 'foto_masuk_')) {
+                    $photoSrc = $fotoSrc;
+                }
+            @endphp
             <div class="reg-photo">
-                @if($fotoSrc)
-                    <img src="{{ $fotoSrc }}" alt="Foto masuk">
+                @if($photoSrc)
+                    <img src="{{ $photoSrc }}" alt="{{ $details['alt'] }}">
                 @else
                     <div class="reg-photo-inner">
-                        <span class="reg-photo-size">{{ $i === 0 ? '2x3' : '3x4' }}</span>
-                        <span class="reg-photo-label">Foto Masuk</span>
+                        <span class="reg-photo-size">{{ $details['size'] }}</span>
+                        <span class="reg-photo-label">{{ $details['label'] }}</span>
                     </div>
                 @endif
             </div>
-        @endfor
-        @for($i=0;$i<2;$i++)
-            <div class="reg-photo">
-                <div class="reg-photo-inner">
-                    <span class="reg-photo-size">{{ $i === 0 ? '2x3' : '3x4' }}</span>
-                    <span class="reg-photo-label">Foto Keluar</span>
-                </div>
-            </div>
-        @endfor
+        @endforeach
     </div>
 
     <div class="reg-p1-body">

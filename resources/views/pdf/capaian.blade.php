@@ -286,7 +286,7 @@
             $pilihanKenaikan = in_array(strtoupper((string) $keputusan), ['LULUS', 'TIDAK LULUS'], true)
                 ? ['LULUS', 'TIDAK LULUS']
                 : ['NAIK', 'TIDAK NAIK'];
-            $kelasTujuan = $kelasTujuanNama ?? ($nextKelasMap[$kelasNama] ?? '-');
+            $kelasTujuan = $kelasTujuanNama ?? '-';
             $tglKeputusan = $riwayatKelas?->tanggal_keputusan_kenaikan;
             $namaKepsek = $sekolah->nama_kepala_sekolah ?? '-';
             $nipKepsek = $sekolah->nip_kepala_sekolah ?? '-';
@@ -322,7 +322,7 @@
             </tr>
             <tr>
                 <td class="kl">Dari :</td>
-                <td class="kv"><b>{{ $isXII ? $namaSekolahKelulusan : 'Kelas ' . $kelasNama . ' Ke Kelas ' . $kelasTujuan }}</b></td>
+                <td class="kv"><b>{{ $isXII ? $namaSekolahKelulusan : $kelasNama . ' ke ' . $kelasTujuan }}</b></td>
             </tr>
             <tr>
                 <td class="kl">Tanggal :</td>
